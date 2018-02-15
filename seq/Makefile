@@ -2,14 +2,13 @@ CXX        = g++ -std=c++11
 
 
 SOURCES_CPP =SeqMain.cpp
-HELPERS     =../common/Real.hpp ../common/FutharkArrays.hpp ../common/Option.hpp ../common/FormattedOptions.hpp ../common/Domain.hpp
 EXECUTABLE  =SeqMain
 DATA		=../trinomial-option/data
 COMPARE		=compare
 
 default: compile
 
-.o: $(SOURCES_CPP) $(HELPERS)
+.o: $(SOURCES_CPP)
 	@$(CXX) -c $@ $<
 
 compile: $(EXECUTABLE)

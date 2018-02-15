@@ -2,14 +2,13 @@ CXX        = nvcc -std=c++11 --maxrregcount=32 --ptxas-options=-v
 
 
 SOURCES_CPP =CudaMain.cu
-HELPERS     =ScanKernels.cu.h CudaErrors.cu.h ../common/Real.hpp ../common/Option.hpp ../common/FormattedOptions.hpp ../common/FutharkArrays.hpp
 EXECUTABLE  =CudaMain
 DATA		=../data
 COMPARE		=compare
 
 default: compile
 
-.cu.o: $(SOURCES_CPP) $(HELPERS)
+.cu.o: $(SOURCES_CPP)
 	@$(CXX) -c $@ $<
 
 compile: $(EXECUTABLE)
