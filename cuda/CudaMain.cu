@@ -4,8 +4,8 @@
 #include "../common/FormattedOptions.hpp"
 #include "../common/FutharkArrays.hpp"
 #include "../common/Domain.hpp"
-#include "CudaErrors.cu.h"
-#include "ScanKernels.cu.h"
+#include "CudaErrors.cuh"
+#include "ScanKernels.cuh"
 
 #include <chrono>
 
