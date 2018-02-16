@@ -19,12 +19,6 @@ struct Option
 
     static vector<Option> read_options(string filename)
     {
-        vector<real> strikes;
-        vector<real> maturities;
-        vector<int> num_of_terms;
-        vector<real> rrps;
-        vector<real> vols;
-
         if (filename.empty())
         {
             throw invalid_argument("File not specified.");
@@ -36,6 +30,12 @@ struct Option
         {
             throw invalid_argument("File does not exist.");
         }
+
+        vector<real> strikes;
+        vector<real> maturities;
+        vector<int> num_of_terms;
+        vector<real> rrps;
+        vector<real> vols;
 
         FutharkArrays::read_futhark_array(in, &strikes);
         FutharkArrays::read_futhark_array(in, &maturities);
