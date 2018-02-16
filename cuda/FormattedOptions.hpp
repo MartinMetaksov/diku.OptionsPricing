@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <cmath>
-#include "Real.hpp"
-#include "Option.hpp"
+#include "../common/Real.hpp"
+#include "../common/Option.hpp"
 
 using namespace std;
 

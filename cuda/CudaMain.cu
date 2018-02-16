@@ -1,11 +1,11 @@
 #define CUDA
 #include "../common/Real.hpp"
 #include "../common/Option.hpp"
-#include "../common/FormattedOptions.hpp"
 #include "../common/FutharkArrays.hpp"
 #include "../common/Domain.hpp"
 #include "CudaErrors.cuh"
 #include "ScanKernels.cuh"
+#include "FormattedOptions.hpp"
 
 #include <chrono>
 

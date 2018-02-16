@@ -3,7 +3,7 @@ CXX        = g++ -std=c++11
 
 SOURCES_CPP =SeqMain.cpp
 EXECUTABLE  =SeqMain
-DATA		=../trinomial-option/data
+DATA		=../data
 COMPARE		=compare
 
 default: compile
