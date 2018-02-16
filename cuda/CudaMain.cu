@@ -358,18 +358,23 @@ void trinomialPricing(FormattedOptions format, real *result, bool isTest = false
 
 int main(int argc, char *argv[])
 {
-    // Read options from stdin, allocate the result array
-    vector<Option> options = Option::read_options();
-    auto result = new real[options.size()];
-
     bool isTest = false;
-    for (int i = 0; i < argc; ++i)
+    string filename;
+    for (int i = 1; i < argc; ++i)
     {
         if (strcmp(argv[i], "-test") == 0)
         {
             isTest = true;
         }
+        else
+        {
+            filename = argv[i];
+        }
     }
+
+    // Read options from stdin, allocate the result array
+    vector<Option> options = Option::read_options(filename);
+    auto result = new real[options.size()];
 
     if (isTest)
     {

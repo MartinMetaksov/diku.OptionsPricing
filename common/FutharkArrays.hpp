@@ -12,15 +12,14 @@ class FutharkArrays
 {
   public:
 	template <class T>
-	typename std::enable_if<std::is_arithmetic<T>::value, void>::type static read_futhark_array(vector<T> *array)
+	typename std::enable_if<std::is_arithmetic<T>::value, void>::type static read_futhark_array(istream &in, vector<T> *array)
 	{
 		T x;
-		int t;
 		char c;
-		cin >> c;
-		while (!cin.eof())
+		in >> c;
+		while (!in.eof())
 		{
-			cin >> x >> c;
+			in >> x >> c;
 			array->push_back(x);
 
 			if (c == ']')

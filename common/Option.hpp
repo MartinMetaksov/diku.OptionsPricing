@@ -1,6 +1,7 @@
 #ifndef OPTION_HPP
 #define OPTION_HPP
 
+#include <fstream>
 #include <vector>
 #include "Real.hpp"
 #include "FutharkArrays.hpp"
@@ -16,7 +17,7 @@ struct Option
     real reversion_rate;
     real volatility;
 
-    static vector<Option> read_options()
+    static vector<Option> read_options(string filename)
     {
         vector<real> strikes;
         vector<real> maturities;
@@ -24,11 +25,23 @@ struct Option
         vector<real> rrps;
         vector<real> vols;
 
-        FutharkArrays::read_futhark_array(&strikes);
-        FutharkArrays::read_futhark_array(&maturities);
-        FutharkArrays::read_futhark_array(&num_of_terms);
-        FutharkArrays::read_futhark_array(&rrps);
-        FutharkArrays::read_futhark_array(&vols);
+        if (filename.empty())
+        {
+            throw invalid_argument("File not specified.");
+        }
+
+        ifstream in(filename);
+
+        if (!in)
+        {
+            throw invalid_argument("File does not exist.");
+        }
+
+        FutharkArrays::read_futhark_array(in, &strikes);
+        FutharkArrays::read_futhark_array(in, &maturities);
+        FutharkArrays::read_futhark_array(in, &num_of_terms);
+        FutharkArrays::read_futhark_array(in, &rrps);
+        FutharkArrays::read_futhark_array(in, &vols);
 
         int size = strikes.size();
         vector<Option> options;
