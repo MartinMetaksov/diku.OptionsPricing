@@ -20,7 +20,7 @@ class FutharkArrays
 		cin >> c;
 		while (!cin.eof())
 		{
-			cin >> x >> c >> t >> c;
+			cin >> x >> c;
 			array->push_back(x);
 
 			if (c == ']')
@@ -32,28 +32,11 @@ class FutharkArrays
 	typename std::enable_if<std::is_arithmetic<T>::value, void>::type static write_futhark_array(T *array, unsigned int length)
 	{
 		cout.precision(numeric_limits<T>::max_digits10);
-		string type;
-		if (is_same<T, int>::value)
-		{
-			type = "i32";
-		}
-		else if (is_same<T, float>::value)
-		{
-			type = "f32";
-		}
-		else if (is_same<T, double>::value)
-		{
-			type = "f64";
-		}
-		else
-		{
-			type = "";
-		}
 
-		cout << '[' << fixed << array[0] << type;
+		cout << '[' << fixed << array[0];
 		for (unsigned int i = 1; i < length; ++i)
 		{
-			cout << ", " << fixed << array[i] << type;
+			cout << ", " << fixed << array[i];
 		}
 		cout << ']' << endl;
 	}
