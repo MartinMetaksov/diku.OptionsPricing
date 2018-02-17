@@ -17,7 +17,7 @@ struct Option
     real reversion_rate;
     real volatility;
 
-    static vector<Option> read_options(string filename)
+    static vector<Option> read_options(const string &filename)
     {
         if (filename.empty())
         {
