@@ -128,7 +128,7 @@ __device__
 __device__
 #endif
     inline real
-    fwdHelper(int idx, real M, real dr, real dt, real alphai, volatile real *QCopy, int beg_ind, int m, int i, int imax, int jmax, int j)
+    fwdHelper(real M, real dr, real dt, real alphai, volatile real *QCopy, int beg_ind, int m, int i, int imax, int jmax, int j)
 {
     auto eRdt_u1 = exp(-(((real)(j + 1)) * dr + alphai) * dt);
     auto eRdt = exp(-(((real)j) * dr + alphai) * dt);

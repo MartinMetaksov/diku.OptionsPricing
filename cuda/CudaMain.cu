@@ -182,7 +182,7 @@ trinomialChunk(
             else
             {
                 int begind = sgm_ind == 0 ? 0 : scanned_lens[sgm_ind - 1];
-                Qs[threadIdx.x] = fwdHelper(threadIdx.x, Ms[sgm_ind], drs[sgm_ind], dts[sgm_ind], block_alphass[sgm_ind * (n_max + 1) + k], //
+                Qs[threadIdx.x] = fwdHelper(Ms[sgm_ind], drs[sgm_ind], dts[sgm_ind], block_alphass[sgm_ind * (n_max + 1) + k], //
                                             QCopys, begind, m, k, imax, jmaxs[sgm_ind], j);
             }
         }
