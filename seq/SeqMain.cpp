@@ -4,7 +4,7 @@
 
 real compute_single_option(const Option &option)
 {
-    int ycCount = extent<decltype(h_YieldCurve)>::value;
+    const int ycCount = extent<decltype(h_YieldCurve)>::value;
     auto X = option.strike_price;
     auto T = option.maturity;
     auto n = option.num_of_terms;
@@ -59,11 +59,11 @@ real compute_single_option(const Option &option)
         for (auto jj = 0; jj < Qlen; ++jj)
         {
             auto j = jj - imax;
-            alpha_val += (j < -imax) || (j > imax) ? 0 : Q[j + m] * exp(-((real)j) * dr * dt);
+            alpha_val += (j < -imax || j > imax) ? 0 : Q[j + m] * exp(-((real)j) * dr * dt);
         }
 
         // interpolation of yield curve
-        auto t = ((real)(i + 1)) * dt + one; // plus one year
+        real t = (i + 1) * dt + one; // plus one year
         int t2 = round(t);
         int t1 = t2 - 1;
         if (t2 >= ycCount)
@@ -124,7 +124,7 @@ real compute_single_option(const Option &option)
     delete[] QCopy;
     delete[] alphas;
 
-    return 0;
+    return ret;
 }
 
 void compute_all_options(const string &filename)
