@@ -11,10 +11,10 @@ real compute_single_option(const Option &option)
     auto dt = T / ((real)n);
     auto a = option.reversion_rate;
     auto sigma = option.volatility;
-    auto V = sigma * sigma * (one - (exp(zero - two * a * dt))) / (two * a);
-    auto dr = sqrt((one + two) * V);
+    auto V = sigma * sigma * (one - (exp(-two * a * dt))) / (two * a);
+    auto dr = sqrt(three * V);
     auto M = (exp(zero - a * dt)) - one;
-    auto jmax = (int)(-0.184 / M) + 1;
+    auto jmax = (int)(minus184 / M) + 1;
     auto m = jmax + 2;
 
     //----------------------
@@ -63,6 +63,7 @@ real compute_single_option(const Option &option)
         }
 
         // interpolation of yield curve
+        // TODO: this is bad
         real t = (i + 1) * dt + one; // plus one year
         int t2 = round(t);
         int t1 = t2 - 1;
@@ -72,8 +73,8 @@ real compute_single_option(const Option &option)
             t1 = ycCount - 2;
         }
 
-        auto R = (h_YieldCurve[t2].p - h_YieldCurve[t1].p) /     //
-                     (h_YieldCurve[t2].t - h_YieldCurve[t1].t) * //
+        auto R = (h_YieldCurve[t2].p - h_YieldCurve[t1].p) /             //
+                     ((real)(h_YieldCurve[t2].t - h_YieldCurve[t1].t)) * //
                      (t * year - h_YieldCurve[t1].t) +
                  h_YieldCurve[t1].p;
         alphas[i + 1] = log(alpha_val / exp(-R * t));

@@ -18,24 +18,29 @@ const real minus184 = -0.184;
 struct Yield
 {
     real p;
-    real t;
+    int t;
 };
 
+// The DM zero coupon yield curve, July 8, 1994.
 #ifdef CUDA
 __constant__
 #endif
     Yield h_YieldCurve[] =
-        {{.p = 0.0501772, .t = 3.0},    //
-         {.p = 0.0509389, .t = 367.0},  //
-         {.p = 0.0579733, .t = 731.0},  //
-         {.p = 0.0630595, .t = 1096.0}, //
-         {.p = 0.0673464, .t = 1461.0}, //
-         {.p = 0.0694816, .t = 1826.0}, //
-         {.p = 0.0708807, .t = 2194.0}, //
-         {.p = 0.0727527, .t = 2558.0}, //
-         {.p = 0.0730852, .t = 2922.0}, //
-         {.p = 0.0739790, .t = 3287.0}, //
-         {.p = 0.0749015, .t = 3653.0}};
+        {{.p = 0.0501772, .t = 3},    //
+         {.p = 0.0498284, .t = 31},   //
+         {.p = 0.0497234, .t = 62},   //
+         {.p = 0.0496157, .t = 94},   //
+         {.p = 0.0499058, .t = 185},  //
+         {.p = 0.0509389, .t = 367},  //
+         {.p = 0.0579733, .t = 731},  //
+         {.p = 0.0630595, .t = 1096}, //
+         {.p = 0.0673464, .t = 1461}, //
+         {.p = 0.0694816, .t = 1826}, //
+         {.p = 0.0708807, .t = 2194}, //
+         {.p = 0.0727527, .t = 2558}, //
+         {.p = 0.0730852, .t = 2922}, //
+         {.p = 0.0739790, .t = 3287}, //
+         {.p = 0.0749015, .t = 3653}};
 
 // Probability Equations
 
@@ -46,7 +51,7 @@ __device__
     inline real
     PU_A(int j, real M)
 {
-    return one / six + (((real)(j * j)) * M * M + ((real)j) * M) * half;
+    return one / six + (j * j * M * M + j * M) * half;
 }
 
 #ifdef CUDA
@@ -55,7 +60,7 @@ __device__
     inline real
     PM_A(int j, real M)
 {
-    return two / three - (((real)(j * j)) * M * M);
+    return two / three - j * j * M * M;
 }
 
 #ifdef CUDA
@@ -64,7 +69,7 @@ __device__
     inline real
     PD_A(int j, real M)
 {
-    return one / six + (((real)(j * j)) * M * M - ((real)j) * M) * half;
+    return one / six + (j * j * M * M - j * M) * half;
 }
 
 // Exhibit 1B (j == -jmax)
@@ -74,7 +79,7 @@ __device__
     inline real
     PU_B(int j, real M)
 {
-    return one / six + (((real)(j * j)) * M * M - ((real)j) * M) * half;
+    return one / six + (j * j * M * M - j * M) * half;
 }
 
 #ifdef CUDA
@@ -83,7 +88,7 @@ __device__
     inline real
     PM_B(int j, real M)
 {
-    return -one / three - (((real)(j * j)) * M * M) + two * ((real)j) * M;
+    return -one / three - j * j * M * M + two * j * M;
 }
 
 #ifdef CUDA
@@ -92,7 +97,7 @@ __device__
     inline real
     PD_B(int j, real M)
 {
-    return seven / six + (((real)(j * j)) * M * M - three * ((real)j) * M) * half;
+    return seven / six + (j * j * M * M - three * j * M) * half;
 }
 
 // Exhibit 1C (j == jmax)
@@ -102,7 +107,7 @@ __device__
     inline real
     PU_C(int j, real M)
 {
-    return seven / six + (((real)(j * j)) * M * M + three * ((real)j) * M) * half;
+    return seven / six + (j * j * M * M + three * j * M) * half;
 }
 
 #ifdef CUDA
@@ -111,7 +116,7 @@ __device__
     inline real
     PM_C(int j, real M)
 {
-    return -one / three - (((real)(j * j)) * M * M) - two * ((real)j) * M;
+    return -one / three - j * j * M * M - two * j * M;
 }
 
 #ifdef CUDA
@@ -120,7 +125,7 @@ __device__
     inline real
     PD_C(int j, real M)
 {
-    return one / six + (((real)(j * j)) * M * M + ((real)j) * M) * half;
+    return one / six + (j * j * M * M + j * M) * half;
 }
 
 // forward propagation helper
