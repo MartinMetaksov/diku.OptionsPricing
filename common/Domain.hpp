@@ -42,6 +42,35 @@ __constant__
          {.p = 0.0739790, .t = 3287}, //
          {.p = 0.0749015, .t = 3653}};
 
+#ifdef CUDA
+__device__
+#endif
+    real
+    getYieldAtDay(real t)
+{
+    auto first = h_YieldCurve[0];
+    auto second = h_YieldCurve[0];
+
+    for (auto yield : h_YieldCurve)
+    {
+        if (yield.t > t)
+        {
+            second = yield;
+            break;
+        }
+        first = yield;
+    }
+
+    // Prevent division by zero
+    if (first.t == second.t)
+    {
+        return first.p;
+    }
+
+    auto coefficient = (t - first.t) / (second.t - first.t);
+    return first.p + coefficient * (second.p - first.p);
+}
+
 // Probability Equations
 
 // Exhibit 1A (-jmax < j < jmax)

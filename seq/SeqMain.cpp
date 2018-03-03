@@ -4,23 +4,21 @@
 
 real compute_single_option(const Option &option)
 {
-    const int ycCount = extent<decltype(h_YieldCurve)>::value;
     auto X = option.strike_price;
-    auto T = option.maturity;
     auto n = option.num_of_terms;
-    auto dt = T / ((real)n);
+    auto dt = option.length * year / option.num_of_terms; // in days
     auto a = option.reversion_rate;
     auto sigma = option.volatility;
     auto V = sigma * sigma * (one - (exp(-two * a * dt))) / (two * a);
     auto dr = sqrt(three * V);
     auto M = (exp(zero - a * dt)) - one;
     auto jmax = (int)(minus184 / M) + 1;
-    auto m = jmax + 2;
 
     //----------------------
     // Compute Q values
     //-----------------------
     // Define initial tree values
+    auto m = jmax + 2;
     auto Qlen = 2 * m + 1;
     auto Q = new real[Qlen]();
     Q[m] = one;
@@ -63,20 +61,9 @@ real compute_single_option(const Option &option)
         }
 
         // interpolation of yield curve
-        // TODO: this is bad
-        real t = (i + 1) * dt + one; // plus one year
-        int t2 = round(t);
-        int t1 = t2 - 1;
-        if (t2 >= ycCount)
-        {
-            t2 = ycCount - 1;
-            t1 = ycCount - 2;
-        }
+        real t = (i + 1) * dt;
+        auto R = getYieldAtDay(t);
 
-        auto R = (h_YieldCurve[t2].p - h_YieldCurve[t1].p) /             //
-                     ((real)(h_YieldCurve[t2].t - h_YieldCurve[t1].t)) * //
-                     (t * year - h_YieldCurve[t1].t) +
-                 h_YieldCurve[t1].p;
         alphas[i + 1] = log(alpha_val / exp(-R * t));
     }
 

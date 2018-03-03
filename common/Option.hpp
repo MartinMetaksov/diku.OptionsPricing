@@ -12,7 +12,8 @@ struct Option
 {
   public:
     real strike_price;
-    real maturity;
+    int maturity;
+    int length;
     int num_of_terms;
     real reversion_rate;
     real volatility;
@@ -32,13 +33,15 @@ struct Option
         }
 
         vector<real> strikes;
-        vector<real> maturities;
+        vector<int> maturities;
+        vector<int> lengths;
         vector<int> num_of_terms;
         vector<real> rrps;
         vector<real> vols;
 
         FutharkArrays::read_futhark_array(in, &strikes);
         FutharkArrays::read_futhark_array(in, &maturities);
+        FutharkArrays::read_futhark_array(in, &lengths);
         FutharkArrays::read_futhark_array(in, &num_of_terms);
         FutharkArrays::read_futhark_array(in, &rrps);
         FutharkArrays::read_futhark_array(in, &vols);
@@ -52,6 +55,7 @@ struct Option
             Option o;
             o.strike_price = strikes.at(i);
             o.maturity = maturities.at(i);
+            o.length = lengths.at(i);
             o.num_of_terms = num_of_terms.at(i);
             o.reversion_rate = rrps.at(i);
             o.volatility = vols.at(i);
