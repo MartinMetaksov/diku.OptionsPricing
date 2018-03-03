@@ -73,7 +73,7 @@ __device__
 
 // Probability Equations
 
-// Exhibit 1A (-jmax < j < jmax)
+// Exhibit 1A (-jmax < j < jmax) (eq. 3A in Hull-White 1996)
 #ifdef CUDA
 __device__
 #endif
@@ -101,7 +101,7 @@ __device__
     return one / six + (j * j * M * M - j * M) * half;
 }
 
-// Exhibit 1B (j == -jmax)
+// Exhibit 1B (j == -jmax) (eq. 3C in Hull-White 1996)
 #ifdef CUDA
 __device__
 #endif
@@ -129,7 +129,7 @@ __device__
     return seven / six + (j * j * M * M - three * j * M) * half;
 }
 
-// Exhibit 1C (j == jmax)
+// Exhibit 1C (j == jmax) (eq. 3B in Hull-White 1996)
 #ifdef CUDA
 __device__
 #endif

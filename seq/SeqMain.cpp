@@ -2,6 +2,14 @@
 #include "../common/Option.hpp"
 #include "../common/FutharkArrays.hpp"
 
+struct jvalue
+{
+    real rate;
+    real pu;
+    real pm;
+    real pd;
+};
+
 real compute_single_option(const Option &option)
 {
     auto X = option.strike_price;
@@ -13,106 +21,36 @@ real compute_single_option(const Option &option)
     auto dr = sqrt(three * V);
     auto M = exp(-a * dt) - one;
     auto jmax = (int)(minus184 / M) + 1;
+    auto jmin = -jmax;
 
-    //----------------------
-    // Compute Q values
-    //-----------------------
-    // Define initial tree values
-    auto m = jmax + 2;
-    auto Qlen = 2 * m + 1;
-    auto Q = new real[Qlen]();
-    Q[m] = one;
+    auto width = 2 * jmax + 1;
 
-    auto alphas = new real[n + 1](); // [n+1]real
-    alphas[0] = h_YieldCurve[0].p;
+    // Compute Table 2.
+    auto jvalues = new jvalue[width];
 
-    auto QCopy = new real[Qlen]();
+    jvalue &valmin = jvalues[0];
+    valmin.rate = jmin * dr;
+    valmin.pu = PU_B(jmin, M);
+    valmin.pm = PM_B(jmin, M);
+    valmin.pd = PD_B(jmin, M);
 
-    // forward propagation loop
-    for (auto i = 0; i < n; ++i)
+    jvalue &valmax = jvalues[width - 1];
+    valmax.rate = jmax * dr;
+    valmax.pu = PU_C(jmax, M);
+    valmax.pm = PM_C(jmax, M);
+    valmax.pd = PD_C(jmax, M);
+
+    for (auto i = 1; i < width - 1; ++i)
     {
-        auto imax = min(i + 1, jmax);
-
-        // Reset
-        memcpy(QCopy, Q, sizeof(real) * Qlen);
-
-        //--------------------------
-        // forward iteration step --
-        //--------------------------
-        for (auto jj = 0; jj < Qlen; ++jj)
-        {
-            auto j = jj - m;
-            if (j < -imax || j > imax)
-            {
-                Q[jj] = zero;
-            }
-            else
-            {
-                Q[jj] = fwdHelper(M, dr, dt, alphas[i], QCopy, 0, m, i, imax, jmax, j);
-            }
-        }
-
-        // determine new alphas
-        real alpha_val = 0;
-        for (auto jj = 0; jj < Qlen; ++jj)
-        {
-            auto j = jj - imax;
-            alpha_val += (j < -imax || j > imax) ? 0 : Q[j + m] * exp(-((real)j) * dr * dt);
-        }
-
-        // interpolation of yield curve
-        real t = (i + 1) * dt;
-        auto R = getYieldAtDay(t * year);
-
-        alphas[i + 1] = log(alpha_val / exp(-R * t));
+        jvalue &val = jvalues[i];
+        auto j = i + jmin;
+        val.rate = j * dr;
+        val.pu = PU_A(j, M);
+        val.pm = PM_A(j, M);
+        val.pd = PD_A(j, M);
     }
 
-    //---------------------------------------------------------
-    // Compute values at expiration date:
-    // call option value at period end is V(T) = S(T) - X
-    // if S(T) is greater than X, or zero otherwise.
-    // The computation is similar for put options.
-    //---------------------------------------------------------
-    auto Call = Q;
-    for (auto j = 0; j < Qlen; ++j)
-    {
-        Call[j] = ((j >= -jmax + m) && (j <= jmax + m)) ? one : zero;
-    }
-
-    auto CallCopy = QCopy;
-
-    // back propagation loop
-    for (auto ii = 0; ii < n; ++ii)
-    {
-        auto i = n - 1 - ii;
-        auto imax = min(i + 1, jmax);
-
-        // Copy array values to avoid overwriting during update
-        memcpy(CallCopy, Call, sizeof(real) * Qlen);
-
-        //---------------------------
-        // backward iteration step --
-        //---------------------------
-        for (auto jj = 0; jj < Qlen; ++jj)
-        {
-            auto j = jj - m;
-            if (j < -imax || j > imax)
-            {
-                Call[jj] = zero;
-            }
-            else
-            {
-                Call[jj] = bkwdHelper(X, M, dr, dt, alphas[i], CallCopy, 0, m, i, jmax, j);
-            }
-        }
-    }
-
-    auto ret = Call[m];
-    delete[] Q;
-    delete[] QCopy;
-    delete[] alphas;
-
-    return ret;
+    return 0;
 }
 
 void compute_all_options(const string &filename)
