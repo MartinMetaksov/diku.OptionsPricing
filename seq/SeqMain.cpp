@@ -6,7 +6,7 @@ real compute_single_option(const Option &option)
 {
     auto X = option.strike_price;
     auto n = option.num_of_terms;
-    auto dt = option.length * year / option.num_of_terms; // in days
+    auto dt = option.length / (real)option.num_of_terms;
     auto a = option.reversion_rate;
     auto sigma = option.volatility;
     auto V = sigma * sigma * (one - (exp(-two * a * dt))) / (two * a);
@@ -62,7 +62,7 @@ real compute_single_option(const Option &option)
 
         // interpolation of yield curve
         real t = (i + 1) * dt;
-        auto R = getYieldAtDay(t);
+        auto R = getYieldAtDay(t * year);
 
         alphas[i + 1] = log(alpha_val / exp(-R * t));
     }
