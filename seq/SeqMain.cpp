@@ -9,9 +9,9 @@ real compute_single_option(const Option &option)
     auto dt = option.length / (real)option.num_of_terms;
     auto a = option.reversion_rate;
     auto sigma = option.volatility;
-    auto V = sigma * sigma * (one - (exp(-two * a * dt))) / (two * a);
+    auto V = sigma * sigma * (one - exp(-two * a * dt)) / (two * a);
     auto dr = sqrt(three * V);
-    auto M = (exp(zero - a * dt)) - one;
+    auto M = exp(-a * dt) - one;
     auto jmax = (int)(minus184 / M) + 1;
 
     //----------------------
