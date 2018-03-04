@@ -29,7 +29,7 @@ real compute_single_option(const Option &option)
     auto jmin = -jmax;
     auto width = 2 * jmax + 1;
 
-    // Compute Table 2.
+    // Precompute probabilities and rates for all js.
     auto jvalues = new jvalue[width];
 
     jvalue &valmin = jvalues[0];
@@ -65,14 +65,13 @@ real compute_single_option(const Option &option)
     for (auto i = 0; i < n; ++i)
     {
         auto jhigh = min(i, jmax);
-        auto alphai = alphas[i];
 
-        // forward iteration step
+        // Forward iteration step, compute Qs in the next time step
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto qexp = Qs[i * width + jind] * exp(-(alphai + j * dr) * dt);
+            auto qexp = Qs[i * width + jind] * exp(-(alphas[i] + jval.rate) * dt);
 
             if (j - 1 < jmin)
             {
@@ -97,7 +96,8 @@ real compute_single_option(const Option &option)
             }
         }
 
-        // determine the new alpha
+        // Determine the new alpha using equation 30.22
+        // by summing up Qs from the next time step
         auto jhigh1 = min(i + 1, jmax);
         real alpha_val = 0;
         for (auto j = -jhigh1; j <= jhigh1; ++j)
@@ -109,8 +109,8 @@ real compute_single_option(const Option &option)
         auto t = (i + 2) * dt;            // next next time step
         auto R = getYieldAtDay(t * year); // discount rate
         auto P = exp(-R * t);             // discount bond price
-        auto alpha = log(alpha_val / P);
-        alphas[i + 1] = alpha; // new alpha
+        auto alpha = log(alpha_val / P);  // new alpha
+        alphas[i + 1] = alpha;
     }
 
     delete[] Qs;
