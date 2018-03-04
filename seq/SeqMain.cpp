@@ -20,9 +20,13 @@ real compute_single_option(const Option &option)
     auto V = sigma * sigma * (one - exp(-two * a * dt)) / (two * a);
     auto dr = sqrt(three * V);
     auto M = exp(-a * dt) - one;
+
+    // simplified computations
+    // dr = sigma * sqrt(three * dt);
+    // M = -a * dt;
+
     auto jmax = (int)(minus184 / M) + 1;
     auto jmin = -jmax;
-
     auto width = 2 * jmax + 1;
 
     // Compute Table 2.
@@ -55,26 +59,47 @@ real compute_single_option(const Option &option)
     auto Qs = new real[(n + 1) * width](); // Qs[i][j]
     Qs[jmax] = one;                        // Qs[0][0] = 1$
 
-    auto alphas = new real[n + 1](); // alphas[i]
-    alphas[0] = h_YieldCurve[0].p;   // alphas[0] = initial interest rate
+    auto alphas = new real[n + 1]();      // alphas[i]
+    alphas[0] = getYieldAtDay(dt * year); // initial dt-period interest rate
 
-    for (auto i = 1; i < n; ++i)
+    for (auto i = 0; i < 1; ++i)
     {
-        auto jlow = max(-i - 1, jmin); // min value of j
-        auto jhigh = min(i - 1, jmax); // max value of j
+        auto jhigh = min(i, jmax);
+        auto alphai = alphas[i];
 
-        auto R = getYieldAtDay(i * dt * year); // discount rate
-        auto e = exp(-R);
-
-        for (auto j = jlow; j <= jhigh; ++j)
+        // forward iteration step
+        for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
-            auto jval = jvalues[jind]; // precomputed
+            auto jval = jvalues[jind]; // precomputed probabilities and rates
+            auto qexp = Qs[i * width + jind] * exp(-(alphai + j * dr) * dt);
 
-            Qs[i * (jind + 1)] = jval.pu * e; // up
-            Qs[i * jind] = jval.pm * e;       // middle
-            Qs[i * (jind - 1)] = jval.pd * e; // down
+            if (j + 1 != jmax)
+            {
+                Qs[(i + 1) * width + (jind + 1)] += jval.pu * qexp; // up
+            }
+
+            Qs[(i + 1) * width + jind] += jval.pm * qexp; // middle
+
+            if (j - 1 != jmin)
+            {
+                Qs[(i + 1) * width + (jind - 1)] += jval.pd * qexp; // down
+            }
         }
+
+        // determine the new alpha
+        auto jhigh1 = min(i + 1, jmax);
+        real alpha_val = 0;
+        for (auto j = -jhigh1; j <= jhigh1; ++j)
+        {
+            auto jind = j - jmin; // array index for j
+            alpha_val += Qs[(i + 1) * width + jind] * exp(-j * dr * dt);
+        }
+
+        auto t = (i + 2) * dt;              // next next time step
+        auto R = getYieldAtDay(t * year);   // discount rate
+        auto P = exp(-R * t);               // discount bond price
+        alphas[i + 1] = log(alpha_val / P); // new alpha
     }
 
     delete[] Qs;
