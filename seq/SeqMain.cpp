@@ -62,7 +62,7 @@ real compute_single_option(const Option &option)
     auto alphas = new real[n + 1]();      // alphas[i]
     alphas[0] = getYieldAtDay(dt * year); // initial dt-period interest rate
 
-    for (auto i = 0; i < 1; ++i)
+    for (auto i = 0; i < n; ++i)
     {
         auto jhigh = min(i, jmax);
         auto alphai = alphas[i];
@@ -74,16 +74,26 @@ real compute_single_option(const Option &option)
             auto jval = jvalues[jind]; // precomputed probabilities and rates
             auto qexp = Qs[i * width + jind] * exp(-(alphai + j * dr) * dt);
 
-            if (j + 1 != jmax)
+            if (j - 1 < jmin)
             {
-                Qs[(i + 1) * width + (jind + 1)] += jval.pu * qexp; // up
+                // Bottom edge branching
+                Qs[(i + 1) * width + jind + 2] += jval.pu * qexp; // up two
+                Qs[(i + 1) * width + jind + 1] += jval.pm * qexp; // up one
+                Qs[(i + 1) * width + jind] += jval.pd * qexp;     // middle
             }
-
-            Qs[(i + 1) * width + jind] += jval.pm * qexp; // middle
-
-            if (j - 1 != jmin)
+            else if (j + 1 > jmax)
             {
-                Qs[(i + 1) * width + (jind - 1)] += jval.pd * qexp; // down
+                // Top edge branching
+                Qs[(i + 1) * width + jind] += jval.pu * qexp;     // middle
+                Qs[(i + 1) * width + jind - 1] += jval.pm * qexp; // down one
+                Qs[(i + 1) * width + jind - 2] += jval.pd * qexp; // down two
+            }
+            else
+            {
+                // Standard branching
+                Qs[(i + 1) * width + jind + 1] += jval.pu * qexp; // up
+                Qs[(i + 1) * width + jind] += jval.pm * qexp;     // middle
+                Qs[(i + 1) * width + jind - 1] += jval.pd * qexp; // down
             }
         }
 
@@ -96,10 +106,11 @@ real compute_single_option(const Option &option)
             alpha_val += Qs[(i + 1) * width + jind] * exp(-j * dr * dt);
         }
 
-        auto t = (i + 2) * dt;              // next next time step
-        auto R = getYieldAtDay(t * year);   // discount rate
-        auto P = exp(-R * t);               // discount bond price
-        alphas[i + 1] = log(alpha_val / P); // new alpha
+        auto t = (i + 2) * dt;            // next next time step
+        auto R = getYieldAtDay(t * year); // discount rate
+        auto P = exp(-R * t);             // discount bond price
+        auto alpha = log(alpha_val / P);
+        alphas[i + 1] = alpha; // new alpha
     }
 
     delete[] Qs;
