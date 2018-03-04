@@ -50,6 +50,37 @@ real compute_single_option(const Option &option)
         val.pd = PD_A(j, M);
     }
 
+    // Forward induction to calculate Qs and alphas
+    // i in 0..n    j in jmin..jmax
+    auto Qs = new real[(n + 1) * width](); // Qs[i][j]
+    Qs[jmax] = one;                        // Qs[0][0] = 1$
+
+    auto alphas = new real[n + 1](); // alphas[i]
+    alphas[0] = h_YieldCurve[0].p;   // alphas[0] = initial interest rate
+
+    for (auto i = 1; i < n; ++i)
+    {
+        auto jlow = max(-i - 1, jmin); // min value of j
+        auto jhigh = min(i - 1, jmax); // max value of j
+
+        auto R = getYieldAtDay(i * dt * year); // discount rate
+        auto e = exp(-R);
+
+        for (auto j = jlow; j <= jhigh; ++j)
+        {
+            auto jind = j - jmin;      // array index for j
+            auto jval = jvalues[jind]; // precomputed
+
+            Qs[i * (jind + 1)] = jval.pu * e; // up
+            Qs[i * jind] = jval.pm * e;       // middle
+            Qs[i * (jind - 1)] = jval.pd * e; // down
+        }
+    }
+
+    delete[] Qs;
+    delete[] jvalues;
+    delete[] alphas;
+
     return 0;
 }
 
