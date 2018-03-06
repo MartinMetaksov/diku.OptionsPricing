@@ -113,11 +113,64 @@ real compute_single_option(const Option &option)
         alphas[i + 1] = alpha;
     }
 
+    // backward propagation
+    auto call = new real[(n + 1) * width](); // call[i][j] initialized to 0 by default
+
+    for (auto i = n-1; i >= 0; --i)
+    {
+        auto jhigh = min(i, jmax);
+
+        for (auto j = -jhigh; j <= jhigh; ++j) {
+            auto jind = j - jmin; // array index for j
+            call[i * width + jind] = 1;
+        }
+    }
+
+    for (auto i = n-1; i >= 0; --i)
+    {
+        auto jhigh = min(i, jmax);
+
+        for (auto j = -jhigh; j <= jhigh; ++j)
+        {
+            auto jind = j - jmin; // array index for j
+            auto jval = jvalues[jind]; // precomputed probabilities and rates
+            auto qexp = call[i * width + jind] * exp(-(alphas[i] + jval.rate) * dt);
+
+            real res;
+            if (j == jmax)
+            {
+                // top node
+                res = (jval.pu * call[(i) * width + jind] +
+                        jval.pm * call[(i) * width + jind - 1] +
+                        jval.pd * call[(i) * width + jind - 2]) * qexp;
+            }
+            else if (j == -jmax)
+            {
+                // bottom node
+                res = (jval.pu * call[(i) * width + jind + 2] +
+                        jval.pm * call[(i) * width + jind + 1] +
+                        jval.pd * call[(i) * width + jind]) * qexp;
+            }
+            else
+            {
+                // central node
+                res = (jval.pu * call[(i) * width + jind + 1] +
+                        jval.pm * call[(i) * width + jind] +
+                        jval.pd * call[(i) * width + jind - 1]) * qexp;
+            }
+
+            // TODO (WMP) This should be parametrized; length of contract, here 3 years
+            call[(i) * width + jind] = i == (int)(three / dt) ?
+                    call[(i) * width + jind] = max(X - res, zero) :
+                                           res;
+        }
+    }
+
     delete[] Qs;
     delete[] jvalues;
     delete[] alphas;
 
-    return 0;
+    return call[jmax];
 }
 
 void compute_all_options(const string &filename)
