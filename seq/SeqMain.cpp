@@ -116,7 +116,7 @@ real compute_single_option(const Option &option)
     // backward propagation
     auto call = new real[(n + 1) * width](); // call[i][j] initialized to 0 by default
 
-    for (auto i = n-1; i >= 0; --i)
+    for (auto i = n; i >= 0; --i)
     {
         auto jhigh = min(i, jmax);
 
@@ -140,29 +140,29 @@ real compute_single_option(const Option &option)
             if (j == jmax)
             {
                 // Top edge branching
-                res = (jval.pu * call[i * width + jind] +
-                        jval.pm * call[i * width + jind - 1] +
-                        jval.pd * call[i * width + jind - 2]) * qexp;
+                res = (jval.pu * call[(i+1) * width + jind] +
+                        jval.pm * call[(i+1) * width + jind - 1] +
+                        jval.pd * call[(i+1) * width + jind - 2]) * qexp;
             }
             else if (j == -jmax)
             {
                 // Bottom edge branching
-                res = (jval.pu * call[i * width + jind + 2] +
-                        jval.pm * call[i * width + jind + 1] +
-                        jval.pd * call[i * width + jind]) * qexp;
+                res = (jval.pu * call[(i+1) * width + jind + 2] +
+                        jval.pm * call[(i+1) * width + jind + 1] +
+                        jval.pd * call[(i+1) * width + jind]) * qexp;
             }
             else
             {
                 // Standard branching
-                res = (jval.pu * call[i * width + jind + 1] +
-                        jval.pm * call[i * width + jind] +
-                        jval.pd * call[i * width + jind - 1]) * qexp;
+                res = (jval.pu * call[(i+1) * width + jind + 1] +
+                        jval.pm * call[(i+1) * width + jind] +
+                        jval.pd * call[(i+1) * width + jind - 1]) * qexp;
             }
 
             // TODO (WMP) This should be parametrized; length of contract, here 3 years
-            call[i * width + jind] = i == (int)(three / dt) ?
-                    call[i * width + jind] = max(X - res, zero) :
-                                           res;
+            call[i * width + jind] = i == (int)(option.length / dt) ?
+                                     max(X - res, zero) :
+                                     res;
         }
     }
 
