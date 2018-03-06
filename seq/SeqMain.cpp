@@ -139,29 +139,29 @@ real compute_single_option(const Option &option)
             real res;
             if (j == jmax)
             {
-                // top node
-                res = (jval.pu * call[(i) * width + jind] +
-                        jval.pm * call[(i) * width + jind - 1] +
-                        jval.pd * call[(i) * width + jind - 2]) * qexp;
+                // Top edge branching
+                res = (jval.pu * call[i * width + jind] +
+                        jval.pm * call[i * width + jind - 1] +
+                        jval.pd * call[i * width + jind - 2]) * qexp;
             }
             else if (j == -jmax)
             {
-                // bottom node
-                res = (jval.pu * call[(i) * width + jind + 2] +
-                        jval.pm * call[(i) * width + jind + 1] +
-                        jval.pd * call[(i) * width + jind]) * qexp;
+                // Bottom edge branching
+                res = (jval.pu * call[i * width + jind + 2] +
+                        jval.pm * call[i * width + jind + 1] +
+                        jval.pd * call[i * width + jind]) * qexp;
             }
             else
             {
-                // central node
-                res = (jval.pu * call[(i) * width + jind + 1] +
-                        jval.pm * call[(i) * width + jind] +
-                        jval.pd * call[(i) * width + jind - 1]) * qexp;
+                // Standard branching
+                res = (jval.pu * call[i * width + jind + 1] +
+                        jval.pm * call[i * width + jind] +
+                        jval.pd * call[i * width + jind - 1]) * qexp;
             }
 
             // TODO (WMP) This should be parametrized; length of contract, here 3 years
-            call[(i) * width + jind] = i == (int)(three / dt) ?
-                    call[(i) * width + jind] = max(X - res, zero) :
+            call[i * width + jind] = i == (int)(three / dt) ?
+                    call[i * width + jind] = max(X - res, zero) :
                                            res;
         }
     }
