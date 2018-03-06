@@ -113,9 +113,10 @@ real compute_single_option(const Option &option)
         alphas[i + 1] = alpha;
     }
 
-    // backward propagation
+    // Backward propagation
     auto call = new real[(n + 1) * width](); // call[i][j] initialized to 0 by default
 
+    // set all tree nodes to 1 initially
     for (auto i = n; i >= 0; --i)
     {
         auto jhigh = min(i, jmax);
@@ -134,7 +135,7 @@ real compute_single_option(const Option &option)
         {
             auto jind = j - jmin; // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto qexp = call[i * width + jind] * exp(-(alphas[i] + jval.rate) * dt);
+            auto callExp = call[i * width + jind] * exp(-(alphas[i] + jval.rate) * dt);
 
             real res;
             if (j == jmax)
@@ -142,27 +143,26 @@ real compute_single_option(const Option &option)
                 // Top edge branching
                 res = (jval.pu * call[(i+1) * width + jind] +
                         jval.pm * call[(i+1) * width + jind - 1] +
-                        jval.pd * call[(i+1) * width + jind - 2]) * qexp;
+                        jval.pd * call[(i+1) * width + jind - 2]) * callExp;
             }
             else if (j == -jmax)
             {
                 // Bottom edge branching
                 res = (jval.pu * call[(i+1) * width + jind + 2] +
                         jval.pm * call[(i+1) * width + jind + 1] +
-                        jval.pd * call[(i+1) * width + jind]) * qexp;
+                        jval.pd * call[(i+1) * width + jind]) * callExp;
             }
             else
             {
                 // Standard branching
                 res = (jval.pu * call[(i+1) * width + jind + 1] +
                         jval.pm * call[(i+1) * width + jind] +
-                        jval.pd * call[(i+1) * width + jind - 1]) * qexp;
+                        jval.pd * call[(i+1) * width + jind - 1]) * callExp;
             }
 
-            // TODO (WMP) This should be parametrized; length of contract, here 3 years
-            call[i * width + jind] = i == (int)(option.length / dt) ?
-                                     max(X - res, zero) :
-                                     res;
+            // after obtaining the result from (i+1) nodes, set the call for ith node
+            // todo: this is never true.. X should probably be used somewhere else
+            call[i * width + jind] = i == (int)(option.length / dt) ? max(X - res, zero) : res;
         }
     }
 
