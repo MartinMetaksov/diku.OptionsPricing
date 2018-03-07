@@ -12,9 +12,11 @@ struct jvalue
 
 real compute_single_option(const Option &option)
 {
+    auto T = option.maturity;
     auto X = option.strike_price;
     auto n = option.num_of_terms;
-    auto dt = option.length / (real)option.num_of_terms;
+    auto t = option.length;
+    auto dt = t / (real)n;
     auto a = option.reversion_rate;
     auto sigma = option.volatility;
     auto V = sigma * sigma * (one - exp(-two * a * dt)) / (two * a);
@@ -62,6 +64,9 @@ real compute_single_option(const Option &option)
     auto alphas = new real[n + 1]();      // alphas[i]
     alphas[0] = getYieldAtDay(dt * year); // initial dt-period interest rate
 
+    real P_length = 0;
+    real P_length1 = 0;
+
     for (auto i = 0; i < n; ++i)
     {
         auto jhigh = min(i, jmax);
@@ -102,75 +107,104 @@ real compute_single_option(const Option &option)
         real alpha_val = 0;
         for (auto j = -jhigh1; j <= jhigh1; ++j)
         {
-            auto jind = j - jmin; // array index for j
-            alpha_val += Qs[(i + 1) * width + jind] * exp(-j * dr * dt);
+            auto jind = j - jmin;      // array index for j
+            auto jval = jvalues[jind]; // precomputed probabilities and rates
+            alpha_val += Qs[(i + 1) * width + jind] * exp(-jval.rate * dt);
         }
 
-        auto t = (i + 2) * dt;            // next next time step
-        auto R = getYieldAtDay(t * year); // discount rate
-        auto P = exp(-R * t);             // discount bond price
-        auto alpha = log(alpha_val / P);  // new alpha
+        auto ti = (i + 2) * dt;            // next next time step
+        auto R = getYieldAtDay(ti * year); // discount rate
+        auto P = exp(-R * ti);             // discount bond price
+        auto alpha = log(alpha_val / P);   // new alpha
         alphas[i + 1] = alpha;
+
+        auto eat = (one - exp(-a * ti));
+        auto fwd = (sigma * sigma * eat * eat) / (two * a * a);
+        auto xa = alpha - fwd;
+
+        if (i == n - 2)
+        {
+            P_length = P;
+        }
+        else if (i == n - 1)
+        {
+            P_length1 = P;
+        }
     }
+    delete[] Qs;
 
     // Backward propagation
     auto call = new real[(n + 1) * width](); // call[i][j] initialized to 0 by default
 
-    // set all tree nodes to 1 initially
-    for (auto i = n; i >= 0; --i)
-    {
-        auto jhigh = min(i, jmax);
+    auto F_length = 0.07830417; //TODO: compute somehow
+    auto R_maturity = getYieldAtDay(T * year);
+    auto P_maturity = exp(-R_maturity * T);
+    auto B_maturity = (1 - exp(-a * (T - t))) / a;
+    auto B_length = (1 - exp(-a)) / a;
+    auto Vt = sigma * sigma * (1 - exp(-2 * a * t)) / (4 * a);
+    auto A_maturity = P_maturity / P_length * exp(B_maturity * F_length - (Vt * B_maturity * B_maturity));
+    auto A_length = P_length1 / P_length * exp(B_length * F_length - (Vt * B_length * B_length));
+    auto A_length_log = log(A_length);
 
-        for (auto j = -jhigh; j <= jhigh; ++j) {
-            auto jind = j - jmin; // array index for j
-            call[i * width + jind] = 1;
-        }
+    for (auto j = jmin; j <= jmax; ++j)
+    {
+        auto jind = j - jmin;                        // array index for j
+        auto jval = jvalues[jind];                   // precomputed probabilities and rates
+        auto R = alphas[n] + jval.rate;              // dt-period rate
+        auto r = (R * dt + A_length_log) / B_length; // instantaneous rate
+        real P = A_maturity * exp(-B_maturity * r);  // bond price
+        auto payoff = max(X - 100 * P, zero);
+        call[n * width + jind] = payoff;
     }
 
-    for (auto i = n-1; i >= 0; --i)
+    for (auto i = n - 1; i >= 0; --i)
     {
         auto jhigh = min(i, jmax);
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
-            auto jind = j - jmin; // array index for j
+            auto jind = j - jmin;      // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto callExp = call[i * width + jind] * exp(-(alphas[i] + jval.rate) * dt);
+            auto callExp = exp(-(alphas[i] + jval.rate) * dt);
 
             real res;
             if (j == jmax)
             {
                 // Top edge branching
-                res = (jval.pu * call[(i+1) * width + jind] +
-                        jval.pm * call[(i+1) * width + jind - 1] +
-                        jval.pd * call[(i+1) * width + jind - 2]) * callExp;
+                res = (jval.pu * call[(i + 1) * width + jind] +
+                       jval.pm * call[(i + 1) * width + jind - 1] +
+                       jval.pd * call[(i + 1) * width + jind - 2]) *
+                      callExp;
             }
             else if (j == -jmax)
             {
                 // Bottom edge branching
-                res = (jval.pu * call[(i+1) * width + jind + 2] +
-                        jval.pm * call[(i+1) * width + jind + 1] +
-                        jval.pd * call[(i+1) * width + jind]) * callExp;
+                res = (jval.pu * call[(i + 1) * width + jind + 2] +
+                       jval.pm * call[(i + 1) * width + jind + 1] +
+                       jval.pd * call[(i + 1) * width + jind]) *
+                      callExp;
             }
             else
             {
                 // Standard branching
-                res = (jval.pu * call[(i+1) * width + jind + 1] +
-                        jval.pm * call[(i+1) * width + jind] +
-                        jval.pd * call[(i+1) * width + jind - 1]) * callExp;
+                res = (jval.pu * call[(i + 1) * width + jind + 1] +
+                       jval.pm * call[(i + 1) * width + jind] +
+                       jval.pd * call[(i + 1) * width + jind - 1]) *
+                      callExp;
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            // todo: this is never true.. X should probably be used somewhere else
-            call[i * width + jind] = i == (int)(option.length / dt) ? max(X - res, zero) : res;
+            call[i * width + jind] = res;
         }
     }
 
-    delete[] Qs;
+    auto result = call[jmax];
+
     delete[] jvalues;
     delete[] alphas;
+    delete[] call;
 
-    return call[jmax];
+    return result;
 }
 
 void compute_all_options(const string &filename)
