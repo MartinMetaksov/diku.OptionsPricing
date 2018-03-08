@@ -53,8 +53,9 @@ __constant__
 __device__
 #endif
     real
-    getYieldAtDay(real t)
+    getYieldAtYear(real t)
 {
+    t *= year;
     auto first = h_YieldCurve[0];
     auto second = h_YieldCurve[0];
 

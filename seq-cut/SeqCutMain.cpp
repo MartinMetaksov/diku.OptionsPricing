@@ -11,15 +11,15 @@ struct jvalue
 };
 
 /**
- *  Sequential version that computes the bond tree until bond maturity
- *  and prices the option on maturity during backward propagation.
+ *  Sequential version that computes the bond tree until option maturity
+ *  and then analytically computes the option payoff.
 **/
 real compute_single_option(const Option &option)
 {
     const real T = option.Maturity;
     const real t = option.Length;
     const int termUnitsInYearCount = ceil((real)year / option.TermUnit);
-    const int n = option.TermStepCount * termUnitsInYearCount * T;
+    const int n = option.TermStepCount * termUnitsInYearCount * t;
     const real dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
 
     const real X = option.StrikePrice;
@@ -69,6 +69,9 @@ real compute_single_option(const Option &option)
 
     auto alphas = new real[n + 1](); // alphas[i]
     alphas[0] = getYieldAtYear(dt);  // initial dt-period interest rate
+
+    real P_length = 0;
+    real P_length1 = 0;
 
     for (auto i = 0; i < n; ++i)
     {
@@ -126,19 +129,46 @@ real compute_single_option(const Option &option)
         Qs = QsCopy;
         QsCopy = QsT;
         fill_n(QsCopy, width, 0);
+
+        if (i == n - 2)
+        {
+            P_length = P;
+        }
+        else if (i == n - 1)
+        {
+            P_length1 = P;
+        }
     }
 
     // Backward propagation
     auto call = Qs; // call[j]
     auto callCopy = QsCopy;
 
-    fill_n(call, width, 100); // initialize to 100$
+    auto F_length = 0.07830417; //TODO: compute somehow
+    auto R_maturity = getYieldAtYear(T);
+    auto P_maturity = exp(-R_maturity * T);
+    auto B_maturity = (1 - exp(-a * (T - t))) / a;
+    auto B_length = (1 - exp(-a)) / a;
+    auto Vt = sigma * sigma * (1 - exp(-2 * a * t)) / (4 * a);
+    auto A_maturity = P_maturity / P_length * exp(B_maturity * F_length - (Vt * B_maturity * B_maturity));
+    auto A_length = P_length1 / P_length * exp(B_length * F_length - (Vt * B_length * B_length));
+    auto A_length_log = log(A_length);
+
+    for (auto j = jmin; j <= jmax; ++j)
+    {
+        auto jind = j - jmin;                        // array index for j
+        auto jval = jvalues[jind];                   // precomputed probabilities and rates
+        auto R = alphas[n] + jval.rate;              // dt-period rate
+        auto r = (R * dt + A_length_log) / B_length; // instantaneous rate
+        real P = A_maturity * exp(-B_maturity * r);  // bond price
+        auto payoff = max(X - 100 * P, zero);
+        call[jind] = payoff;
+    }
 
     for (auto i = n - 1; i >= 0; --i)
     {
         auto jhigh = min(i, jmax);
         auto alpha = alphas[i];
-        auto isMaturity = i == ((int)(option.Length / dt));
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
@@ -173,7 +203,7 @@ real compute_single_option(const Option &option)
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            callCopy[jind] = isMaturity ? max(X - res, zero) : res;
+            callCopy[jind] = res;
         }
 
         // Switch call arrays
