@@ -10,77 +10,79 @@ struct jvalue
     real pd;
 };
 
+void print_array_csv(ostream &out, real *array, int size)
+{
+    for (auto i = 0; i < size; ++i)
+    {
+        out << array[i] << ',';
+    }
+}
+
 /**
  *  Sequential version that computes the bond tree until bond maturity
  *  and prices the option on maturity during backward propagation.
 **/
 real compute_single_option(const Option &option)
 {
-    const real T = option.Maturity;
-    const real t = option.Length;
-    const int termUnitsInYearCount = ceil((real)year / option.TermUnit);
-    const int n = option.TermStepCount * termUnitsInYearCount * T;
-    const real dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
-
-    const real X = option.StrikePrice;
-    const real a = option.ReversionRate;
-    const real sigma = option.Volatility;
-    const real V = sigma * sigma * (one - exp(-two * a * dt)) / (two * a);
-    const real dr = sqrt(three * V);
-    const real M = exp(-a * dt) - one;
-
-    // simplified computations
-    // dr = sigma * sqrt(three * dt);
-    // M = -a * dt;
-
-    auto jmax = (int)(minus184 / M) + 1;
-    auto jmin = -jmax;
-    auto width = 2 * jmax + 1;
+    auto c = computeConstants(option);
 
     // Precompute probabilities and rates for all js.
-    auto jvalues = new jvalue[width];
+    auto jvalues = new jvalue[c.width];
+    auto jmin = -c.jmax;
 
     jvalue &valmin = jvalues[0];
-    valmin.rate = jmin * dr;
-    valmin.pu = PU_B(jmin, M);
-    valmin.pm = PM_B(jmin, M);
-    valmin.pd = PD_B(jmin, M);
+    valmin.rate = jmin * c.dr;
+    valmin.pu = PU_B(jmin, c.M);
+    valmin.pm = PM_B(jmin, c.M);
+    valmin.pd = PD_B(jmin, c.M);
 
-    jvalue &valmax = jvalues[width - 1];
-    valmax.rate = jmax * dr;
-    valmax.pu = PU_C(jmax, M);
-    valmax.pm = PM_C(jmax, M);
-    valmax.pd = PD_C(jmax, M);
+    jvalue &valmax = jvalues[c.width - 1];
+    valmax.rate = c.jmax * c.dr;
+    valmax.pu = PU_C(c.jmax, c.M);
+    valmax.pm = PM_C(c.jmax, c.M);
+    valmax.pd = PD_C(c.jmax, c.M);
 
-    for (auto i = 1; i < width - 1; ++i)
+    for (auto i = 1; i < c.width - 1; ++i)
     {
         jvalue &val = jvalues[i];
         auto j = i + jmin;
-        val.rate = j * dr;
-        val.pu = PU_A(j, M);
-        val.pm = PM_A(j, M);
-        val.pd = PD_A(j, M);
+        val.rate = j * c.dr;
+        val.pu = PU_A(j, c.M);
+        val.pm = PM_A(j, c.M);
+        val.pd = PD_A(j, c.M);
     }
 
     // Forward induction to calculate Qs and alphas
-    auto Qs = new real[width]();     // Qs[j]: j in jmin..jmax
-    auto QsCopy = new real[width](); // QsCopy[j]
-    Qs[jmax] = one;                  // Qs[0] = 1$
+    auto Qs = new real[c.width]();     // Qs[j]: j in jmin..jmax
+    auto QsCopy = new real[c.width](); // QsCopy[j]
+    Qs[c.jmax] = one;                  // Qs[0] = 1$
 
-    auto alphas = new real[n + 1](); // alphas[i]
-    alphas[0] = getYieldAtYear(dt);  // initial dt-period interest rate
+    auto alphas = new real[c.n + 1](); // alphas[i]
+    alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
 
-    for (auto i = 0; i < n; ++i)
+    ofstream out("forward-" + to_string(c.n) + ".csv");
+
+    out << "i,alpha,";
+    for (auto j = jmin; j <= c.jmax; ++j)
     {
-        auto jhigh = min(i, jmax);
+        out << "Qs[" << j << "],";
+    }
+    out << endl;
+
+    for (auto i = 0; i < c.n; ++i)
+    {
+        auto jhigh = min(i, c.jmax);
         auto alpha = alphas[i];
+        out << i << ',' << alpha << ',';
+        print_array_csv(out, Qs, c.width);
+        out << endl;
 
         // Forward iteration step, compute Qs in the next time step
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto qexp = Qs[jind] * exp(-(alpha + jval.rate) * dt);
+            auto qexp = Qs[jind] * exp(-(alpha + jval.rate) * c.dt);
 
             if (j - 1 < jmin)
             {
@@ -89,7 +91,7 @@ real compute_single_option(const Option &option)
                 QsCopy[jind + 1] += jval.pm * qexp; // up one
                 QsCopy[jind] += jval.pd * qexp;     // middle
             }
-            else if (j + 1 > jmax)
+            else if (j + 1 > c.jmax)
             {
                 // Top edge branching
                 QsCopy[jind] += jval.pu * qexp;     // middle
@@ -107,16 +109,16 @@ real compute_single_option(const Option &option)
 
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
-        auto jhigh1 = min(i + 1, jmax);
+        auto jhigh1 = min(i + 1, c.jmax);
         real alpha_val = 0;
         for (auto j = -jhigh1; j <= jhigh1; ++j)
         {
             auto jind = j - jmin;      // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            alpha_val += QsCopy[jind] * exp(-jval.rate * dt);
+            alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        auto ti = (i + 2) * dt;             // next next time step
+        auto ti = (i + 2) * c.dt;           // next next time step
         auto R = getYieldAtYear(ti);        // discount rate
         auto P = exp(-R * ti);              // discount bond price
         alphas[i + 1] = log(alpha_val / P); // new alpha
@@ -125,29 +127,46 @@ real compute_single_option(const Option &option)
         auto QsT = Qs;
         Qs = QsCopy;
         QsCopy = QsT;
-        fill_n(QsCopy, width, 0);
+        fill_n(QsCopy, c.width, 0);
     }
+    out << c.n << ',' << alphas[c.n] << ',';
+    print_array_csv(out, Qs, c.width);
+    out << endl;
+    out.close();
 
     // Backward propagation
     auto call = Qs; // call[j]
     auto callCopy = QsCopy;
 
-    fill_n(call, width, 100); // initialize to 100$
+    fill_n(call, c.width, 100); // initialize to 100$
 
-    for (auto i = n - 1; i >= 0; --i)
+    ofstream out2("backward-" + to_string(c.n) + ".csv");
+
+    out2 << "i,";
+    for (auto j = jmin; j <= c.jmax; ++j)
     {
-        auto jhigh = min(i, jmax);
+        out2 << "call[" << j << "],";
+    }
+    out2 << endl;
+
+    out2 << c.n << ',';
+    print_array_csv(out2, call, c.width);
+    out2 << endl;
+
+    for (auto i = c.n - 1; i >= 0; --i)
+    {
+        auto jhigh = min(i, c.jmax);
         auto alpha = alphas[i];
-        auto isMaturity = i == ((int)(option.Length / dt));
+        auto isMaturity = i == ((int)(option.Length / c.dt));
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
             auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto callExp = exp(-(alpha + jval.rate) * dt);
+            auto callExp = exp(-(alpha + jval.rate) * c.dt);
 
             real res;
-            if (j == jmax)
+            if (j == c.jmax)
             {
                 // Top edge branching
                 res = (jval.pu * call[jind] +
@@ -155,7 +174,7 @@ real compute_single_option(const Option &option)
                        jval.pd * call[jind - 2]) *
                       callExp;
             }
-            else if (j == -jmax)
+            else if (j == jmin)
             {
                 // Bottom edge branching
                 res = (jval.pu * call[jind + 2] +
@@ -173,8 +192,12 @@ real compute_single_option(const Option &option)
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            callCopy[jind] = isMaturity ? max(X - res, zero) : res;
+            callCopy[jind] = isMaturity ? max(c.X - res, zero) : res;
         }
+
+        out2 << i << ',';
+        print_array_csv(out2, callCopy, c.width);
+        out2 << endl;
 
         // Switch call arrays
         auto callT = call;
@@ -182,7 +205,9 @@ real compute_single_option(const Option &option)
         callCopy = callT;
     }
 
-    auto result = call[jmax];
+    out2.close();
+
+    auto result = call[c.jmax];
 
     delete[] jvalues;
     delete[] alphas;
