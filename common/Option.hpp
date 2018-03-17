@@ -49,6 +49,8 @@ struct Option
         FutharkArrays::read_futhark_array(in, &rrps);
         FutharkArrays::read_futhark_array(in, &vols);
 
+        in.close();
+
         int size = strikes.size();
         vector<Option> options;
         options.reserve(size);
