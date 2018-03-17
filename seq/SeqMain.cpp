@@ -203,6 +203,8 @@ real compute_single_option(const Option &option)
         auto callT = call;
         call = callCopy;
         callCopy = callT;
+
+        fill_n(callCopy, c.width, 0);
     }
 
     out2.close();
