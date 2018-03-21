@@ -1,6 +1,6 @@
 #define CUDA
 #include "../common/Real.hpp"
-#include "../common/Option.hpp"
+#include "../common/OptionConstants.hpp"
 #include "../common/FutharkArrays.hpp"
 #include "../common/Domain.hpp"
 #include "../cuda/CudaErrors.cuh"
@@ -85,7 +85,7 @@ void computeAllOptions(const string &filename, bool isTest = false)
 
     for (int i = 0; i < options.size(); ++i)
     {
-        auto c = computeConstants(options.at(i));
+        auto c = OptionConstants::computeConstants(options.at(i));
         optionConstants[i] = c;
         if (c.n > n_max) n_max = c.n;
         if (c.width > width_max) width_max = c.width;

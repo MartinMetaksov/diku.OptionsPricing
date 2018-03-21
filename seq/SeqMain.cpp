@@ -1,6 +1,7 @@
 #include "../common/Domain.hpp"
-#include "../common/Option.hpp"
+#include "../common/OptionConstants.hpp"
 #include "../common/FutharkArrays.hpp"
+#include <cstring>
 
 struct jvalue
 {
@@ -14,10 +15,8 @@ struct jvalue
  *  Sequential version that computes the bond tree until bond maturity
  *  and prices the option on maturity during backward propagation.
 **/
-real computeSingleOption(const Option &option)
+real computeSingleOption(const OptionConstants &c)
 {
-    auto c = computeConstants(option);
-
     // Precompute probabilities and rates for all js.
     auto jvalues = new jvalue[c.width];
     auto jmin = -c.jmax;
@@ -117,7 +116,7 @@ real computeSingleOption(const Option &option)
     {
         auto jhigh = min(i, c.jmax);
         auto alpha = alphas[i];
-        auto isMaturity = i == ((int)(option.Length / c.dt));
+        auto isMaturity = i == ((int)(c.t / c.dt));
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
@@ -181,7 +180,8 @@ void computeAllOptions(const string &filename)
 
     for (int i = 0; i < options.size(); ++i)
     {
-        result[i] = computeSingleOption(options.at(i));
+        auto c = OptionConstants::computeConstants(options.at(i));
+        result[i] = computeSingleOption(c);
     }
 
     FutharkArrays::write_futhark_array(result, options.size());

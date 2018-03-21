@@ -1,11 +1,14 @@
+#ifndef DOMAIN_HPP
+#define DOMAIN_HPP
+
 #include "Real.hpp"
-#include "Option.hpp"
 #include <cmath>
 #include <algorithm>
 
 using namespace std;
 
 // Follows code independent of the instantiation of real
+
 const real zero = 0;
 const real one = 1;
 const real two = 2;
@@ -166,48 +169,6 @@ __device__
     return one / six + (j * j * M * M + j * M) * half;
 }
 
-struct OptionConstants
-{
-    real T;
-    real t;
-    int termUnitsInYearCount;
-    int n;
-    real dt; // [years]
-    real X;
-    real a;
-    real sigma;
-    real V;
-    real dr;
-    real M;
-    int jmax;
-    int width;
-};
-
-OptionConstants computeConstants(const Option &option)
-{
-    OptionConstants c;
-    c.T = option.Maturity;
-    c.t = option.Length;
-    c.termUnitsInYearCount = ceil((real)year / option.TermUnit);
-    c.n = option.TermStepCount * c.termUnitsInYearCount * c.T;
-    c.dt = c.termUnitsInYearCount / (real)option.TermStepCount; // [years]
-
-    c.X = option.StrikePrice;
-    c.a = option.ReversionRate;
-    c.sigma = option.Volatility;
-    c.V = c.sigma * c.sigma * (one - exp(-two * c.a * c.dt)) / (two * c.a);
-    c.dr = sqrt(three * c.V);
-    c.M = exp(-c.a * c.dt) - one;
-
-    // simplified computations
-    // c.dr = c.sigma * sqrt(three * c.dt);
-    // c.M = -c.a * c.dt;
-
-    c.jmax = (int)(minus184 / c.M) + 1;
-    c.width = 2 * c.jmax + 1;
-    return c;
-}
-
 #ifdef CUDA
 __device__
 #endif
@@ -349,3 +310,5 @@ __device__
     else
         return res;
 }
+
+#endif
