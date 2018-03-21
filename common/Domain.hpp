@@ -212,6 +212,18 @@ __device__
     return c;
 }
 
+#ifdef CUDA
+__device__
+#endif
+    inline real
+    computeAlpha(const real aggregatedQs, const int i, const real dt)
+{
+    auto ti = (i + 2) * dt;       // next next time step
+    auto R = getYieldAtYear(ti);  // discount rate
+    auto P = exp(-R * ti);        // discount bond price
+    return log(aggregatedQs / P); // new alpha
+}
+
 // forward propagation helper
 #ifdef CUDA
 __device__
