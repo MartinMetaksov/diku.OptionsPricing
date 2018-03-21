@@ -10,19 +10,11 @@ struct jvalue
     real pd;
 };
 
-void print_array_csv(ostream &out, real *array, int size)
-{
-    for (auto i = 0; i < size; ++i)
-    {
-        out << array[i] << ',';
-    }
-}
-
 /**
  *  Sequential version that computes the bond tree until bond maturity
  *  and prices the option on maturity during backward propagation.
 **/
-real compute_single_option(const Option &option)
+real computeSingleOption(const Option &option)
 {
     auto c = computeConstants(option);
 
@@ -60,22 +52,10 @@ real compute_single_option(const Option &option)
     auto alphas = new real[c.n + 1](); // alphas[i]
     alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
 
-    ofstream out("seq-forward-" + to_string(c.n) + ".csv");
-
-    out << "i,alpha,";
-    for (auto j = jmin; j <= c.jmax; ++j)
-    {
-        out << "Qs[" << j << "],";
-    }
-    out << endl;
-
     for (auto i = 0; i < c.n; ++i)
     {
         auto jhigh = min(i, c.jmax);
         auto alpha = alphas[i];
-        out << i << ',' << alpha << ',';
-        print_array_csv(out, Qs, c.width);
-        out << endl;
 
         // Forward iteration step, compute Qs in the next time step
         for (auto j = -jhigh; j <= jhigh; ++j)
@@ -118,10 +98,7 @@ real compute_single_option(const Option &option)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        auto ti = (i + 2) * c.dt;           // next next time step
-        auto R = getYieldAtYear(ti);        // discount rate
-        auto P = exp(-R * ti);              // discount bond price
-        alphas[i + 1] = log(alpha_val / P); // new alpha
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt);
 
         // Switch Qs
         auto QsT = Qs;
@@ -129,29 +106,12 @@ real compute_single_option(const Option &option)
         QsCopy = QsT;
         fill_n(QsCopy, c.width, 0);
     }
-    out << c.n << ',' << alphas[c.n] << ',';
-    print_array_csv(out, Qs, c.width);
-    out << endl;
-    out.close();
 
     // Backward propagation
     auto call = Qs; // call[j]
     auto callCopy = QsCopy;
 
     fill_n(call, c.width, 100); // initialize to 100$
-
-    ofstream out2("seq-backward-" + to_string(c.n) + ".csv");
-
-    out2 << "i,";
-    for (auto j = jmin; j <= c.jmax; ++j)
-    {
-        out2 << "call[" << j << "],";
-    }
-    out2 << endl;
-
-    out2 << c.n << ',';
-    print_array_csv(out2, call, c.width);
-    out2 << endl;
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
@@ -195,10 +155,6 @@ real compute_single_option(const Option &option)
             callCopy[jind] = isMaturity ? max(c.X - res, zero) : res;
         }
 
-        out2 << i << ',';
-        print_array_csv(out2, callCopy, c.width);
-        out2 << endl;
-
         // Switch call arrays
         auto callT = call;
         call = callCopy;
@@ -206,8 +162,6 @@ real compute_single_option(const Option &option)
 
         fill_n(callCopy, c.width, 0);
     }
-
-    out2.close();
 
     auto result = call[c.jmax];
 
@@ -219,7 +173,7 @@ real compute_single_option(const Option &option)
     return result;
 }
 
-void compute_all_options(const string &filename)
+void computeAllOptions(const string &filename)
 {
     // Read options from filename, allocate the result array
     auto options = Option::read_options(filename);
@@ -227,7 +181,7 @@ void compute_all_options(const string &filename)
 
     for (int i = 0; i < options.size(); ++i)
     {
-        result[i] = compute_single_option(options.at(i));
+        result[i] = computeSingleOption(options.at(i));
     }
 
     FutharkArrays::write_futhark_array(result, options.size());
@@ -251,7 +205,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    compute_all_options(filename);
+    computeAllOptions(filename);
 
     return 0;
 }
