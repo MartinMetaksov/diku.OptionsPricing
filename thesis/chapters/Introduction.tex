@@ -1,0 +1,60 @@
+\chapter{Introduction}
+\label{Introduction}
+It is a common necessity for financial organizations to strive for higher performance in the tools they use on daily basis. Such examples are companies managing asset portfolios with large number of assets, or financial software companies providing instruments for pricing and risk management. Led by the need for faster computations, the use of parallel solutions is increasing, allowing for efficient code execution on modern hardware.
+
+SimCorp~\footnote{\url{https://www.simcorp.com/}}, as one such organization, is trying to investigate and attempt to improve the core pricing functionalities in its product, Simcorp Dimension, by using various parallelization techniques to review the implementations of various pricing models used by their clients. One model of interest to them is the Hull-White Single-Factor Short Interest Rate Term Structure Model~\cite[pg. 691]{npfits, ofod}, used to simulate random changes in interest rates in order to price derivatives (especially options), where the underlying product is based on an interest rate (e.g. a bond). This model can be implemented by using trinomial trees\cite[pg. 444]{ofod}, \cite{uhwirt} - a generic numerical method known for its higher accuracy and stability compared to other popular models used for this purpose (e.g. binomial trees). This project will be a collaboration between Department of Computer Science of University of Copenhagen and SimCorp Technology Labs, research and innovation team at SimCorp, aiming to study code transformations for accelerated execution for pricing of financial instruments on modern massively-parallel hardware (involving CPUs and GPUs). 
+
+% PROJECT DESCRIPTION
+\section{Project description}
+The goal of this thesis is to develop an accelerated parallel implementation of the pricing model using trinomial trees, aiming to achieve an optimal computation time. In this model, each node in a term structure represents a value of interest rate bound with the underlying asset at a specific time step. The evolution of interest rate for every point in time is represented by three possible paths, up, down and middle, each with a corresponding probability. Furthermore, the width of the tree is dependent on the characteristics of the underlying asset (here a bond), while the height/depth of the tree is dependent on the pricing accuracy specified by the number of time steps. For example, a bond with maturity 2 years and monthly time steps will have a depth of $2 \times 12 = 24$. The price of a derivative is then decided through back propagation from the leaves of the tree (bond maturity) to its root (pricing day).
+
+The thesis will first focus on the creation of a proof-of-concept by using the most-basic financial instruments, namely single callable European zero-coupon bonds\footnote{As suggested by SimCorp}. However, the aim is to obtain optimal results out of any possible data set at a later stage, thus this thesis will also look into various techniques for optimizing the solution(s), e.g. applying inspector/executor techniques, benchmarking, tuning model parameters, etc. 
+
+% PROBLEM STATEMENT
+\section{Problem statement}
+Pricing a single option using Hull-White single-factor trinomial tree model consists of two steps:
+\begin{enumerate}
+    \item \textbf{Forward propagation step:} Construct a term structure for the underlying asset by progressing one time step at a time. Determine neutral risk rate for new time step using estimated yield curve data and estimated current asset values.
+    \item \textbf{Backward propagation step:} Discount the asset prices to estimate option payoff at maturity going from the leaves of the tree to its root. 
+\end{enumerate}
+
+Figure~\ref{lst:loops} shows a high-level overview of a function implementing this procedure for pricing of one option. The function mainly consists of two sequential (convergence) loops of count N, which contain inner parallel operators of length M, where N and M are specific to each option (and thus vary across options). M corresponds to the tree width which is dependent on the number of terms and input parameters. N corresponds to the tree height which is dependent on the number of time steps (maturity of the underlying bond and precision).
+\clearpage
+\begin{lstlisting}[caption={High-level view of pricing a single option using Hull-White 1F model},label={lst:loops},language=Haskell,frame=lines]
+-- forward propagation (convergence) loop
+loop i < N:
+    map (iota M)
+    write
+    reduce
+
+map (iota M)
+
+-- backward propagation (convergence) loop
+loop i < N:
+    map (iota M)
+    write
+\end{lstlisting}
+
+Different option or bond maturities (leading to different tree widths) and different level of pricing accuracy (number of simulated time steps leading to different tree heights) make choosing an effective parallelization strategy difficult. This thesis will focus on three strategies for approaching this problem:
+\begin{itemize}
+    \item \textbf{One option per thread.} Sequentialize all parallel operators inside the function which is most suitable when all widths and heights are equal. Otherwise, it suffers from significant load imbalance (e.g. thread divergence).
+    
+    \item \textbf{Multiple options per thread block.} Use inspector/executor techniques to pack multiple options together in order to accommodate for their different properties.
+    
+    \item \textbf{Full flattening.} Exploit all parallelism.
+    
+\end{itemize}
+% RESEARCH QUESTIONS AND APPROACH
+\section{Research questions and approach}
+This report will focus on the addressing the following research questions:
+\begin{enumerate}
+    \item What are general parallel patterns that exist in the implementation of trinomial trees for option pricing? We will approach this question by getting familiarized with the terminology and the financial background needed to tackle the problem.
+    \item How to implement the Hull-White One-Factor Model using trinomial trees to achieve optimal performance on modern parallel hardware platforms regardless of the the size and computation complexity of interest-rate options? We will try to achieve this by deriving three code versions, one for each thread divergence possibility.
+    \item Can the method be extended to more complex contracts while sustaining optimal performance? 
+\end{enumerate}
+The problem will be approached using concrete steps:
+\begin{itemize}
+    \item We will try to discriminate between code versions e.g. by creating a benchmark for various inputs, and assess which version is the best for each configuration.
+    \item We will experiment with inspector/executor techniques to determine optimal solution in terms of computation time (e.g. computing the height/width of each tree).
+    \item We will experiment with auto-tuning techniques like, e.g. OpenTuner~\footnote{http://opentuner.org/}, to help optimize various parameters of the model and reduce the execution time.
+\end{itemize}
