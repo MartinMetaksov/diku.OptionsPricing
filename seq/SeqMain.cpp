@@ -60,7 +60,7 @@ real compute_single_option(const Option &option)
     auto alphas = new real[c.n + 1](); // alphas[i]
     alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
 
-    ofstream out("forward-" + to_string(c.n) + ".csv");
+    ofstream out("seq-forward-" + to_string(c.n) + ".csv");
 
     out << "i,alpha,";
     for (auto j = jmin; j <= c.jmax; ++j)
@@ -140,7 +140,7 @@ real compute_single_option(const Option &option)
 
     fill_n(call, c.width, 100); // initialize to 100$
 
-    ofstream out2("backward-" + to_string(c.n) + ".csv");
+    ofstream out2("seq-backward-" + to_string(c.n) + ".csv");
 
     out2 << "i,";
     for (auto j = jmin; j <= c.jmax; ++j)

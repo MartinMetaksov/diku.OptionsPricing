@@ -2,7 +2,7 @@ CXX        = g++ -g -std=c++11
 
 
 SOURCES_CPP =SeqMain.cpp
-EXECUTABLE  =SeqMain
+EXECUTABLE  =../build/SeqMain
 DATA		=../data
 COMPARE		=compare
 
