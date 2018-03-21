@@ -1,6 +1,7 @@
 #ifndef OPTION_HPP
 #define OPTION_HPP
 
+#include <stdexcept>
 #include <fstream>
 #include <vector>
 #include "Real.hpp"

@@ -183,11 +183,7 @@ struct OptionConstants
     int width;
 };
 
-#ifdef CUDA
-__device__
-#endif
-    inline OptionConstants
-    computeConstants(const Option &option)
+OptionConstants computeConstants(const Option &option)
 {
     OptionConstants c;
     c.T = option.Maturity;
