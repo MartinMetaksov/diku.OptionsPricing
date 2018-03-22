@@ -63,14 +63,14 @@ real computeSingleOption(const OptionConstants &c)
             auto jval = jvalues[jind]; // precomputed probabilities and rates
             auto qexp = Qs[jind] * exp(-(alpha + jval.rate) * c.dt);
 
-            if (j - 1 < jmin)
+            if (j == jmin)
             {
                 // Bottom edge branching
                 QsCopy[jind + 2] += jval.pu * qexp; // up two
                 QsCopy[jind + 1] += jval.pm * qexp; // up one
                 QsCopy[jind] += jval.pd * qexp;     // middle
             }
-            else if (j + 1 > c.jmax)
+            else if (j == c.jmax)
             {
                 // Top edge branching
                 QsCopy[jind] += jval.pu * qexp;     // middle
