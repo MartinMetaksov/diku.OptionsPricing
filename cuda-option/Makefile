@@ -25,6 +25,9 @@ run: $(EXECUTABLE)
 test: $(EXECUTABLE)
 	@./$(EXECUTABLE) $(DATA)/$(FILE).in -test
 
+mock: $(EXECUTABLE)
+	@./$(EXECUTABLE) -test -mock $(COUNT)
+
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
 	@./$(EXECUTABLE) $(DATA)/$(FILE).in > $(FILE).test.out

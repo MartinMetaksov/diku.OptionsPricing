@@ -1,8 +1,13 @@
 #define CUDA
+
+// Define this to turn on error checking
+#define CUDA_ERROR_CHECK
+
 #include "../common/Real.hpp"
 #include "../common/OptionConstants.hpp"
 #include "../common/FutharkArrays.hpp"
 #include "../common/Domain.hpp"
+#include "../test/Mock.hpp"
 #include "../cuda/CudaErrors.cuh"
 
 #include <chrono>
@@ -10,19 +15,31 @@
 using namespace std;
 using namespace chrono;
 
-// Define this to turn on error checking
-#define CUDA_ERROR_CHECK
-
 __global__ void
-computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *QsInd, int *alphasInd)
+computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *QsInd, int *alphasInd, int totalCount)
 {
-    auto c = options[blockIdx.x];
-    auto Qs = QsAll + QsInd[blockIdx.x];
-    auto QsCopy = QsCopyAll + QsInd[blockIdx.x];
-    auto alphas = alphasAll + alphasInd[blockIdx.x];
+    auto idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    // Out of options check
+    if (idx >= totalCount) return;
+
+    auto c = options[idx];
+    auto Qs = QsAll + QsInd[idx];
+    auto QsCopy = QsCopyAll + QsInd[idx];
+    auto alphas = alphasAll + alphasInd[idx];
+
+    // Stress test
+    for (auto a = 0; a < c.n + 1; ++ a)
+    {
+        for (auto i = 1; i < c.width - 1; ++i)
+        {
+            Qs[i] = QsCopy[i-1] * 10 + QsCopy[i] * 5 + QsCopy[i + 1];
+        }
+        alphas[a] = Qs[0] + 3;
+    }
 
     // some test result
-    res[blockIdx.x] = c.n;
+    res[idx] = c.n;
 }
 
 void computeCuda(OptionConstants *options, real *result, int count, bool isTest = false)
@@ -45,14 +62,15 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
     totalQsCount += options[count - 1].width;
     totalAlphasCount += options[count - 1].n + 1;
     
-    auto blockSize = 1;
+    auto blockSize = 32;
+    auto blockCount = count / (blockSize + 1) + 1;
 
     if (isTest)
     {
         int memorySize = count * sizeof(real) + count * sizeof(OptionConstants) + 2 * count * sizeof(int)
                         + 2 * totalQsCount * sizeof(real) + totalAlphasCount * sizeof(real);
         cout << "Running trinomial option pricing for " << count << " options with block size " << blockSize << endl;
-        cout << "Global memory size " << memorySize << endl;
+        cout << "Global memory size " << memorySize / (1024.0 * 1024.0) << " MB" << endl;
     }
 
     auto time_begin = steady_clock::now();
@@ -73,7 +91,7 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
     cudaMemcpy(d_alphasInd, alphasInd, count * sizeof(int), cudaMemcpyHostToDevice);
 
     auto time_begin_kernel = steady_clock::now();
-    computeSingleOptionKernel<<<count, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_QsInd, d_alphasInd);
+    computeSingleOptionKernel<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_QsInd, d_alphasInd, count);
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
 
@@ -84,6 +102,11 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
 
     cudaFree(d_result);
     cudaFree(d_options);
+    cudaFree(d_QsInd);
+    cudaFree(d_alphasInd);
+    cudaFree(d_Qs);
+    cudaFree(d_QsCopy);
+    cudaFree(d_alphas);
 
     auto time_end = steady_clock::now();
     if (isTest)
@@ -95,28 +118,54 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
 }
 
 
-void computeAllOptions(const string &filename, bool isTest = false)
+void computeAllOptions(const string &filename, bool isTest, int mockCount)
 {
-    // Read options from filename, allocate the result array
-    auto options = Option::read_options(filename);
-    auto result = new real[options.size()];
-    auto optionConstants = new OptionConstants[options.size()];
+    OptionConstants* optionConstants;
+    int length;
 
-    for (int i = 0; i < options.size(); ++i)
+    if (mockCount > 0)
     {
-        optionConstants[i] = OptionConstants::computeConstants(options.at(i));
+        // Make mock constants, count should be a multiple of 4
+        length = mockCount;
+        optionConstants = new OptionConstants[length];
+        for (auto i = 0; i < length; i += 4)
+        {
+            Mock::mockConstants(optionConstants + i + 1, 1, 101, 12000);
+            Mock::mockConstants(optionConstants + i, 1, 10001, 1200);
+            Mock::mockConstants(optionConstants + i + 2, 1, 11, 1800);
+            Mock::mockConstants(optionConstants + i + 3, 1, 1001, 12);
+        }
+    }
+    else
+    {
+        // Read options from filename, allocate the result array
+        auto options = Option::read_options(filename);
+        length = options.size();
+        optionConstants = new OptionConstants[length];
+
+        for (auto i = 0; i < length; ++i)
+        {
+            optionConstants[i] = OptionConstants::computeConstants(options.at(i));
+        }
     }
 
-    computeCuda(optionConstants, result, options.size(), isTest);
+    auto result = new real[length];
+    computeCuda(optionConstants, result, length, isTest);
 
-    FutharkArrays::write_futhark_array(result, options.size());
+    // Don't print mock results
+    if (mockCount <= 0)
+    {
+        FutharkArrays::write_futhark_array(result, length);
+    }
 
     delete[] result;
+    delete[] optionConstants;
 }
 
 int main(int argc, char *argv[])
 {
     bool isTest = false;
+    int mockCount = -1;
     string filename;
     for (int i = 1; i < argc; ++i)
     {
@@ -124,13 +173,18 @@ int main(int argc, char *argv[])
         {
             isTest = true;
         }
+        else if (strcmp(argv[i], "-mock") == 0)
+        {
+            ++i;
+            mockCount = stoi(argv[i]);
+        }
         else
         {
             filename = argv[i];
         }
     }
 
-    computeAllOptions(filename, isTest);
+    computeAllOptions(filename, isTest, mockCount);
 
     return 0;
 }
