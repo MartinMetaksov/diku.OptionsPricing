@@ -1,18 +1,15 @@
-#define CUDA
+#ifndef CUDA_OPTION_CUH
+#define CUDA_OPTION_CUH
 
-// Define this to turn on error checking
-#define CUDA_ERROR_CHECK
+#define CUDA
 
 #include "../common/Real.hpp"
 #include "../common/OptionConstants.hpp"
-#include "../common/FutharkArrays.hpp"
 #include "../common/Domain.hpp"
-#include "../test/Mock.hpp"
 #include "../cuda/CudaErrors.cuh"
-
+#include <cuda_runtime.h>
 #include <chrono>
 
-using namespace std;
 using namespace chrono;
 
 __global__ void
@@ -27,16 +24,6 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     auto Qs = QsAll + QsInd[idx];
     auto QsCopy = QsCopyAll + QsInd[idx];
     auto alphas = alphasAll + alphasInd[idx];
-
-    // Stress test
-    for (auto a = 0; a < c.n + 1; ++ a)
-    {
-        for (auto i = 1; i < c.width - 1; ++i)
-        {
-            Qs[i] = QsCopy[i-1] * 10 + QsCopy[i] * 5 + QsCopy[i + 1];
-        }
-        alphas[a] = Qs[0] + 3;
-    }
 
     // some test result
     res[idx] = c.n;
@@ -113,78 +100,8 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
     {
         cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
         cout << "Total GPU time: " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl
-             << endl;
+            << endl;
     }
 }
 
-
-void computeAllOptions(const string &filename, bool isTest, int mockCount)
-{
-    OptionConstants* optionConstants;
-    int length;
-
-    if (mockCount > 0)
-    {
-        // Make mock constants, count should be a multiple of 4
-        length = mockCount;
-        optionConstants = new OptionConstants[length];
-        for (auto i = 0; i < length; i += 4)
-        {
-            Mock::mockConstants(optionConstants + i + 1, 1, 101, 12000);
-            Mock::mockConstants(optionConstants + i, 1, 10001, 1200);
-            Mock::mockConstants(optionConstants + i + 2, 1, 11, 1800);
-            Mock::mockConstants(optionConstants + i + 3, 1, 1001, 12);
-        }
-    }
-    else
-    {
-        // Read options from filename, allocate the result array
-        auto options = Option::read_options(filename);
-        length = options.size();
-        optionConstants = new OptionConstants[length];
-
-        for (auto i = 0; i < length; ++i)
-        {
-            optionConstants[i] = OptionConstants::computeConstants(options.at(i));
-        }
-    }
-
-    auto result = new real[length];
-    computeCuda(optionConstants, result, length, isTest);
-
-    // Don't print mock results
-    if (mockCount <= 0)
-    {
-        FutharkArrays::write_futhark_array(result, length);
-    }
-
-    delete[] result;
-    delete[] optionConstants;
-}
-
-int main(int argc, char *argv[])
-{
-    bool isTest = false;
-    int mockCount = -1;
-    string filename;
-    for (int i = 1; i < argc; ++i)
-    {
-        if (strcmp(argv[i], "-test") == 0)
-        {
-            isTest = true;
-        }
-        else if (strcmp(argv[i], "-mock") == 0)
-        {
-            ++i;
-            mockCount = stoi(argv[i]);
-        }
-        else
-        {
-            filename = argv[i];
-        }
-    }
-
-    computeAllOptions(filename, isTest, mockCount);
-
-    return 0;
-}
+#endif
