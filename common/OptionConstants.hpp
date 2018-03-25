@@ -7,6 +7,9 @@
 
 using namespace std;
 
+namespace trinom
+{
+
 struct OptionConstants
 {
   public:
@@ -44,5 +47,7 @@ struct OptionConstants
         return c;
     }
 };
+
+}
 
 #endif

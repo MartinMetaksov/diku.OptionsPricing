@@ -11,7 +11,11 @@
 #include <chrono>
 
 using namespace chrono;
+using namespace trinom;
 
+namespace cuda
+{
+    
 __global__ void
 computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *QsInd, int *alphasInd, int totalCount)
 {
@@ -29,7 +33,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     res[idx] = c.n;
 }
 
-void computeCuda(OptionConstants *options, real *result, int count, bool isTest = false)
+void computeOptions(OptionConstants *options, real *result, int count, bool isTest = false)
 {
     // Compute indices
     int* QsInd = new int[count];
@@ -102,6 +106,8 @@ void computeCuda(OptionConstants *options, real *result, int count, bool isTest 
         cout << "Total GPU time: " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl
             << endl;
     }
+}
+
 }
 
 #endif

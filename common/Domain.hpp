@@ -7,6 +7,9 @@
 
 using namespace std;
 
+namespace trinom
+{
+
 // Follows code independent of the instantiation of real
 
 const real zero = 0;
@@ -309,6 +312,8 @@ __device__
         return max(X - res, zero);
     else
         return res;
+}
+
 }
 
 #endif

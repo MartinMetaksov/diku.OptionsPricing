@@ -6,6 +6,7 @@
 #include "../common/FutharkArrays.hpp"
 
 using namespace std;
+using namespace trinom;
 
 void computeAllOptions(const string &filename, bool isTest)
 {
@@ -20,7 +21,7 @@ void computeAllOptions(const string &filename, bool isTest)
     }
 
     auto result = new real[length];
-    computeCuda(optionConstants, result, length, isTest);
+    cuda::computeOptions(optionConstants, result, length, isTest);
 
     // Don't print mock results
     FutharkArrays::write_futhark_array(result, length);
