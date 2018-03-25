@@ -9,6 +9,9 @@
 
 using namespace std;
 
+namespace trinom
+{
+
 struct Option
 {
   public:
@@ -71,5 +74,7 @@ struct Option
         return options;
     }
 };
+
+}
 
 #endif

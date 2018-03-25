@@ -2,6 +2,8 @@
 #include "../common/Option.hpp"
 #include "../common/FutharkArrays.hpp"
 
+using namespace trinom;
+
 struct jvalue
 {
     real rate;

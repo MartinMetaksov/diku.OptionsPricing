@@ -4,6 +4,8 @@
 #include "Seq.hpp"
 #include <cstring>
 
+using namespace trinom;
+
 void computeAllOptions(const string &filename)
 {
     // Read options from filename, allocate the result array
@@ -13,7 +15,7 @@ void computeAllOptions(const string &filename)
     for (int i = 0; i < options.size(); ++i)
     {
         auto c = OptionConstants::computeConstants(options.at(i));
-        result[i] = Seq::computeSingleOption(c);
+        result[i] = seq::computeSingleOption(c);
     }
 
     FutharkArrays::write_futhark_array(result, options.size());

@@ -8,6 +8,9 @@
 
 using namespace std;
 
+namespace trinom
+{
+
 class FutharkArrays
 {
   public:
@@ -40,5 +43,7 @@ class FutharkArrays
 		cout << ']' << endl;
 	}
 };
+
+}
 
 #endif

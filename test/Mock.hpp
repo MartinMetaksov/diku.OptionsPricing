@@ -3,6 +3,8 @@
 
 #include "../common/OptionConstants.hpp"
 
+using namespace trinom;
+
 class Mock
 {
   public:

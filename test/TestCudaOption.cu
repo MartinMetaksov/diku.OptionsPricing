@@ -3,6 +3,8 @@
 #include "../seq/Seq.hpp"
 #include "../cuda-option/CudaOption.cuh"
 
+using namespace trinom;
+
 TEST_CASE("One option per thread cuda")
 {
     int bookCount = 100;
@@ -21,13 +23,13 @@ TEST_CASE("One option per thread cuda")
         o.Volatility = 0.01;
 
         book[i] = OptionConstants::computeConstants(o);
-        bookResults.push_back(Seq::computeSingleOption(book[i]));
+        bookResults.push_back(seq::computeSingleOption(book[i]));
     }
 
     SECTION("Compute one book option")
     {
         real result;
-        computeCuda(book, &result, 1);
+        cuda::computeOptions(book, &result, 1);
 
         REQUIRE(result == bookResults.at(0));
     }
@@ -35,7 +37,7 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(bookCount);
-        computeCuda(book, results.data(), bookCount);
+        cuda::computeOptions(book, results.data(), bookCount);
 
         REQUIRE(bookResults == results);
     }
@@ -55,12 +57,12 @@ TEST_CASE("One option per thread cuda")
         }
         for (auto i = 0; i < count; ++i)
         {
-            bookResults.push_back(Seq::computeSingleOption(options[i]));
+            bookResults.push_back(seq::computeSingleOption(options[i]));
         }
 
         vector<real> results;
         results.resize(count);
-        computeCuda(book, results.data(), count);
+        cuda::computeOptions(book, results.data(), count);
 
         REQUIRE(goldResults == results);
     }
