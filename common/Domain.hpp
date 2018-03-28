@@ -184,6 +184,61 @@ __device__
     return log(aggregatedQs / P); // new alpha
 }
 
+#ifdef CUDA
+__device__
+#endif
+    inline real
+    computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)
+{
+    // this i is only local and has nothing to do with the height of the tree.
+    if (i == 0)
+    {
+        switch (expout)
+        {
+        case 1:
+            return PU_B((-jmax), M); // up
+        case 2:
+            return PM_B((-jmax), M); // mid
+        case 3:
+            return PD_B((-jmax), M); // down
+        case 0:
+        default:
+            return (-jmax) * dr; // rate
+        }
+    }
+    else if (i == width - 1)
+    {
+        switch (expout)
+        {
+        case 1:
+            return PU_C(jmax, M); // up
+        case 2:
+            return PM_C(jmax, M); // mid
+        case 3:
+            return PD_C(jmax, M); // down
+        case 0:
+        default:
+            return jmax * dr; // rate
+        }
+    }
+    else
+    {
+        auto j = i + (-jmax);
+        switch (expout)
+        {
+        case 1:
+            return PU_A(j, M); // up
+        case 2:
+            return PM_A(j, M); // mid
+        case 3:
+            return PD_A(j, M); // down
+        case 0:
+        default:
+            return j * dr; // rate
+        }
+    }
+}
+
 // forward propagation helper
 #ifdef CUDA
 __device__
@@ -313,7 +368,6 @@ __device__
     else
         return res;
 }
-
 }
 
 #endif
