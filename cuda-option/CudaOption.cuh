@@ -30,36 +30,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     auto Qs = QsAll + QsInd[idx];
     auto QsCopy = QsCopyAll + QsInd[idx];
     auto alphas = alphasAll + alphasInd[idx];
-
-    /*
-     * TODO: I'll remove all the jvalues logic tomorrow and calculate it every time we need it instead of storing it.
-     */
-    auto jvalues = new real[c.width * 4];
     auto jmin = -c.jmax;
-
-    for (auto i = 0; i < c.width * 4; i+=4)
-    {
-        if (i == 0) {
-            jvalues[i] = jmin * c.dr;
-            jvalues[i+1] = PU_B(jmin, c.M);
-            jvalues[i+2] = PM_B(jmin, c.M);
-            jvalues[i+3] = PD_B(jmin, c.M);
-        } 
-        else if (i == c.width*4 - 4) {
-            jvalues[i] = c.jmax * c.dr;
-            jvalues[i+1] = PU_C(c.jmax, c.M);
-            jvalues[i+2] = PM_C(c.jmax, c.M);
-            jvalues[i+3] = PD_C(c.jmax, c.M);
-        } 
-        else {
-            auto j = (i/4) + jmin;
-            jvalues[i] = j * c.dr;
-            jvalues[i+1] = PU_A(j, c.M);
-            jvalues[i+2] = PM_A(j, c.M);
-            jvalues[i+3] = PD_A(j, c.M);
-        }
-    }
-
     Qs[c.jmax] = one;
     alphas[0] = getYieldAtYear(c.dt);
 
@@ -72,33 +43,28 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
-            auto rate = jvalues[jind * 4]; // precomputed rates
-            auto pu = jvalues[jind * 4 + 1]; // precomputed up probability
-            auto pm = jvalues[jind * 4 + 2]; // precomputed mid probability
-            auto pd = jvalues[jind * 4 + 3]; // precomputed down probability
-
-            auto qexp = Qs[jind] * exp(-(alpha + rate) * c.dt);
+            auto qexp = Qs[jind] * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
 
             if (j == jmin)
             {
                 // Bottom edge branching
-                QsCopy[jind + 2] += pu * qexp; // up two
-                QsCopy[jind + 1] += pm * qexp; // up one
-                QsCopy[jind] += pd * qexp;     // middle
+                QsCopy[jind + 2] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp; // up two
+                QsCopy[jind + 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp; // up one
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp;     // middle
             }
             else if (j == c.jmax)
             {
                 // Top edge branching
-                QsCopy[jind] += pu * qexp;     // middle
-                QsCopy[jind - 1] += pm * qexp; // down one
-                QsCopy[jind - 2] += pd * qexp; // down two
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp;     // middle
+                QsCopy[jind - 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp; // down one
+                QsCopy[jind - 2] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp; // down two
             }
             else
             {
                 // Standard branching
-                QsCopy[jind + 1] += pu * qexp; // up
-                QsCopy[jind] += pm * qexp;     // middle
-                QsCopy[jind - 1] += pd * qexp; // down
+                QsCopy[jind + 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp; // up
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp;     // middle
+                QsCopy[jind - 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp; // down
             }
         }
 
@@ -109,9 +75,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
         for (auto j = -jhigh1; j <= jhigh1; ++j)
         {
             auto jind = j - jmin;      // array index for j
-            // auto jval = jvalues[jind]; // precomputed probabilities and rates
-            auto rate = jvalues[jind * 4]; // precomputed rates
-            alpha_val += QsCopy[jind] * exp(-rate * c.dt);
+            alpha_val += QsCopy[jind] * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
         alphas[i + 1] = computeAlpha(alpha_val, i, c.dt);
@@ -138,37 +102,32 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
-            
-            auto rate = jvalues[jind * 4]; // precomputed rates
-            auto pu = jvalues[jind * 4 + 1]; // precomputed up probability
-            auto pm = jvalues[jind * 4 + 2]; // precomputed mid probability
-            auto pd = jvalues[jind * 4 + 3]; // precomputed down probability
 
-            auto callExp = exp(-(alpha + rate) * c.dt);
+            auto callExp = exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
 
             real res;
             if (j == c.jmax)
             {
                 // Top edge branching
-                res = (pu * call[jind] +
-                       pm * call[jind - 1] +
-                       pd * call[jind - 2]) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind - 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind - 2]) *
                       callExp;
             }
             else if (j == jmin)
             {
                 // Bottom edge branching
-                res = (pu * call[jind + 2] +
-                       pm * call[jind + 1] +
-                       pd * call[jind]) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind + 2] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind + 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind]) *
                       callExp;
             }
             else
             {
                 // Standard branching
-                res = (pu * call[jind + 1] +
-                       pm * call[jind] +
-                       pd * call[jind - 1]) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind + 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind - 1]) *
                       callExp;
             }
 
