@@ -1,8 +1,6 @@
 #ifndef CUDA_OPTION_CUH
 #define CUDA_OPTION_CUH
 
-#define CUDA
-
 #include "../common/Real.hpp"
 #include "../common/OptionConstants.hpp"
 #include "../common/Domain.hpp"

@@ -1,7 +1,7 @@
 #include "catch.hpp"
-#include "Mock.hpp"
-#include "../seq/Seq.hpp"
 #include "../cuda-option/CudaOption.cuh"
+#include "../seq/Seq.hpp"
+#include "Mock.hpp"
 
 using namespace trinom;
 
@@ -43,26 +43,22 @@ TEST_CASE("One option per thread cuda")
     }
     SECTION("Compute random options")
     {
-        // Make mock constants, count should be a multiple of 4
         int count = 104;
         OptionConstants options[count];
+        OptionConstants *options_p = options;
+
+        Mock::mockConstants(options_p, count, 1001, 12);
+
         vector<real> goldResults;
         goldResults.reserve(count);
-        for (auto i = 0; i < count; i += 4)
+        for (auto &option : options)
         {
-            Mock::mockConstants(options + i + 1, 1, 101, 12000);
-            Mock::mockConstants(options + i, 1, 10001, 1200);
-            Mock::mockConstants(options + i + 2, 1, 11, 1800);
-            Mock::mockConstants(options + i + 3, 1, 1001, 12);
-        }
-        for (auto i = 0; i < count; ++i)
-        {
-            bookResults.push_back(seq::computeSingleOption(options[i]));
+            goldResults.push_back(seq::computeSingleOption(option));
         }
 
         vector<real> results;
         results.resize(count);
-        cuda::computeOptions(book, results.data(), count);
+        cuda::computeOptions(options_p, results.data(), count);
 
         REQUIRE(goldResults == results);
     }

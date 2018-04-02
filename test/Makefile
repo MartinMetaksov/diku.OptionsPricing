@@ -1,4 +1,4 @@
-CXX        = nvcc -std=c++11 --ptxas-options=-v
+CXX        = nvcc -std=c++11
 
 
 SOURCES_CPP =TestMain.cpp TestCudaOption.cu
