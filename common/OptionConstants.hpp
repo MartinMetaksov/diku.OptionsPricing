@@ -2,7 +2,6 @@
 #define OPTION_CONSTANTS_HPP
 
 #include "Option.hpp"
-#include "Domain.hpp"
 #include <cmath>
 
 using namespace std;
@@ -21,6 +20,7 @@ struct OptionConstants
     real M;
     int jmax;
     int width;
+    OptionType type;
 
     static OptionConstants computeConstants(const Option &option)
     {
@@ -30,6 +30,7 @@ struct OptionConstants
         c.t = option.Length;
         c.n = option.TermStepCount * termUnitsInYearCount * T;
         c.dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
+        c.type = option.Type;
 
         auto a = option.ReversionRate;
         c.X = option.StrikePrice;
@@ -47,7 +48,6 @@ struct OptionConstants
         return c;
     }
 };
-
 }
 
 #endif

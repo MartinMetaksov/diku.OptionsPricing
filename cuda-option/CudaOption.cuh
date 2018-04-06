@@ -130,7 +130,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            callCopy[jind] = isMaturity ? max(c.X - res, zero) : res;
+            callCopy[jind] = computeCallValue(isMaturity, c, res);
         }
 
         // Switch call arrays

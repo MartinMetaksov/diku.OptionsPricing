@@ -1,6 +1,6 @@
 #include "../common/Domain.hpp"
 #include "../common/OptionConstants.hpp"
-#include "../common/FutharkArrays.hpp"
+#include "../common/Arrays.hpp"
 #include "Seq.hpp"
 #include <cstring>
 
@@ -18,7 +18,7 @@ void computeAllOptions(const string &filename)
         result[i] = seq::computeSingleOption(c);
     }
 
-    FutharkArrays::write_futhark_array(result, options.size());
+    Arrays::write_array(result, options.size());
 
     delete[] result;
 }

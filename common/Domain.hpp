@@ -2,6 +2,7 @@
 #define DOMAIN_HPP
 
 #include "Real.hpp"
+#include "OptionConstants.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -9,18 +10,6 @@ using namespace std;
 
 namespace trinom
 {
-
-// Follows code independent of the instantiation of real
-
-const real zero = 0;
-const real one = 1;
-const real two = 2;
-const real half = one / two;
-const real three = 3;
-const real six = 6;
-const real seven = 7;
-const real year = 365;
-const real minus184 = -0.184;
 
 struct Yield
 {
@@ -42,21 +31,21 @@ struct Yield
 
 // The DM zero coupon yield curve, July 8, 1994.
 CONSTANT Yield h_YieldCurve[] =
-       {{.p = 0.0501772, .t = 3},    //
-        {.p = 0.0498284, .t = 31},   //
-        {.p = 0.0497234, .t = 62},   //
-        {.p = 0.0496157, .t = 94},   //
-        {.p = 0.0499058, .t = 185},  //
-        {.p = 0.0509389, .t = 367},  //
-        {.p = 0.0579733, .t = 731},  //
-        {.p = 0.0630595, .t = 1096}, //
-        {.p = 0.0673464, .t = 1461}, //
-        {.p = 0.0694816, .t = 1826}, //
-        {.p = 0.0708807, .t = 2194}, //
-        {.p = 0.0727527, .t = 2558}, //
-        {.p = 0.0730852, .t = 2922}, //
-        {.p = 0.0739790, .t = 3287}, //
-        {.p = 0.0749015, .t = 3653}};
+    {{.p = 0.0501772, .t = 3},    //
+     {.p = 0.0498284, .t = 31},   //
+     {.p = 0.0497234, .t = 62},   //
+     {.p = 0.0496157, .t = 94},   //
+     {.p = 0.0499058, .t = 185},  //
+     {.p = 0.0509389, .t = 367},  //
+     {.p = 0.0579733, .t = 731},  //
+     {.p = 0.0630595, .t = 1096}, //
+     {.p = 0.0673464, .t = 1461}, //
+     {.p = 0.0694816, .t = 1826}, //
+     {.p = 0.0708807, .t = 2194}, //
+     {.p = 0.0727527, .t = 2558}, //
+     {.p = 0.0730852, .t = 2922}, //
+     {.p = 0.0739790, .t = 3287}, //
+     {.p = 0.0749015, .t = 3653}};
 
 // Yield h_YieldCurve[] =
 //     {{.p = 0.03430, .t = (int)(0.5 * year)}, //
@@ -198,6 +187,21 @@ DEVICE real computeJValue(const int i, const real dr, const real M, const int wi
             return j * dr; // rate
         }
     }
+}
+
+DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, const real res)
+{
+    if (isMaturity)
+    {
+        switch (c.type)
+        {
+        case OptionType::PUT:
+            return max(c.X - res, zero);
+        case OptionType::CALL:
+            return max(res - c.X, zero);
+        }
+    }
+    return isMaturity ? max(c.X - res, zero) : res;
 }
 
 // forward propagation helper

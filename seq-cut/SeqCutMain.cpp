@@ -1,6 +1,6 @@
 #include "../common/Domain.hpp"
 #include "../common/Option.hpp"
-#include "../common/FutharkArrays.hpp"
+#include "../common/Arrays.hpp"
 
 using namespace trinom;
 
@@ -235,7 +235,7 @@ void compute_all_options(const string &filename)
         result[i] = compute_single_option(options.at(i));
     }
 
-    FutharkArrays::write_futhark_array(result, options.size());
+    Arrays::write_array(result, options.size());
 
     delete[] result;
 }

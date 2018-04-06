@@ -5,12 +5,36 @@
 #include <fstream>
 #include <vector>
 #include "Real.hpp"
-#include "FutharkArrays.hpp"
+#include "Arrays.hpp"
 
 using namespace std;
 
 namespace trinom
 {
+
+enum class OptionType : char
+{
+    PUT = 'P',
+    CALL = 'C'
+};
+
+inline ostream &operator<<(ostream &os, const OptionType t)
+{
+    os << static_cast<char>(t);
+    return os;
+}
+
+inline istream &operator>>(istream &is, OptionType &t)
+{
+    char c;
+    is >> c;
+    t = static_cast<OptionType>(c);
+    if (OptionType::CALL != t && OptionType::PUT != t)
+    {
+        throw out_of_range("Invalid OptionType read from stream.");
+    }
+    return is;
+}
 
 struct Option
 {
@@ -22,6 +46,7 @@ struct Option
     int TermStepCount;
     real ReversionRate;
     real Volatility;
+    OptionType Type;
 
     static vector<Option> read_options(const string &filename)
     {
@@ -44,14 +69,16 @@ struct Option
         vector<int> termsteps;
         vector<real> rrps;
         vector<real> vols;
+        vector<OptionType> types;
 
-        FutharkArrays::read_futhark_array(in, &strikes);
-        FutharkArrays::read_futhark_array(in, &maturities);
-        FutharkArrays::read_futhark_array(in, &lengths);
-        FutharkArrays::read_futhark_array(in, &termunits);
-        FutharkArrays::read_futhark_array(in, &termsteps);
-        FutharkArrays::read_futhark_array(in, &rrps);
-        FutharkArrays::read_futhark_array(in, &vols);
+        Arrays::read_array(in, &strikes);
+        Arrays::read_array(in, &maturities);
+        Arrays::read_array(in, &lengths);
+        Arrays::read_array(in, &termunits);
+        Arrays::read_array(in, &termsteps);
+        Arrays::read_array(in, &rrps);
+        Arrays::read_array(in, &vols);
+        Arrays::read_array(in, &types);
 
         in.close();
 
@@ -69,12 +96,12 @@ struct Option
             o.TermStepCount = termsteps.at(i);
             o.ReversionRate = rrps.at(i);
             o.Volatility = vols.at(i);
+            o.Type = types.at(i);
             options.push_back(o);
         }
         return options;
     }
 };
-
 }
 
 #endif
