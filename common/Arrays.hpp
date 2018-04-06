@@ -1,5 +1,5 @@
-#ifndef FUTHARK_ARRAYS_HPP
-#define FUTHARK_ARRAYS_HPP
+#ifndef ARRAYS_HPP
+#define ARRAYS_HPP
 
 #include <type_traits>
 #include <vector>
@@ -11,11 +11,13 @@ using namespace std;
 namespace trinom
 {
 
-class FutharkArrays
+class Arrays
 {
+
   public:
-	template <class T>
-	typename std::enable_if<std::is_arithmetic<T>::value, void>::type static read_futhark_array(istream &in, vector<T> *array)
+	template <class T,
+			  class = decltype(declval<istream &>() >> declval<T &>())>
+	static void read_array(istream &in, vector<T> *array)
 	{
 		T x;
 		char c;
@@ -30,8 +32,9 @@ class FutharkArrays
 		}
 	}
 
-	template <class T>
-	typename std::enable_if<std::is_arithmetic<T>::value, void>::type static write_futhark_array(T *array, unsigned int length)
+	template <class T,
+			  class = decltype(declval<ostream &>() << declval<T>())>
+	static void write_array(T *array, unsigned int length)
 	{
 		cout.precision(numeric_limits<T>::max_digits10);
 
@@ -43,7 +46,6 @@ class FutharkArrays
 		cout << ']' << endl;
 	}
 };
-
 }
 
 #endif

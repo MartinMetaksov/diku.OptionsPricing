@@ -12,6 +12,15 @@ typedef double real;
 typedef float real;
 #endif
 
+const real zero = 0;
+const real one = 1;
+const real two = 2;
+const real half = one / two;
+const real three = 3;
+const real six = 6;
+const real seven = 7;
+const real year = 365;
+const real minus184 = -0.184;
 }
 
 #endif

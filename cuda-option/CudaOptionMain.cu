@@ -3,7 +3,7 @@
 #define CUDA_ERROR_CHECK
 
 #include "CudaOption.cuh"
-#include "../common/FutharkArrays.hpp"
+#include "../common/Arrays.hpp"
 
 using namespace std;
 using namespace trinom;
@@ -23,8 +23,7 @@ void computeAllOptions(const string &filename, bool isTest)
     auto result = new real[length];
     cuda::computeOptions(optionConstants, result, length, isTest);
 
-    // Don't print mock results
-    FutharkArrays::write_futhark_array(result, length);
+    Arrays::write_array(result, length);
 
     delete[] result;
     delete[] optionConstants;
