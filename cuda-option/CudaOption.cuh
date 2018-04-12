@@ -165,7 +165,7 @@ void computeOptions(OptionConstants *options, real *result, int count, bool isTe
     totalAlphasCount += options[count - 1].n + 1;
     
     auto blockSize = 32;
-    auto blockCount = count / (blockSize + 1) + 1;
+    auto blockCount = ceil(count / ((float)blockSize));
 
     if (isTest)
     {
