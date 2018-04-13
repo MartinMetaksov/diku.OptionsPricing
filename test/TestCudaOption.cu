@@ -5,6 +5,16 @@
 
 using namespace trinom;
 
+void compareVectors(vector<real> a, vector<real> b)
+{
+    REQUIRE(a.size() == b.size());
+
+    for (auto i = 0; i < a.size(); i++)
+    {
+        CHECK(a[i] == Approx(b[i]));
+    }
+}
+
 TEST_CASE("One option per thread cuda")
 {
     int bookCount = 100;
@@ -31,7 +41,7 @@ TEST_CASE("One option per thread cuda")
         real result;
         cuda::computeOptions(book, &result, 1);
 
-        REQUIRE(result == bookResults.at(0));
+        REQUIRE(result == Approx(bookResults.at(0)));
     }
     SECTION("Compute book options with more precision")
     {
@@ -39,7 +49,7 @@ TEST_CASE("One option per thread cuda")
         results.resize(bookCount);
         cuda::computeOptions(book, results.data(), bookCount);
 
-        REQUIRE(bookResults == results);
+        compareVectors(bookResults, results);
     }
     SECTION("Compute random options")
     {
@@ -60,6 +70,6 @@ TEST_CASE("One option per thread cuda")
         results.resize(count);
         cuda::computeOptions(options_p, results.data(), count);
 
-        REQUIRE(goldResults == results);
+        compareVectors(goldResults, results);
     }
 }
