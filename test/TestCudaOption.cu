@@ -5,13 +5,13 @@
 
 using namespace trinom;
 
-void compareVectors(vector<real> a, vector<real> b)
+void compareVectors(vector<real> test, vector<real> gold)
 {
-    REQUIRE(a.size() == b.size());
+    REQUIRE(test.size() == gold.size());
 
-    for (auto i = 0; i < a.size(); i++)
+    for (auto i = 0; i < test.size(); i++)
     {
-        CHECK(a[i] == Approx(b[i]));
+        CHECK(test[i] == Approx(gold[i]));
     }
 }
 
@@ -49,7 +49,7 @@ TEST_CASE("One option per thread cuda")
         results.resize(bookCount);
         cuda::computeOptions(book, results.data(), bookCount);
 
-        compareVectors(bookResults, results);
+        compareVectors(results, bookResults);
     }
     SECTION("Compute random options")
     {
@@ -70,6 +70,6 @@ TEST_CASE("One option per thread cuda")
         results.resize(count);
         cuda::computeOptions(options_p, results.data(), count);
 
-        compareVectors(goldResults, results);
+        compareVectors(results, goldResults);
     }
 }
