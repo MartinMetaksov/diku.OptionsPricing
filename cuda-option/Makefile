@@ -17,7 +17,7 @@ $(EXECUTABLE):
 
 compile-compare: $(COMPARE)
 $(COMPARE):
-	@futhark-opencl compare.fut
+	@futhark-opencl $(DATA)/compare.fut
 
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE) $(DATA)/$(FILE).in
@@ -31,7 +31,7 @@ mock: $(EXECUTABLE)
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
 	@./$(EXECUTABLE) $(DATA)/$(FILE).in > $(FILE).test.out
-	@cat $(DATA)/$(FILE).out $(FILE).test.out | ./compare 
+	@cat $(DATA)/$(FILE).out $(FILE).test.out | ./$(DATA)/compare 
 
 clean:
 	@rm -f $(EXECUTABLE)
