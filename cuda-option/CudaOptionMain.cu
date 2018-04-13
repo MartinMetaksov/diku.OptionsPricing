@@ -23,7 +23,10 @@ void computeAllOptions(const string &filename, bool isTest)
     auto result = new real[length];
     cuda::computeOptions(optionConstants, result, length, isTest);
 
-    Arrays::write_array(result, length);
+    if (!isTest)
+    {
+        Arrays::write_array(result, length);
+    }
 
     delete[] result;
     delete[] optionConstants;
