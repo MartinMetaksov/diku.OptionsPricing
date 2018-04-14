@@ -32,90 +32,51 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     Qs[c.jmax] = one;
     alphas[0] = getYieldAtYear(c.dt);
 
-    for (auto i = 1; i <= c.n; ++i)
+    for (auto i = 0; i < c.n; ++i)
     {
         auto jhigh = min(i, c.jmax);
-        auto alpha = alphas[i-1];
-        real alpha_val = 0;
+        auto alpha = alphas[i];
 
         // Forward iteration step, compute Qs in the next time step
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j - jmin;      // array index for j
+            auto qexp = Qs[jind] * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
 
-            auto expp1 = j == jhigh ? zero : Qs[jind + 1] * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm = Qs[jind] * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm1 = j == -jhigh ? zero : Qs[jind - 1] * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            
-            if (i == 1) {
-                if (j == -jhigh) {
-                    QsCopy[jind] = 
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                } else if (j == jhigh) {
-                    QsCopy[jind] = 
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
-                } else {
-                    QsCopy[jind] = 
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
-                }
+            if (j == jmin)
+            {
+                // Bottom edge branching
+                QsCopy[jind + 2] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp; // up two
+                QsCopy[jind + 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp; // up one
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp;     // middle
             }
-            else if (i <= c.jmax) {
-                if (j == -jhigh) {
-                    QsCopy[jind] = 
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    QsCopy[jind] = 
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                } else if (j == jhigh) {
-                    QsCopy[jind] =
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
-                } else if (j == jhigh - 1) {
-                    QsCopy[jind] =
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
-                } else {
-                    QsCopy[jind] =
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                }
-            } else {
-                if (j == -jhigh) {
-                    QsCopy[jind] =
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    QsCopy[jind] =
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
-                            
-                } else if (j == jhigh) {
-                    QsCopy[jind] =
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
-                } else if (j == jhigh - 1) {
-                    QsCopy[jind] =
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
-                            
-                } else {
-                    QsCopy[jind] =
-                            ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * Qs[jind - 2] * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
-                            ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * Qs[jind + 2] * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
-                }
+            else if (j == c.jmax)
+            {
+                // Top edge branching
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp;     // middle
+                QsCopy[jind - 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp; // down one
+                QsCopy[jind - 2] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp; // down two
             }
-            // Determine the new alpha using equation 30.22
-            // by summing up Qs from the next time step
+            else
+            {
+                // Standard branching
+                QsCopy[jind + 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * qexp; // up
+                QsCopy[jind] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * qexp;     // middle
+                QsCopy[jind - 1] += computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * qexp; // down
+            }
+        }
+
+        // Determine the new alpha using equation 30.22
+        // by summing up Qs from the next time step
+        auto jhigh1 = min(i + 1, c.jmax);
+        real alpha_val = 0;
+        for (auto j = -jhigh1; j <= jhigh1; ++j)
+        {
+            auto jind = j - jmin;      // array index for j
             alpha_val += QsCopy[jind] * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alphas[i] = computeAlpha(alpha_val, i-1, c.dt);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt);
 
         // Switch Qs
         auto QsT = Qs;
