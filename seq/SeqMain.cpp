@@ -24,6 +24,7 @@ void print_array_csv(ostream &out, real *array, int size)
 **/
 real compute_single_option(const Option &option)
 {
+    const auto precision = numeric_limits<real>::max_digits10;
     auto c = computeConstants(option);
 
     // Precompute probabilities and rates for all js.
@@ -61,6 +62,7 @@ real compute_single_option(const Option &option)
     alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
 
     ofstream out("seq-forward-" + to_string(c.n) + ".csv");
+    out.precision(precision);
 
     out << "i,alpha,";
     for (auto j = jmin; j <= c.jmax; ++j)
@@ -118,7 +120,7 @@ real compute_single_option(const Option &option)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        auto ti = (i + 2) * c.dt;           // next next time step
+        auto ti = (i + 1) * c.dt + 1;       // next next time step
         auto R = getYieldAtYear(ti);        // discount rate
         auto P = exp(-R * ti);              // discount bond price
         alphas[i + 1] = log(alpha_val / P); // new alpha
@@ -141,6 +143,7 @@ real compute_single_option(const Option &option)
     fill_n(call, c.width, 100); // initialize to 100$
 
     ofstream out2("seq-backward-" + to_string(c.n) + ".csv");
+    out2.precision(precision);
 
     out2 << "i,";
     for (auto j = jmin; j <= c.jmax; ++j)
