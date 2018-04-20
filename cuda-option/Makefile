@@ -20,18 +20,15 @@ $(COMPARE):
 	@futhark-opencl $(DATA)/compare.fut
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) $(DATA)/$(FILE).in
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in
 
 test: $(EXECUTABLE)
-	@./$(EXECUTABLE) $(DATA)/$(FILE).in -test
-
-mock: $(EXECUTABLE)
-	@./$(EXECUTABLE) -test -mock $(COUNT)
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -test
 
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
-	@./$(EXECUTABLE) $(DATA)/$(FILE).in > $(FILE).test.out
-	@cat $(DATA)/$(FILE).out $(FILE).test.out | ./$(DATA)/compare 
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in > $(FILE).test.out
+	@cat $(DATA)/$(FILE).out $(FILE).test.out | ./compare 
 
 clean:
 	@rm -f $(EXECUTABLE)

@@ -1,7 +1,7 @@
 #ifndef DOMAIN_HPP
 #define DOMAIN_HPP
 
-#include "Real.hpp"
+#include "Yield.hpp"
 #include "OptionConstants.hpp"
 #include <cmath>
 #include <algorithm>
@@ -10,12 +10,6 @@ using namespace std;
 
 namespace trinom
 {
-
-struct Yield
-{
-    real p;
-    int t;
-};
 
 #ifdef __CUDA_ARCH__
 #define CONSTANT __constant__
@@ -29,39 +23,15 @@ struct Yield
 #define DEVICE
 #endif
 
-// The DM zero coupon yield curve, July 8, 1994.
-CONSTANT Yield h_YieldCurve[] =
-    {{.p = 0.0501772, .t = 3},    //
-     {.p = 0.0498284, .t = 31},   //
-     {.p = 0.0497234, .t = 62},   //
-     {.p = 0.0496157, .t = 94},   //
-     {.p = 0.0499058, .t = 185},  //
-     {.p = 0.0509389, .t = 367},  //
-     {.p = 0.0579733, .t = 731},  //
-     {.p = 0.0630595, .t = 1096}, //
-     {.p = 0.0673464, .t = 1461}, //
-     {.p = 0.0694816, .t = 1826}, //
-     {.p = 0.0708807, .t = 2194}, //
-     {.p = 0.0727527, .t = 2558}, //
-     {.p = 0.0730852, .t = 2922}, //
-     {.p = 0.0739790, .t = 3287}, //
-     {.p = 0.0749015, .t = 3653}};
-
-// Yield h_YieldCurve[] =
-//     {{.p = 0.03430, .t = (int)(0.5 * year)}, //
-//      {.p = 0.03824, .t = (int)(1.0 * year)}, //
-//      {.p = 0.04183, .t = (int)(1.5 * year)}, //
-//      {.p = 0.04512, .t = (int)(2.0 * year)}, //
-//      {.p = 0.04812, .t = (int)(2.5 * year)}, //
-//      {.p = 0.05086, .t = (int)(3.0 * year)}};
-DEVICE real getYieldAtYear(real t)
+DEVICE real getYieldAtYear(real t, const Yield *curve, const int size)
 {
     t *= year;
-    auto first = h_YieldCurve[0];
-    auto second = h_YieldCurve[0];
+    auto first = curve[0];
+    auto second = curve[0];
 
-    for (auto yield : h_YieldCurve)
+    for (auto i = 0; i < size; ++i)
     {
+        const auto yield = curve[i];
         if (yield.t > t)
         {
             second = yield;
@@ -130,12 +100,12 @@ DEVICE inline real PD_C(int j, real M)
     return one / six + (j * j * M * M + j * M) * half;
 }
 
-DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt)
+DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt, const Yield *curve, const int size)
 {
-    auto ti = (i + 2) * dt;       // next next time step
-    auto R = getYieldAtYear(ti);  // discount rate
-    auto P = exp(-R * ti);        // discount bond price
-    return log(aggregatedQs / P); // new alpha
+    auto ti = (i + 1) * dt + one;
+    auto R = getYieldAtYear(ti, curve, size); // discount rate
+    auto P = exp(-R * ti);                    // discount bond price
+    return log(aggregatedQs / P);             // new alpha
 }
 
 DEVICE real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)

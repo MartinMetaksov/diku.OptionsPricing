@@ -16,8 +16,11 @@ using namespace trinom;
 namespace cuda
 {
     
+__constant__ Yield YieldCurve[100];
+    
 __global__ void
-computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *QsInd, int *alphasInd, int totalCount)
+computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, 
+    int *QsInd, int *alphasInd, int totalCount, int yieldCurveSize)
 {
     auto idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -30,7 +33,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     auto alphas = alphasAll + alphasInd[idx];
     auto jmin = -c.jmax;
     Qs[c.jmax] = one;
-    alphas[0] = getYieldAtYear(c.dt);
+    alphas[0] = getYieldAtYear(c.dt, YieldCurve, yieldCurveSize);
 
     for (auto i = 0; i < c.n; ++i)
     {
@@ -76,7 +79,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
             alpha_val += QsCopy[jind] * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, YieldCurve, yieldCurveSize);
 
         // Switch Qs
         auto QsT = Qs;
@@ -144,7 +147,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     res[idx] = call[c.jmax];
 }
 
-void computeOptions(OptionConstants *options, real *result, int count, bool isTest = false)
+void computeOptions(OptionConstants *options, real *result, int count, const vector<Yield> &yield, bool isTest = false)
 {
     // Compute indices
     int* QsInd = new int[count];
@@ -188,12 +191,13 @@ void computeOptions(OptionConstants *options, real *result, int count, bool isTe
     CudaSafeCall(cudaMalloc((void **)&d_QsCopy, totalQsCount * sizeof(real)));
     CudaSafeCall(cudaMalloc((void **)&d_alphas, totalAlphasCount * sizeof(real)));
 
-    cudaMemcpy(d_options, options, count * sizeof(OptionConstants), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_QsInd, QsInd, count * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_alphasInd, alphasInd, count * sizeof(int), cudaMemcpyHostToDevice);
+    CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
+    CudaSafeCall(cudaMemcpy(d_options, options, count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_QsInd, QsInd, count * sizeof(int), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_alphasInd, alphasInd, count * sizeof(int), cudaMemcpyHostToDevice));
 
     auto time_begin_kernel = steady_clock::now();
-    computeSingleOptionKernel<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_QsInd, d_alphasInd, count);
+    computeSingleOptionKernel<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_QsInd, d_alphasInd, count, yield.size());
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
 

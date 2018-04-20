@@ -18,8 +18,11 @@ struct jvalue
  *  Sequential version that computes the bond tree until bond maturity
  *  and prices the option on maturity during backward propagation.
  **/
-real computeSingleOption(const OptionConstants &c)
+real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
 {
+    const Yield *curve = yield.data();
+    const int curveSize = yield.size();
+
     // Precompute probabilities and rates for all js.
     auto jvalues = new jvalue[c.width];
     auto jmin = -c.jmax;
@@ -51,8 +54,8 @@ real computeSingleOption(const OptionConstants &c)
     auto QsCopy = new real[c.width](); // QsCopy[j]
     Qs[c.jmax] = one;                  // Qs[0] = 1$
 
-    auto alphas = new real[c.n + 1](); // alphas[i]
-    alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
+    auto alphas = new real[c.n + 1]();                  // alphas[i]
+    alphas[0] = getYieldAtYear(c.dt, curve, curveSize); // initial dt-period interest rate
 
     for (auto i = 0; i < c.n; ++i)
     {
@@ -100,7 +103,7 @@ real computeSingleOption(const OptionConstants &c)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, curve, curveSize);
 
         // Switch Qs
         auto QsT = Qs;

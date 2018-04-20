@@ -16,10 +16,10 @@ $(EXECUTABLE):
 	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) $(DATA)/$(FILE).in
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in
 
 test: $(EXECUTABLE)
-	@./$(EXECUTABLE) $(DATA)/$(FILE).in -test
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -test
 
 clean:
 	@rm -f $(EXECUTABLE)

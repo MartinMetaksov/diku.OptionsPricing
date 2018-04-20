@@ -4,14 +4,16 @@
 
 #include "CudaOption.cuh"
 #include "../common/Arrays.hpp"
+#include "../common/Args.hpp"
 
 using namespace std;
 using namespace trinom;
 
-void computeAllOptions(const string &filename, bool isTest)
+void computeAllOptions(const Args &args)
 {
     // Read options from filename, allocate the result array
-    auto options = Option::read_options(filename);
+    auto options = Option::readOptions(args.options);
+    auto yield = Yield::readYieldCurve(args.yield);
     auto length = options.size();
     auto optionConstants = new OptionConstants[length];
 
@@ -21,9 +23,12 @@ void computeAllOptions(const string &filename, bool isTest)
     }
 
     auto result = new real[length];
-    cuda::computeOptions(optionConstants, result, length, isTest);
+    cuda::computeOptions(optionConstants, result, length, yield, args.test);
 
-    Arrays::write_array(result, length);        
+    if (!args.test)
+    {
+        Arrays::write_array(result, length);
+    }
 
     delete[] result;
     delete[] optionConstants;
@@ -31,21 +36,9 @@ void computeAllOptions(const string &filename, bool isTest)
 
 int main(int argc, char *argv[])
 {
-    bool isTest = false;
-    string filename;
-    for (int i = 1; i < argc; ++i)
-    {
-        if (strcmp(argv[i], "-test") == 0)
-        {
-            isTest = true;
-        }
-        else
-        {
-            filename = argv[i];
-        }
-    }
+    auto args = Args::parseArgs(argc, argv);
 
-    computeAllOptions(filename, isTest);
+    computeAllOptions(args);
 
     return 0;
 }

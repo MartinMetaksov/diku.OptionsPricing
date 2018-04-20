@@ -48,7 +48,7 @@ struct Option
     real Volatility;
     OptionType Type;
 
-    static vector<Option> read_options(const string &filename)
+    static vector<Option> readOptions(const string &filename)
     {
         if (filename.empty())
         {

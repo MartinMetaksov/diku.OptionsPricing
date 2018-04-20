@@ -5,6 +5,8 @@
 
 using namespace trinom;
 
+#define YIELD_CURVE_PATH "../data/yield.in" 
+
 void compareVectors(vector<real> test, vector<real> gold)
 {
     REQUIRE(test.size() == gold.size());
@@ -17,6 +19,8 @@ void compareVectors(vector<real> test, vector<real> gold)
 
 TEST_CASE("One option per thread cuda")
 {
+    auto yield = Yield::readYieldCurve(YIELD_CURVE_PATH);
+
     int bookCount = 100;
     OptionConstants book[bookCount];
     vector<real> bookResults;
@@ -33,13 +37,13 @@ TEST_CASE("One option per thread cuda")
         o.Volatility = 0.01;
 
         book[i] = OptionConstants::computeConstants(o);
-        bookResults.push_back(seq::computeSingleOption(book[i]));
+        bookResults.push_back(seq::computeSingleOption(book[i], yield));
     }
 
     SECTION("Compute one book option")
     {
         real result;
-        cuda::computeOptions(book, &result, 1);
+        cuda::computeOptions(book, &result, 1, yield);
 
         REQUIRE(result == Approx(bookResults.at(0)));
     }
@@ -47,7 +51,7 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(bookCount);
-        cuda::computeOptions(book, results.data(), bookCount);
+        cuda::computeOptions(book, results.data(), bookCount, yield);
 
         compareVectors(results, bookResults);
     }
@@ -63,12 +67,12 @@ TEST_CASE("One option per thread cuda")
         goldResults.reserve(count);
         for (auto &option : options)
         {
-            goldResults.push_back(seq::computeSingleOption(option));
+            goldResults.push_back(seq::computeSingleOption(option, yield));
         }
 
         vector<real> results;
         results.resize(count);
-        cuda::computeOptions(options_p, results.data(), count);
+        cuda::computeOptions(options_p, results.data(), count, yield);
 
         compareVectors(results, goldResults);
     }

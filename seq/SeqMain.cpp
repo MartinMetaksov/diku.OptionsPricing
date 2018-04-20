@@ -1,21 +1,22 @@
 #include "../common/Domain.hpp"
 #include "../common/OptionConstants.hpp"
 #include "../common/Arrays.hpp"
+#include "../common/Args.hpp"
 #include "Seq.hpp"
-#include <cstring>
 
 using namespace trinom;
 
-void computeAllOptions(const string &filename)
+void computeAllOptions(const Args &args)
 {
     // Read options from filename, allocate the result array
-    auto options = Option::read_options(filename);
+    auto options = Option::readOptions(args.options);
+    auto yield = Yield::readYieldCurve(args.yield);
     auto result = new real[options.size()];
 
     for (int i = 0; i < options.size(); ++i)
     {
         auto c = OptionConstants::computeConstants(options.at(i));
-        result[i] = seq::computeSingleOption(c);
+        result[i] = seq::computeSingleOption(c, yield);
     }
 
     Arrays::write_array(result, options.size());
@@ -25,21 +26,9 @@ void computeAllOptions(const string &filename)
 
 int main(int argc, char *argv[])
 {
-    bool isTest = false;
-    string filename;
-    for (int i = 1; i < argc; ++i)
-    {
-        if (strcmp(argv[i], "-test") == 0)
-        {
-            isTest = true;
-        }
-        else
-        {
-            filename = argv[i];
-        }
-    }
+    auto args = Args::parseArgs(argc, argv);
 
-    computeAllOptions(filename);
+    computeAllOptions(args);
 
     return 0;
 }
