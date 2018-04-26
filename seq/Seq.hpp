@@ -54,8 +54,8 @@ real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
     auto QsCopy = new real[c.width](); // QsCopy[j]
     Qs[c.jmax] = one;                  // Qs[0] = 1$
 
-    auto alphas = new real[c.n + 1]();                  // alphas[i]
-    alphas[0] = getYieldAtYear(c.dt, curve, curveSize); // initial dt-period interest rate
+    auto alphas = new real[c.n + 1]();                              // alphas[i]
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit, curve, curveSize); // initial dt-period interest rate
 
     for (auto i = 0; i < c.n; ++i)
     {
@@ -103,7 +103,7 @@ real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, curve, curveSize);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, c.termUnit, curve, curveSize);
 
         // Switch Qs
         auto QsT = Qs;

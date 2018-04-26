@@ -23,16 +23,16 @@ namespace trinom
 #define DEVICE
 #endif
 
-DEVICE real getYieldAtYear(real t, const Yield *curve, const int size)
+DEVICE real getYieldAtYear(const real t, const int termUnit, const Yield *curve, const int size)
 {
-    t *= year;
+    const int tDays = (int)round(t * termUnit);
     auto first = curve[0];
     auto second = curve[0];
 
     for (auto i = 0; i < size; ++i)
     {
         const auto yield = curve[i];
-        if (yield.t > t)
+        if (yield.t >= tDays)
         {
             second = yield;
             break;
@@ -46,7 +46,7 @@ DEVICE real getYieldAtYear(real t, const Yield *curve, const int size)
         return first.p;
     }
 
-    auto coefficient = (t - first.t) / (second.t - first.t);
+    auto coefficient = (tDays - first.t) / (real)(second.t - first.t);
     return first.p + coefficient * (second.p - first.p);
 }
 
@@ -100,12 +100,12 @@ DEVICE inline real PD_C(int j, real M)
     return one / six + (j * j * M * M + j * M) * half;
 }
 
-DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt, const Yield *curve, const int size)
+DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt, const int termUnit, const Yield *curve, const int size)
 {
-    auto ti = (i + 1) * dt + one;
-    auto R = getYieldAtYear(ti, curve, size); // discount rate
-    auto P = exp(-R * ti);                    // discount bond price
-    return log(aggregatedQs / P);             // new alpha
+    auto ti = (i + 2) * dt;
+    auto R = getYieldAtYear(ti, termUnit, curve, size); // discount rate
+    auto P = exp(-R * ti);                              // discount bond price
+    return log(aggregatedQs / P) / dt;                  // new alpha
 }
 
 DEVICE real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)

@@ -2,7 +2,7 @@ CXX        = nvcc -std=c++11 --ptxas-options=-v
 
 
 SOURCES_CPP =CudaOptionMain.cu
-EXECUTABLE  =../build/CudaOption
+EXECUTABLE  =../build/CudaOptionScatter
 DATA		=../data
 COMPARE		=compare
 

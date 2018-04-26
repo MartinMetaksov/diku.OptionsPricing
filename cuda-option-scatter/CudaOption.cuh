@@ -33,7 +33,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
     auto alphas = alphasAll + alphasInd[idx];
     auto jmin = -c.jmax;
     Qs[c.jmax] = one;
-    alphas[0] = getYieldAtYear(c.dt, YieldCurve, yieldCurveSize);
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
 
     for (auto i = 0; i < c.n; ++i)
     {
@@ -79,7 +79,7 @@ computeSingleOptionKernel(real *res, OptionConstants *options, real *QsAll, real
             alpha_val += QsCopy[jind] * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, YieldCurve, yieldCurveSize);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
 
         // Switch Qs
         auto QsT = Qs;

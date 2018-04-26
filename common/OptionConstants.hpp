@@ -12,6 +12,7 @@ namespace trinom
 struct OptionConstants
 {
   public:
+    int termUnit;
     real t;
     int n;
     real dt; // [years]
@@ -27,6 +28,7 @@ struct OptionConstants
         OptionConstants c;
         auto T = option.Maturity;
         auto termUnitsInYearCount = ceil((real)year / option.TermUnit);
+        c.termUnit = option.TermUnit;
         c.t = option.Length;
         c.n = option.TermStepCount * termUnitsInYearCount * T;
         c.dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
