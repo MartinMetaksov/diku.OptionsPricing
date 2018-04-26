@@ -58,8 +58,8 @@ real compute_single_option(const Option &option)
     auto QsCopy = new real[c.width](); // QsCopy[j]
     Qs[c.jmax] = one;                  // Qs[0] = 1$
 
-    auto alphas = new real[c.n + 1](); // alphas[i]
-    alphas[0] = getYieldAtYear(c.dt);  // initial dt-period interest rate
+    auto alphas = new real[c.n + 1]();            // alphas[i]
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit); // initial dt-period interest rate
 
     ofstream out("seq-forward-" + to_string(c.n) + ".csv");
     out.precision(precision);
@@ -120,10 +120,10 @@ real compute_single_option(const Option &option)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        auto ti = (i + 1) * c.dt + 1;       // next next time step
-        auto R = getYieldAtYear(ti);        // discount rate
-        auto P = exp(-R * ti);              // discount bond price
-        alphas[i + 1] = log(alpha_val / P); // new alpha
+        auto ti = (i + 2) * c.dt;                  // next next time step
+        auto R = getYieldAtYear(ti, c.termUnit);   // discount rate
+        auto P = exp(-R * ti);                     // discount bond price
+        alphas[i + 1] = log(alpha_val / P) / c.dt; // new alpha
 
         // Switch Qs
         auto QsT = Qs;

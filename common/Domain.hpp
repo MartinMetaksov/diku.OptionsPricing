@@ -54,15 +54,15 @@ __constant__
 __device__
 #endif
     real
-    getYieldAtYear(real t)
+    getYieldAtYear(const real t, const int termUnit)
 {
-    t *= year;
+    const int tDays = (int)round(t * termUnit);
     auto first = h_YieldCurve[0];
     auto second = h_YieldCurve[0];
 
     for (auto yield : h_YieldCurve)
     {
-        if (yield.t > t)
+        if (yield.t >= tDays)
         {
             second = yield;
             break;
@@ -76,7 +76,7 @@ __device__
         return first.p;
     }
 
-    auto coefficient = (t - first.t) / (second.t - first.t);
+    auto coefficient = (tDays - first.t) / (real)(second.t - first.t);
     return first.p + coefficient * (second.p - first.p);
 }
 
@@ -170,7 +170,7 @@ struct OptionConstants
 {
     real T;
     real t;
-    int termUnitsInYearCount;
+    int termUnit;
     int n;
     real dt; // [years]
     real X;
@@ -192,9 +192,10 @@ __device__
     OptionConstants c;
     c.T = option.Maturity;
     c.t = option.Length;
-    c.termUnitsInYearCount = ceil((real)year / option.TermUnit);
-    c.n = option.TermStepCount * c.termUnitsInYearCount * c.T;
-    c.dt = c.termUnitsInYearCount / (real)option.TermStepCount; // [years]
+    c.termUnit = option.TermUnit;
+    int termUnitsInYearCount = ceil((real)year / option.TermUnit);
+    c.n = option.TermStepCount * termUnitsInYearCount * c.T;
+    c.dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
 
     c.X = option.StrikePrice;
     c.a = option.ReversionRate;
