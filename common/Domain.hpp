@@ -3,8 +3,6 @@
 
 #include "Yield.hpp"
 #include "OptionConstants.hpp"
-#include <cmath>
-#include <algorithm>
 
 using namespace std;
 
@@ -25,7 +23,7 @@ namespace trinom
 
 DEVICE real getYieldAtYear(const real t, const int termUnit, const Yield *curve, const int size)
 {
-    const int tDays = (int)round(t * termUnit);
+    const int tDays = (int)ROUND(t * termUnit);
     auto first = curve[0];
     auto second = curve[0];
 
