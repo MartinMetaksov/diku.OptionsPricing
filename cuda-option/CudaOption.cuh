@@ -205,7 +205,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
     const auto count = options.size();
     const auto totalQsCount = maxWidth * count;
     const auto totalAlphasCount = maxHeight * count;
-    const auto blockSize = 32;
+    const auto blockSize = 64;
     const auto blockCount = ceil(count / ((float)blockSize));
 
     if (isTest)
@@ -433,7 +433,7 @@ void computeOptionsNaive(const vector<OptionConstants> &options, const vector<Yi
     totalQsCount += options.at(count - 1).width;
     totalAlphasCount += options.at(count - 1).n + 1;
     
-    auto blockSize = 32;
+    auto blockSize = 64;
     auto blockCount = ceil(count / ((float)blockSize));
 
     if (isTest)
