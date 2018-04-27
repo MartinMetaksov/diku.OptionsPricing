@@ -33,6 +33,9 @@ void computeAllOptions(const Args &args)
         case 2:
             cuda::computeOptionsCoalesced(optionConstants, yield, result, args.test);
             break;
+        case 3:
+            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yield, result, args.test);
+            break;
     }
 
     if (!args.test)

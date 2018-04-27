@@ -106,7 +106,7 @@ DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real
     return log(aggregatedQs / P) / dt;                  // new alpha
 }
 
-DEVICE real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)
+DEVICE inline real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)
 {
     // this i is only local and has nothing to do with the height of the tree.
     if (i == 0)
