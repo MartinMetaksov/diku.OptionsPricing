@@ -24,7 +24,16 @@ void computeAllOptions(const Args &args)
     }
 
     auto result = new real[options.size()];
-    cuda::computeOptions(optionConstants, yield, result, args.test);
+
+    switch (args.version)
+    {
+        case 1:
+            cuda::computeOptionsNaive(optionConstants, yield, result, args.test);
+            break;
+        case 2:
+            cuda::computeOptionsCoalesced(optionConstants, yield, result, args.test);
+            break;
+    }
 
     if (!args.test)
     {

@@ -19,6 +19,8 @@ class Mock
         c.jmax = width / 2;
         c.M = minus184 / (c.jmax - 1);
         c.width = 2 * c.jmax + 1;
+        c.termUnit = 365;
+        c.type = OptionType::PUT;
         fill_n(result, count, c);
     }
 };

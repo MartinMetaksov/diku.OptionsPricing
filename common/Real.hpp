@@ -5,7 +5,7 @@ namespace trinom
 {
 
 // Define this to use doubles
-#define USE_DOUBLE
+//#define USE_DOUBLE
 #ifdef USE_DOUBLE
 typedef double real;
 #define ROUND(X) round((X))
@@ -23,7 +23,6 @@ const real six = 6;
 const real seven = 7;
 const real year = 365;
 const real minus184 = -0.184;
-
 }
 
 #endif

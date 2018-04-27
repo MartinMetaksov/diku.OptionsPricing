@@ -13,7 +13,8 @@ void compareVectors(vector<real> test, vector<real> gold)
 
     for (auto i = 0; i < test.size(); i++)
     {
-        CHECK(test[i] == Approx(gold[i]));
+        // epsilon serves to set the percentage by which a result can be erroneous, before it is rejected.
+        CHECK(test[i] == Approx(gold[i]).epsilon(0.0001));
     }
 }
 
@@ -22,9 +23,10 @@ TEST_CASE("One option per thread cuda")
     auto yield = Yield::readYieldCurve(YIELD_CURVE_PATH);
 
     int bookCount = 100;
-    OptionConstants book[bookCount];
     vector<real> bookResults;
+    vector<OptionConstants> book;
     bookResults.reserve(bookCount);
+    book.reserve(bookCount);
     for (int i = 0; i < bookCount; ++i)
     {
         Option o;
@@ -36,32 +38,25 @@ TEST_CASE("One option per thread cuda")
         o.ReversionRate = 0.1;
         o.Volatility = 0.01;
 
-        book[i] = OptionConstants::computeConstants(o);
+        book.push_back(OptionConstants::computeConstants(o));
         bookResults.push_back(seq::computeSingleOption(book[i], yield));
     }
 
-    SECTION("Compute one book option")
-    {
-        real result;
-        cuda::computeOptions(book, &result, 1, yield);
-
-        REQUIRE(result == Approx(bookResults.at(0)));
-    }
     SECTION("Compute book options with more precision")
     {
         vector<real> results;
         results.resize(bookCount);
-        cuda::computeOptions(book, results.data(), bookCount, yield);
+        cuda::computeOptionsCoalesced(book, yield, results.data());
 
         compareVectors(results, bookResults);
     }
     SECTION("Compute random options")
     {
         int count = 104;
-        OptionConstants options[count];
-        OptionConstants *options_p = options;
+        vector<OptionConstants> options;
+        options.resize(count);
 
-        Mock::mockConstants(options_p, count, 1001, 12);
+        Mock::mockConstants(options.data(), count, 1001, 12);
 
         vector<real> goldResults;
         goldResults.reserve(count);
@@ -72,7 +67,7 @@ TEST_CASE("One option per thread cuda")
 
         vector<real> results;
         results.resize(count);
-        cuda::computeOptions(options_p, results.data(), count, yield);
+        cuda::computeOptionsCoalesced(options, yield, results.data());
 
         compareVectors(results, goldResults);
     }

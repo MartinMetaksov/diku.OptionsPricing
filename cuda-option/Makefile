@@ -1,4 +1,4 @@
-CXX        = nvcc -std=c++11 --ptxas-options=-v
+CXX        = nvcc -std=c++11 #--ptxas-options=-v
 
 
 SOURCES_CPP =CudaOptionMain.cu
@@ -20,10 +20,10 @@ $(COMPARE):
 	@futhark-opencl $(DATA)/compare.fut
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION)
 
 test: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -test
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION) -test
 
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
