@@ -14,24 +14,24 @@ void computeAllOptions(const Args &args)
     // Read options from filename, allocate the result array
     auto options = Option::readOptions(args.options);
     auto yield = Yield::readYieldCurve(args.yield);
-    auto length = options.size();
-    auto optionConstants = new OptionConstants[length];
+    vector<OptionConstants> optionConstants;
+    optionConstants.reserve(options.size());
 
-    for (auto i = 0; i < length; ++i)
+    for (auto &option : options)
     {
-        optionConstants[i] = OptionConstants::computeConstants(options.at(i));
+        auto constant = OptionConstants::computeConstants(option);
+        optionConstants.push_back(constant);
     }
 
-    auto result = new real[length];
-    cuda::computeOptions(optionConstants, result, length, yield, args.test);
+    auto result = new real[options.size()];
+    cuda::computeOptions(optionConstants, yield, result, args.test);
 
     if (!args.test)
     {
-        Arrays::write_array(result, length);
+        Arrays::write_array(result, options.size());
     }
 
     delete[] result;
-    delete[] optionConstants;
 }
 
 int main(int argc, char *argv[])
