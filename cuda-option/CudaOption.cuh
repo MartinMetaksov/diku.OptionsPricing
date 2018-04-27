@@ -33,16 +33,43 @@ __device__ void fillArrayColumn(const int count, const real value, real *array, 
         ptr += totalCount;
     }
 }
+
+__device__ static OptionConstants getOptionFromArrays(const char *array, int i, int count)
+    {
+        real* ts = (real*)array;
+        real* dts = ts + count;
+        real* drs = dts + count;
+        real* Xs = drs + count;
+        real* Ms = Xs + count;
+        int32_t* jmaxs = (int32_t*)(Ms + count);
+        int32_t* ns = jmaxs + count;
+        int32_t* widths = ns + count;
+        uint16_t* termUnits = (uint16_t*)(widths + count);
+        OptionType* types = (OptionType*)(termUnits + count);
+
+        OptionConstants option;
+        option.t = ts[i];
+        option.dt = dts[i];
+        option.dr = drs[i];
+        option.X = Xs[i];
+        option.M = Ms[i];
+        option.jmax = jmaxs[i];
+        option.n = ns[i];
+        option.width = widths[i];
+        option.termUnit = termUnits[i];
+        option.type = types[i];
+        return option;
+    }
     
 __global__ void
-kernelCoalesced(real *res, const OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, const int totalCount, const int yieldCurveSize)
+kernelCoalesced(real *res, const char *options, real *QsAll, real *QsCopyAll, real *alphasAll, const int totalCount, const int yieldCurveSize)
 {
     const int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
     // Out of options check
     if (idx >= totalCount) return;
 
-    auto c = options[idx];
+    auto c = getOptionFromArrays(options, idx, totalCount);
     auto jmin = -c.jmax;
     auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
     *getArrayAt(c.jmax, QsAll, totalCount, idx) = one;
@@ -201,6 +228,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
         }
     }
     maxHeight += 1; // n + 1 alphas
+    auto array = OptionConstants::toStructureOfArrays(options);
     
     const auto count = options.size();
     const auto totalQsCount = maxWidth * count;
@@ -219,7 +247,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
     const auto time_begin = steady_clock::now();
 
     real *d_result, *d_Qs, *d_QsCopy, *d_alphas;
-    OptionConstants *d_options;
+    char *d_options;
     CudaSafeCall(cudaMalloc((void **)&d_result, count * sizeof(real)));
     CudaSafeCall(cudaMalloc((void **)&d_options, count * sizeof(OptionConstants)));
     CudaSafeCall(cudaMalloc((void **)&d_Qs, totalQsCount * sizeof(real)));
@@ -227,7 +255,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
     CudaSafeCall(cudaMalloc((void **)&d_alphas, totalAlphasCount * sizeof(real)));
 
     CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
-    CudaSafeCall(cudaMemcpy(d_options, options.data(), count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_options, array, count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
 
     auto time_begin_kernel = steady_clock::now();
     kernelCoalesced<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, count, yield.size());
@@ -244,6 +272,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
     cudaFree(d_Qs);
     cudaFree(d_QsCopy);
     cudaFree(d_alphas);
+    delete[] array;
 
     auto time_end = steady_clock::now();
     if (isTest)

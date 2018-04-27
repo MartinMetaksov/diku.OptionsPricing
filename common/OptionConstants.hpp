@@ -50,6 +50,40 @@ struct OptionConstants
         c.width = 2 * c.jmax + 1;
         return c;
     }
+
+    static char* toStructureOfArrays(const vector<OptionConstants> &options)
+    {
+        const int count = options.size();
+        char* array = new char[count * sizeof(OptionConstants)];
+
+        real* ts = (real*)array;
+        real* dts = ts + count;
+        real* drs = dts + count;
+        real* Xs = drs + count;
+        real* Ms = Xs + count;
+        int32_t* jmaxs = (int32_t*)(Ms + count);
+        int32_t* ns = jmaxs + count;
+        int32_t* widths = ns + count;
+        uint16_t* termUnits = (uint16_t*)(widths + count);
+        OptionType* types = (OptionType*)(termUnits + count);
+
+        auto i = 0;
+        for (auto &option : options)
+        {
+            ts[i] = option.t;
+            dts[i] = option.dt;
+            drs[i] = option.dr;
+            Xs[i] = option.X;
+            Ms[i] = option.M;
+            jmaxs[i] = option.jmax;
+            ns[i] = option.n;
+            widths[i] = option.width;
+            termUnits[i] = option.termUnit;
+            types[i] = option.type;
+            ++i;
+        }
+        return array;
+    }
 };
 }
 
