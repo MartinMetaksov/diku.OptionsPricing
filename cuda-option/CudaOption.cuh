@@ -44,13 +44,13 @@ computeSingleOptionKernel(real *res, const OptionConstants *options, real *QsAll
 
     auto c = options[idx];
     auto jmin = -c.jmax;
+    auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
     *getArrayAt(c.jmax, QsAll, totalCount, idx) = one;
-    *getArrayAt(0, alphasAll, totalCount, idx) = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+    *getArrayAt(0, alphasAll, totalCount, idx) = alpha;
 
     for (auto i = 1; i <= c.n; ++i)
     {
         const auto jhigh = min(i, c.jmax);
-        const auto alpha = *getArrayAt(i-1, alphasAll, totalCount, idx);
         real alpha_val = 0;
 
         // Forward iteration step, compute Qs in the next time step
@@ -61,76 +61,66 @@ computeSingleOptionKernel(real *res, const OptionConstants *options, real *QsAll
             auto expp1 = j == jhigh ? zero : *getArrayAt(jind + 1, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
             auto expm = *getArrayAt(jind, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
             auto expm1 = j == -jhigh ? zero : *getArrayAt(jind - 1, QsAll, totalCount, idx)  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            
+            real Q;
+
             if (i == 1) {
                 if (j == -jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                 } else if (j == jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
                 } else {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
                 }
             }
             else if (i <= c.jmax) {
                 if (j == -jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                 } else if (j == -jhigh + 1) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
                         computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                 } else if (j == jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
                 } else if (j == jhigh - 1) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
                         computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
                 } else {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
                         computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
                         computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                 }
             } else {
                 if (j == -jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                 } else if (j == -jhigh + 1) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
                             
                 } else if (j == jhigh) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
                 } else if (j == jhigh - 1) {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
                             
                 } else {
-                    *getArrayAt(jind, QsCopyAll, totalCount, idx) = 
-                            ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind - 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
-                            computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                            computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                            computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
-                            ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind + 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind - 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
+                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind + 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
                 }
             }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
-            alpha_val += *getArrayAt(jind, QsCopyAll, totalCount, idx) * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
+            *getArrayAt(jind, QsCopyAll, totalCount, idx) = Q;
+            alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        *getArrayAt(i, alphasAll, totalCount, idx) = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+        alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+        *getArrayAt(i, alphasAll, totalCount, idx) = alpha;
 
         // Switch Qs
         auto QsT = QsAll;
