@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <vector>
+#include <cinttypes>
 #include "Real.hpp"
 #include "Arrays.hpp"
 
@@ -42,11 +43,11 @@ struct Option
     real StrikePrice;
     real Maturity;
     real Length;
-    int TermUnit;
-    int TermStepCount;
     real ReversionRate;
     real Volatility;
     OptionType Type;
+    uint16_t TermUnit;
+    uint16_t TermStepCount;
 
     static vector<Option> readOptions(const string &filename)
     {

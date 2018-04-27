@@ -12,16 +12,17 @@ namespace trinom
 struct OptionConstants
 {
   public:
-    int termUnit;
     real t;
-    int n;
     real dt; // [years]
-    real X;
     real dr;
+    real X;
     real M;
-    int jmax;
-    int width;
-    OptionType type;
+    int32_t jmax;
+    int32_t n;
+    int32_t width;
+    uint16_t termUnit;
+    OptionType type;    // char
+    uint8_t padding;
 
     static OptionConstants computeConstants(const Option &option)
     {

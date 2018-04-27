@@ -186,7 +186,7 @@ kernelCoalesced(real *res, const OptionConstants *options, real *QsAll, real *Qs
 
 void computeOptionsCoalesced(const vector<OptionConstants> &options, const vector<Yield> &yield, real *result, bool isTest = false)
 {
-    // Compute indices
+    // Compute padding
     int maxWidth = 0;
     int maxHeight = 0;
     for (auto &option : options)
