@@ -23,23 +23,6 @@ __device__ inline real* getArrayAt(const int index, real *array, const int count
     return array + index * count + threadId;
 }
 
-__device__ inline int getNumUnpaddedFields(const int blockSize, const int blockId, int *maxs) 
-{
-    // todo: function is incorrect ... 
-    int res = 0;
-    for(int i = 0; i < blockId; ++i) {
-        if (maxs[i] < maxs[i+1]) {
-            res += blockSize * (maxs[blockId] - maxs[i]);
-        }
-    }
-    return res;
-}
-
-__device__ inline real* getUnpaddedArrayAt(const int index, real *array, const int count, const int threadId, const int blockId, int blockSize, int *maxs)
-{
-    return array + index * count + threadId - getNumUnpaddedFields(blockSize, blockId, maxs);
-}
-
 __device__ void fillArrayColumn(const int count, const real value, real *array, const int totalCount, const int threadId)
 {
     auto ptr = getArrayAt(0, array, totalCount, threadId);
@@ -51,152 +34,38 @@ __device__ void fillArrayColumn(const int count, const real value, real *array, 
     }
 }
 
-/*
- * Forward helper using gather
- */
-__device__ inline real forward_helper(
-    const int idx,
-    const int i, 
-    const int j, 
-    const int jind,
-    const int jhigh, 
-    const real dr, 
-    const real dt, 
-    const real M, 
-    const int width, 
-    const int jmax,
-    real* QsAll,
-    const int totalCount,
-    const real alpha,
-    bool isCoalesced) 
+__device__ inline real* getUnpaddedArrayAt(const int index, real *array, const int threadId, const int blockSize, const int startInd)
 {
-    auto expp1 = isCoalesced ? 
-        (j == jhigh ? zero : *getArrayAt(jind + 1, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 1, dr, M, width, jmax, 0)) * dt)) : 
-        (j == jhigh ? zero : QsAll[jind + 1] * exp(-(alpha + computeJValue(jind + 1, dr, M, width, jmax, 0)) * dt));
-    auto expm = isCoalesced ? 
-        (*getArrayAt(jind, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind, dr, M, width, jmax, 0)) * dt)) : 
-        (QsAll[jind] * exp(-(alpha + computeJValue(jind, dr, M, width, jmax, 0)) * dt));
-    auto expm1 = isCoalesced ? 
-        (j == -jhigh ? zero : *getArrayAt(jind - 1, QsAll, totalCount, idx)  * exp(-(alpha + computeJValue(jind - 1, dr, M, width, jmax, 0)) * dt)) : 
-        (j == -jhigh ? zero : QsAll[jind - 1] * exp(-(alpha + computeJValue(jind - 1, dr, M, width, jmax, 0)) * dt));
-
-    if (i == 1) {
-        if (j == -jhigh) {
-            return computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-        } else if (j == jhigh) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1;
-        } else {
-            return computeJValue(jind, dr, M, width, jmax, 2) * expm;
-        }
-    }
-
-    else if (i <= jmax) {
-        if (j == -jhigh) {
-            return computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-        } else if (j == -jhigh + 1) {
-            return computeJValue(jind, dr, M, width, jmax, 2) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-        } else if (j == jhigh) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1;
-        } else if (j == jhigh - 1) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 2) * expm;
-        } else {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 2) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-        }
-    } else {
-        if (j == -jhigh) {
-            return computeJValue(jind, dr, M, width, jmax, 3) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-        } else if (j == -jhigh + 1) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 2) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 2) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1;
-                    
-        } else if (j == jhigh) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 1) * expm;
-        } else if (j == jhigh - 1) {
-            return computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 2) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 2) * expp1;
-                    
-        } else {
-            return ((j == -jhigh + 2) ? computeJValue(jind - 2, dr, M, width, jmax, 1) * (isCoalesced ? 
-                    *getArrayAt(jind - 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind - 2, dr, M, width, jmax, 0)) * dt) : 
-                    QsAll[jind - 2] * exp(-(alpha + computeJValue(jind - 2, dr, M, width, jmax, 0)) * dt))
-                : zero) +
-                computeJValue(jind - 1, dr, M, width, jmax, 1) * expm1 +
-                computeJValue(jind, dr, M, width, jmax, 2) * expm +
-                computeJValue(jind + 1, dr, M, width, jmax, 3) * expp1 +
-                ((j == jhigh - 2) ? computeJValue(jind + 2, dr, M, width, jmax, 3) * (isCoalesced ? 
-                    *getArrayAt(jind + 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 2, dr, M, width, jmax, 0)) * dt) : 
-                    QsAll[jind + 2] * exp(-(alpha + computeJValue(jind + 2, dr, M, width, jmax, 0)) * dt))
-                : zero);
-        }
-    }
+    return array + startInd + blockSize * index + threadId;;
 }
 
-/*
- * Backward helper using gather
- */
-__device__ inline real backward_helper(
-    const int idx,
-    const int j, 
-    const int jind,
-    const real dr, 
-    const real dt, 
-    const real M, 
-    const int width, 
-    const int jmax,
-    real* QsAll,
-    const int totalCount,
-    const real alpha,
-    bool isCoalesced) 
+__device__ void fillUnpaddedArrayColumn(const int count, const real value, real *array, const int threadId, const int blockSize, const int startInd)
 {
-    auto callExp = exp(-(alpha + computeJValue(jind, dr, M, width, jmax, 0)) * dt);
+    auto ptr = getUnpaddedArrayAt(0, array, threadId, blockSize, startInd);
 
-    if (j == jmax)
+    for (auto i = 0; i < count; ++i)
     {
-        // Top edge branching
-        return (computeJValue(jind, dr, M, width, jmax, 1) * (isCoalesced ? *getArrayAt(jind, QsAll, totalCount, idx) : QsAll[jind]) +
-            computeJValue(jind, dr, M, width, jmax, 2) * (isCoalesced ? *getArrayAt(jind - 1, QsAll, totalCount, idx) : QsAll[jind - 1]) +
-            computeJValue(jind, dr, M, width, jmax, 3) * (isCoalesced ? *getArrayAt(jind - 2, QsAll, totalCount, idx) : QsAll[jind - 2])) *
-            callExp;
-    }
-    else if (j == -jmax)
-    {
-        // Bottom edge branching
-        return (computeJValue(jind, dr, M, width, jmax, 1) * (isCoalesced ? *getArrayAt(jind + 2, QsAll, totalCount, idx) : QsAll[jind + 2]) +
-            computeJValue(jind, dr, M, width, jmax, 2) * (isCoalesced ? *getArrayAt(jind + 1, QsAll, totalCount, idx) : QsAll[jind + 1]) +
-            computeJValue(jind, dr, M, width, jmax, 3) * (isCoalesced ? *getArrayAt(jind, QsAll, totalCount, idx) : QsAll[jind])) *
-            callExp;
-    }
-    else
-    {
-        // Standard branching
-        return (computeJValue(jind, dr, M, width, jmax, 1) * (isCoalesced ? *getArrayAt(jind + 1, QsAll, totalCount, idx) : QsAll[jind + 1]) +
-            computeJValue(jind, dr, M, width, jmax, 2) * (isCoalesced ? *getArrayAt(jind, QsAll, totalCount, idx) : QsAll[jind]) +
-            computeJValue(jind, dr, M, width, jmax, 3) * (isCoalesced ? *getArrayAt(jind - 1, QsAll, totalCount, idx) : QsAll[jind - 1])) *
-            callExp;
+        *ptr = value;
+        ptr += blockSize;
     }
 }
 
 __global__ void
-kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *MaxWidths, int *MaxHeights, const int totalCount, const int blockSize, const int yieldCurveSize)
+kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *ScannedWidths, int *ScannedHeights, const int totalCount, const int yieldCurveSize)
 {
+    const int tidx = threadIdx.x;
     const int bidx = blockIdx.x;
-    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    const int idx = tidx + blockDim.x * blockIdx.x;
+    const int blockSize = blockDim.x;
+    
 
     // Out of options check
     if (idx >= totalCount) return;
 
     auto c = options[idx];
     auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
-    *getUnpaddedArrayAt(c.jmax, QsAll, totalCount, idx, bidx, blockSize, MaxWidths) = one;
-    *getUnpaddedArrayAt(c.jmax, alphasAll, totalCount, idx, bidx, blockSize, MaxHeights) = alpha;
+    *getUnpaddedArrayAt(c.jmax, QsAll, tidx, blockSize, ScannedWidths[bidx]) = one;
+    *getUnpaddedArrayAt(c.jmax, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
 
     for (auto i = 1; i <= c.n; ++i)
     {
@@ -208,42 +77,121 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
         {
             auto jind = j - (-c.jmax); // array index for j
             
-            // real Q = forward_helper(idx, i, j, jind, jhigh, c.dr, c.dt, c.M, c.width, c.jmax, QsAll, totalCount, alpha, true);            
-            real Q = zero;
+            auto expp1 = j == jhigh ? zero : *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm = *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm1 = j == -jhigh ? zero : *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx])  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            real Q;
+
+            if (i == 1) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                }
+            }
+            else if (i <= c.jmax) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                } else {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                }
+            } else {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                            
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
+                            
+                } else {
+                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind - 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
+                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind + 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                }
+            }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
-            *getUnpaddedArrayAt(jind, QsCopyAll, totalCount, idx, bidx, blockSize, MaxWidths) = Q;
+            *getUnpaddedArrayAt(jind, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]) = Q;
             alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
         alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
-        *getUnpaddedArrayAt(i, alphasAll, totalCount, idx, bidx, blockSize, MaxHeights) = alpha;
+        *getUnpaddedArrayAt(i, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
 
         // Switch Qs
         auto QsT = QsAll;
         QsAll = QsCopyAll;
         QsCopyAll = QsT;
-        fillArrayColumn(c.width, 0, QsCopyAll, totalCount, idx);
+        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]);
     }
     
     // Backward propagation
-    fillArrayColumn(c.width, 100, QsAll, totalCount, idx); // initialize to 100$
+    fillUnpaddedArrayColumn(c.width, 100, QsAll, tidx, blockSize, ScannedWidths[bidx]);
+
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
         auto jhigh = min(i, c.jmax);
-        auto alpha = *getUnpaddedArrayAt(i, alphasAll, totalCount, idx, bidx, blockSize, MaxHeights);
+        auto alpha = *getUnpaddedArrayAt(i, alphasAll, tidx, blockSize, ScannedHeights[bidx]);
         
-        // auto isMaturity = i == ((int)(c.t / c.dt));
+        auto isMaturity = i == ((int)(c.t / c.dt));
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j + c.jmax;      // array index for j
-            // after obtaining the result from (i+1) nodes, set the call for ith node
-            // *getArrayAt(jind, QsCopyAll, totalCount, idx) = computeCallValue(isMaturity, c, 
-            //     backward_helper(idx, j, jind, c.dr, c.dt, c.M, c.width, c.jmax, QsAll, totalCount, alpha, true));
-            *getUnpaddedArrayAt(jind, QsCopyAll, totalCount, idx, bidx, blockSize, MaxWidths) = zero;
+            auto callExp = exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
 
+            real res;
+            if (j == c.jmax)
+            {
+                // Top edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 2, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                      callExp;
+            }
+            else if (j == -c.jmax)
+            {
+                // Bottom edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                      callExp;
+            }
+            else
+            {
+                // Standard branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                      callExp;
+            }
+
+            // after obtaining the result from (i+1) nodes, set the call for ith node
+            *getUnpaddedArrayAt(jind, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]) = computeCallValue(isMaturity, c, res);
         }
 
         // Switch call arrays
@@ -251,10 +199,10 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
         QsAll = QsCopyAll;
         QsCopyAll = QsT;
 
-        fillArrayColumn(c.width, 0, QsCopyAll, totalCount, idx);
+        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]);
     }
 
-    res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, totalCount, idx, bidx, blockSize, MaxWidths);
+    res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, tidx, blockSize, ScannedWidths[bidx]);
 }
 
 void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &options, const vector<Yield> &yield, vector<real> &results, bool isTest = false)
@@ -288,12 +236,30 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
     int totalAlphasCount = 0;
 
     // todo: this can maybe be done better in c++ ? :D 
-    for (auto& n : maxWidths) {
+    vector<int> scannedWidths(blockCount, 0);
+    vector<int> scannedHeights(blockCount, 0);
+    for (int i = 0; i < maxWidths.size(); ++i) {
+        auto& n = maxWidths.at(i);
         totalQsCount += n;
+        if (i == 0) {
+            scannedWidths.at(i) = 0;
+        } else if (i == maxWidths.size()-1) {
+            continue;
+        } else {
+            scannedWidths.at(i) = scannedWidths.at(i-1) + n;
+        }
     }
 
-    for (auto& n : maxHeights) {
+    for (int i = 0; i < maxHeights.size(); ++i) {
+        auto& n = maxHeights.at(i);
         totalAlphasCount += n;
+        if (i == 0) {
+            scannedHeights.at(i) = 0;
+        } else if (i == maxHeights.size()-1) {
+            continue;
+        } else {
+            scannedHeights.at(i) = scannedHeights.at(i-1) + n;
+        }
     }
 
     if (isTest)
@@ -307,23 +273,23 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
     const auto time_begin = steady_clock::now();
 
     real *d_result, *d_Qs, *d_QsCopy, *d_alphas;
-    int *d_MaxWidths, *d_MaxHeights;
+    int *d_ScannedWidths, *d_ScannedHeights;
     OptionConstants *d_options;
     CudaSafeCall(cudaMalloc((void **)&d_result, count * sizeof(real)));
     CudaSafeCall(cudaMalloc((void **)&d_options, count * sizeof(OptionConstants)));
     CudaSafeCall(cudaMalloc((void **)&d_Qs, totalQsCount * sizeof(real)));
     CudaSafeCall(cudaMalloc((void **)&d_QsCopy, totalQsCount * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_MaxWidths, blockCount * sizeof(int)));
-    CudaSafeCall(cudaMalloc((void **)&d_MaxHeights, blockCount * sizeof(int)));
+    CudaSafeCall(cudaMalloc((void **)&d_ScannedWidths, blockCount * sizeof(int)));
+    CudaSafeCall(cudaMalloc((void **)&d_ScannedHeights, blockCount * sizeof(int)));
     CudaSafeCall(cudaMalloc((void **)&d_alphas, totalAlphasCount * sizeof(real)));
 
     CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
     CudaSafeCall(cudaMemcpy(d_options, options.data(), count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_MaxWidths, &maxWidths, blockCount * sizeof(int), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_MaxHeights, &maxHeights, blockCount * sizeof(int), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_ScannedWidths, &scannedWidths, blockCount * sizeof(int), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_ScannedHeights, &scannedHeights, blockCount * sizeof(int), cudaMemcpyHostToDevice));
 
     auto time_begin_kernel = steady_clock::now();
-    kernelPaddingPerThreadBlock<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_MaxWidths, d_MaxHeights, count, blockSize, yield.size());
+    kernelPaddingPerThreadBlock<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_ScannedWidths, d_ScannedHeights, count, yield.size());
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
 
@@ -337,8 +303,8 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
     cudaFree(d_Qs);
     cudaFree(d_QsCopy);
     cudaFree(d_alphas);
-    cudaFree(d_MaxWidths);
-    cudaFree(d_MaxHeights);
+    cudaFree(d_ScannedWidths);
+    cudaFree(d_ScannedHeights);
 
     auto time_end = steady_clock::now();
     if (isTest)
@@ -372,7 +338,61 @@ kernelCoalesced(real *res, const OptionConstants *options, real *QsAll, real *Qs
         {
             auto jind = j + c.jmax;      // array index for j
             
-            real Q = forward_helper(idx, i, j, jind, jhigh, c.dr, c.dt, c.M, c.width, c.jmax, QsAll, totalCount, alpha, true);
+            auto expp1 = j == jhigh ? zero : *getArrayAt(jind + 1, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm = *getArrayAt(jind, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm1 = j == -jhigh ? zero : *getArrayAt(jind - 1, QsAll, totalCount, idx)  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            real Q;
+
+            if (i == 1) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                }
+            }
+            else if (i <= c.jmax) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                } else {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                }
+            } else {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                            
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
+                            
+                } else {
+                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind - 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
+                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind + 2, QsAll, totalCount, idx) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                }
+            }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
             *getArrayAt(jind, QsCopyAll, totalCount, idx) = Q;
@@ -401,10 +421,36 @@ kernelCoalesced(real *res, const OptionConstants *options, real *QsAll, real *Qs
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j + c.jmax;      // array index for j
+            auto callExp = exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+
+            real res;
+            if (j == c.jmax)
+            {
+                // Top edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getArrayAt(jind - 1, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind - 2, QsAll, totalCount, idx)) *
+                      callExp;
+            }
+            else if (j == - c.jmax)
+            {
+                // Bottom edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind + 2, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getArrayAt(jind + 1, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind, QsAll, totalCount, idx)) *
+                      callExp;
+            }
+            else
+            {
+                // Standard branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getArrayAt(jind + 1, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getArrayAt(jind, QsAll, totalCount, idx) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getArrayAt(jind - 1, QsAll, totalCount, idx)) *
+                      callExp;
+            }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            *getArrayAt(jind, QsCopyAll, totalCount, idx) = computeCallValue(isMaturity, c, 
-                backward_helper(idx, j, jind, c.dr, c.dt, c.M, c.width, c.jmax, QsAll, totalCount, alpha, true));
+            *getArrayAt(jind, QsCopyAll, totalCount, idx) = computeCallValue(isMaturity, c, res);
         }
 
         // Switch call arrays
@@ -515,8 +561,62 @@ kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, r
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j + c.jmax;      // array index for j            
-            real Q = forward_helper(idx, i, j, jind, jhigh, c.dr, c.dt, c.M, c.width, c.jmax, Qs, totalCount, alpha, false);            
+            
+            auto expp1 = j == jhigh ? zero : Qs[jind + 1] * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm = Qs[jind] * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm1 = j == -jhigh ? zero : Qs[jind - 1] * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            real Q;
 
+            if (i == 1) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                }
+            }
+            else if (i <= c.jmax) {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                } else {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                }
+            } else {
+                if (j == -jhigh) {
+                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                            
+                } else if (j == jhigh) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
+                            
+                } else {
+                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * Qs[jind - 2] * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
+                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
+                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
+                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * Qs[jind + 2] * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                }
+            }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
             QsCopy[jind] = Q; 
@@ -548,9 +648,36 @@ kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, r
         {
             auto jind = j + c.jmax;      // array index for j
 
+            auto callExp = exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+
+            real res;
+            if (j == c.jmax)
+            {
+                // Top edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind - 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind - 2]) *
+                      callExp;
+            }
+            else if (j == -c.jmax)
+            {
+                // Bottom edge branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind + 2] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind + 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind]) *
+                      callExp;
+            }
+            else
+            {
+                // Standard branching
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * call[jind + 1] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * call[jind] +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * call[jind - 1]) *
+                      callExp;
+            }
+
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            callCopy[jind] = computeCallValue(isMaturity, c, 
-                backward_helper(idx, j, jind, c.dr, c.dt, c.M, c.width, c.jmax, call, totalCount, alpha, false));
+            callCopy[jind] = computeCallValue(isMaturity, c, res);
         }
 
         // Switch call arrays
