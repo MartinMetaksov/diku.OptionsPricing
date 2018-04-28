@@ -11,17 +11,16 @@ void computeAllOptions(const Args &args)
     // Read options from filename, allocate the result array
     auto options = Option::readOptions(args.options);
     auto yield = Yield::readYieldCurve(args.yield);
-    auto result = new real[options.size()];
+    vector<real> results;
+    results.reserve(options.size());
 
-    for (int i = 0; i < options.size(); ++i)
+    for (auto &option : options)
     {
-        auto c = OptionConstants::computeConstants(options.at(i));
-        result[i] = seq::computeSingleOption(c, yield);
+        auto c = OptionConstants::computeConstants(option);
+        results.push_back(seq::computeSingleOption(c, yield));
     }
 
-    Arrays::write_array(result, options.size());
-
-    delete[] result;
+    Arrays::write_array(cout, results);
 }
 
 int main(int argc, char *argv[])

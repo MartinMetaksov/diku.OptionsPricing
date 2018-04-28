@@ -2,12 +2,21 @@
 #define OPTION_CONSTANTS_HPP
 
 #include "Option.hpp"
+#include <algorithm>
+#include <vector>
 #include <cmath>
 
 using namespace std;
 
 namespace trinom
 {
+
+enum class SortType : char
+{
+    WIDTH = 'W',
+    HEIGHT = 'H',
+    NONE = '-'
+};
 
 struct OptionConstants
 {
@@ -21,7 +30,7 @@ struct OptionConstants
     int32_t n;
     int32_t width;
     uint16_t termUnit;
-    OptionType type;    // char
+    OptionType type; // char
     uint8_t padding;
 
     static OptionConstants computeConstants(const Option &option)
@@ -49,6 +58,21 @@ struct OptionConstants
         c.jmax = (int)(minus184 / c.M) + 1;
         c.width = 2 * c.jmax + 1;
         return c;
+    }
+
+    static void sortConstants(vector<OptionConstants> &v, const SortType sortType)
+    {
+        switch (sortType)
+        {
+            case SortType::WIDTH:
+            cout << "width" << endl;
+                sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.width < b.width); });
+                break;
+            case SortType::HEIGHT:
+            cout << "height" << endl;
+                sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.n < b.n); });
+                break;
+        }
     }
 };
 }

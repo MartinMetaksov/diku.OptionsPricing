@@ -23,27 +23,28 @@ void computeAllOptions(const Args &args)
         optionConstants.push_back(constant);
     }
 
-    auto result = new real[options.size()];
+    OptionConstants::sortConstants(optionConstants, args.sort);
+
+    vector<real> results;
+    results.resize(options.size());
 
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(optionConstants, yield, result, args.test);
+            cuda::computeOptionsNaive(optionConstants, yield, results, args.test);
             break;
         case 2:
-            cuda::computeOptionsCoalesced(optionConstants, yield, result, args.test);
+            cuda::computeOptionsCoalesced(optionConstants, yield, results, args.test);
             break;
         case 3:
-            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yield, result, args.test);
+            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yield, results, args.test);
             break;
     }
 
     if (!args.test)
     {
-        Arrays::write_array(result, options.size());
+        Arrays::write_array(cout, results);
     }
-
-    delete[] result;
 }
 
 int main(int argc, char *argv[])

@@ -35,8 +35,8 @@ struct Yield
         vector<real> prices;
         vector<int> timesteps;
 
-        Arrays::read_array(in, &prices);
-        Arrays::read_array(in, &timesteps);
+        Arrays::read_array(in, prices);
+        Arrays::read_array(in, timesteps);
 
         in.close();
 

@@ -17,7 +17,7 @@ class Arrays
   public:
 	template <class T,
 			  class = decltype(declval<istream &>() >> declval<T &>())>
-	static void read_array(istream &in, vector<T> *array)
+	static void read_array(istream &in, vector<T> &array)
 	{
 		T x;
 		char c;
@@ -25,7 +25,7 @@ class Arrays
 		while (!in.eof())
 		{
 			in >> x >> c;
-			array->push_back(x);
+			array.push_back(x);
 
 			if (c == ']')
 				break;
@@ -34,16 +34,16 @@ class Arrays
 
 	template <class T,
 			  class = decltype(declval<ostream &>() << declval<T>())>
-	static void write_array(T *array, unsigned int length)
+	static void write_array(ostream &out, const vector<T> &array)
 	{
-		cout.precision(numeric_limits<T>::max_digits10);
+		out.precision(numeric_limits<T>::max_digits10);
 
-		cout << '[' << fixed << array[0];
-		for (unsigned int i = 1; i < length; ++i)
+		out << '[' << fixed << array[0];
+		for (unsigned int i = 1; i < array.size(); ++i)
 		{
-			cout << ", " << fixed << array[i];
+			out << ", " << fixed << array[i];
 		}
-		cout << ']' << endl;
+		out << ']' << endl;
 	}
 };
 }

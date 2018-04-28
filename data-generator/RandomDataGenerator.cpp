@@ -2,7 +2,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "../common/Args.hpp"
+#include "../common/getoptpp/getopt_pp_standalone.h"
 #include "../common/Option.hpp"
 #include "../common/Real.hpp"
 
@@ -24,33 +24,34 @@ int randIntInRange(int a, int b)
 
 int main(int argc, char *argv[])
 {
-    auto args = Args::parseArgs(argc, argv);
-    auto numOptions = args.numOptions;
-    // vector<Option> options;
+    int numOptions;
+    GetOpt::GetOpt_pp cmd(argc, argv);
+    cmd >> GetOpt::Option('n', "numOptions", numOptions);
 
     ofstream myfile;
-    string filename = "random-" + to_string(numOptions) + ".in";
-    string path = "../data/";
+    string filename = "../data/random-" + to_string(numOptions) + ".in";
 
-    cout << "filename: " << path + filename << endl;
-    myfile.open(path + filename);
+    vector<Option> options;
+    options.reserve(numOptions);
+
     for (int i = 0; i < numOptions; i++)
     {
-        // Option o;
-        // o.strikePrice = 63;
-
-        int strikePrice = 63;
-        int maturity = 9 * randIntInRange(1, 2); // random int between 1-2; controls the height
-        int length = 3;
-        int termUnit = 365;
-        int termStepCount = randIntInRange(5, 50);      // random int between 5-50; controls both the width & height                           // controls both the width & height, but I left this unchanged for consistency
-        real reversionRate = randRealInRange(0.1, 0.9); // random real between 0.1-0.9; controls the width
-        real volatility = 0.01;
-        char type = 'P';
-
-        // options.push(o);
+        Option o;
+        o.StrikePrice = 63;
+        o.Maturity = 9 * randIntInRange(1, 2); // random int between 1-2; controls the height
+        o.Length = 3;
+        o.TermUnit = 365;
+        o.TermStepCount = randIntInRange(5, 50);      // random int between 5-50; controls both the width & height
+        // controls both the width & height, but I left this unchanged for consistency
+        o.ReversionRate = randRealInRange(0.1, 0.9); // random real between 0.1-0.9; controls the width
+        o.Volatility = 0.01;
+        o.Type = OptionType::PUT;
+        options.push_back(o);
     }
 
-    myfile.close();
+    cout << "filename: " << filename << endl;
+
+    Option::writeOptions(filename, options);
+
     return 0;
 }

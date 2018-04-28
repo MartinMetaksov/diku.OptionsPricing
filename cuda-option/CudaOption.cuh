@@ -257,7 +257,7 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
     res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, totalCount, idx, bidx, blockSize, MaxWidths);
 }
 
-void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &options, const vector<Yield> &yield, real *result, bool isTest = false)
+void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &options, const vector<Yield> &yield, vector<real> &results, bool isTest = false)
 {
     const auto count = options.size();
     const auto blockSize = 64;
@@ -330,7 +330,7 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
     CudaCheckError();
 
     // Copy result
-    cudaMemcpy(result, d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(results.data(), d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
 
     cudaFree(d_result);
     cudaFree(d_options);
@@ -418,7 +418,7 @@ kernelCoalesced(real *res, const OptionConstants *options, real *QsAll, real *Qs
     res[idx] = *getArrayAt(c.jmax, QsAll, totalCount, idx);
 }
 
-void computeOptionsCoalesced(const vector<OptionConstants> &options, const vector<Yield> &yield, real *result, bool isTest = false)
+void computeOptionsCoalesced(const vector<OptionConstants> &options, const vector<Yield> &yield, vector<real> &results, bool isTest = false)
 {
     // Compute padding
     int maxWidth = 0;
@@ -471,7 +471,7 @@ void computeOptionsCoalesced(const vector<OptionConstants> &options, const vecto
     CudaCheckError();
 
     // Copy result
-    cudaMemcpy(result, d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(results.data(), d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
 
     cudaFree(d_result);
     cudaFree(d_options);
@@ -564,7 +564,7 @@ kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, r
     res[idx] = call[c.jmax];
 }
 
-void computeOptionsNaive(const vector<OptionConstants> &options, const vector<Yield> &yield, real *result, bool isTest = false)
+void computeOptionsNaive(const vector<OptionConstants> &options, const vector<Yield> &yield, vector<real> &results, bool isTest = false)
 {
     // Compute indices
     const auto count = options.size();
@@ -622,7 +622,7 @@ void computeOptionsNaive(const vector<OptionConstants> &options, const vector<Yi
     CudaCheckError();
 
     // Copy result
-    cudaMemcpy(result, d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
+    cudaMemcpy(results.data(), d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
 
     cudaFree(d_result);
     cudaFree(d_options);

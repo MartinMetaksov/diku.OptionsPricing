@@ -20,10 +20,10 @@ $(COMPARE):
 	@futhark-opencl $(DATA)/compare.fut
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION)
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION) -s $(SORT)
 
 test: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION) -test
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -v $(VERSION) -s $(SORT) -test
 
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
