@@ -25,6 +25,7 @@ __device__ inline real* getArrayAt(const int index, real *array, const int count
 
 __device__ inline int getNumUnpaddedFields(const int blockSize, const int blockId, int *maxs) 
 {
+    // todo: function is incorrect ... 
     int res = 0;
     for(int i = 0; i < blockId; ++i) {
         if (maxs[i] < maxs[i+1]) {
