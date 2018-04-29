@@ -34,15 +34,14 @@ __device__ void fillArrayColumn(const int count, const real value, real *array, 
     }
 }
 
-__device__ inline real* getUnpaddedArrayAt(const int index, real *array, const int threadId, const int blockSize, const int startInd)
+__device__ inline real* getUnpaddedArrayAt(const int index, real *array, const int threadId, const int blockSize, const int blockStart)
 {
-    return array + startInd + blockSize * index + threadId;;
+    return array + blockStart + blockSize * index + threadId;
 }
 
-__device__ void fillUnpaddedArrayColumn(const int count, const real value, real *array, const int threadId, const int blockSize, const int startInd)
+__device__ void fillUnpaddedArrayColumn(const int count, const real value, real *array, const int threadId, const int blockSize, const int blockStart)
 {
-    auto ptr = getUnpaddedArrayAt(0, array, threadId, blockSize, startInd);
-
+    auto ptr = getUnpaddedArrayAt(0, array, threadId, blockSize, blockStart);
     for (auto i = 0; i < count; ++i)
     {
         *ptr = value;
@@ -58,14 +57,13 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
     const int idx = tidx + blockDim.x * blockIdx.x;
     const int blockSize = blockDim.x;
     
-
     // Out of options check
     if (idx >= totalCount) return;
 
     auto c = options[idx];
     auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
     *getUnpaddedArrayAt(c.jmax, QsAll, tidx, blockSize, ScannedWidths[bidx]) = one;
-    *getUnpaddedArrayAt(c.jmax, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
+    *getUnpaddedArrayAt(0, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
 
     for (auto i = 1; i <= c.n; ++i)
     {
@@ -238,27 +236,27 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
     // todo: this can maybe be done better in c++ ? :D 
     vector<int> scannedWidths(blockCount, 0);
     vector<int> scannedHeights(blockCount, 0);
-    for (int i = 0; i < maxWidths.size(); ++i) {
-        auto& n = maxWidths.at(i);
-        totalQsCount += n;
-        if (i == 0) {
-            scannedWidths.at(i) = 0;
-        } else if (i == maxWidths.size()-1) {
-            continue;
-        } else {
-            scannedWidths.at(i) = scannedWidths.at(i-1) + n;
+    if (maxWidths.size() == 1) {
+        totalQsCount += maxWidths.at(0) * blockSize;
+    }
+    for (int i = 1; i < maxWidths.size(); i++) {
+        auto& n = maxWidths.at(i-1);
+        totalQsCount += n * blockSize;
+        scannedWidths.at(i) = scannedWidths.at(i-1) + n * blockSize;
+        if (i == maxWidths.size()-1) {
+            totalQsCount += maxWidths.at(i) * blockSize;
         }
     }
 
-    for (int i = 0; i < maxHeights.size(); ++i) {
-        auto& n = maxHeights.at(i);
-        totalAlphasCount += n;
-        if (i == 0) {
-            scannedHeights.at(i) = 0;
-        } else if (i == maxHeights.size()-1) {
-            continue;
-        } else {
-            scannedHeights.at(i) = scannedHeights.at(i-1) + n;
+    if (maxHeights.size() == 1) {
+        totalAlphasCount += maxHeights.at(0) * blockSize;
+    }
+    for (int i = 1; i < maxHeights.size(); i++) {
+        auto& n = maxHeights.at(i-1);
+        totalAlphasCount += n * blockSize;
+        scannedHeights.at(i) = scannedHeights.at(i-1) + n * blockSize;
+        if (i == maxHeights.size()-1) {
+            totalAlphasCount += maxHeights.at(i) * blockSize;
         }
     }
 
@@ -285,8 +283,8 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
 
     CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
     CudaSafeCall(cudaMemcpy(d_options, options.data(), count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_ScannedWidths, &scannedWidths, blockCount * sizeof(int), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_ScannedHeights, &scannedHeights, blockCount * sizeof(int), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_ScannedWidths, scannedWidths.data(), blockCount * sizeof(int), cudaMemcpyHostToDevice));
+    CudaSafeCall(cudaMemcpy(d_ScannedHeights, scannedHeights.data(), blockCount * sizeof(int), cudaMemcpyHostToDevice));
 
     auto time_begin_kernel = steady_clock::now();
     kernelPaddingPerThreadBlock<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_ScannedWidths, d_ScannedHeights, count, yield.size());
