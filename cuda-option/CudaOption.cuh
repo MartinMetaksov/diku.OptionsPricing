@@ -52,18 +52,17 @@ __device__ void fillUnpaddedArrayColumn(const int count, const real value, real 
 __global__ void
 kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *ScannedWidths, int *ScannedHeights, const int totalCount, const int yieldCurveSize)
 {
-    const int tidx = threadIdx.x;
-    const int bidx = blockIdx.x;
-    const int idx = tidx + blockDim.x * blockIdx.x;
-    const int blockSize = blockDim.x;
-    
+    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // const int blockSize = ;
+    const int widthBlockStartIndex = ScannedWidths[blockIdx.x];
+    const int heightBlockStartIndex = ScannedHeights[blockIdx.x];
     // Out of options check
     if (idx >= totalCount) return;
 
     auto c = options[idx];
     auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
-    *getUnpaddedArrayAt(c.jmax, QsAll, tidx, blockSize, ScannedWidths[bidx]) = one;
-    *getUnpaddedArrayAt(0, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
+    *getUnpaddedArrayAt(c.jmax, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) = one;
+    *getUnpaddedArrayAt(0, alphasAll, threadIdx.x, blockDim.x, heightBlockStartIndex) = alpha;
 
     for (auto i = 1; i <= c.n; ++i)
     {
@@ -75,9 +74,9 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
         {
             auto jind = j - (-c.jmax); // array index for j
             
-            auto expp1 = j == jhigh ? zero : *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm = *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm1 = j == -jhigh ? zero : *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx])  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expp1 = j == jhigh ? zero : *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm = *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expm1 = j == -jhigh ? zero : *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
             real Q;
 
             if (i == 1) {
@@ -123,37 +122,37 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
                         computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
                             
                 } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind - 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
+                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
                         computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
                         computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
                         computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind + 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
                 }
             }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
-            *getUnpaddedArrayAt(jind, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]) = Q;
+            *getUnpaddedArrayAt(jind, QsCopyAll, threadIdx.x, blockDim.x, widthBlockStartIndex) = Q;
             alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
         alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
-        *getUnpaddedArrayAt(i, alphasAll, tidx, blockSize, ScannedHeights[bidx]) = alpha;
+        *getUnpaddedArrayAt(i, alphasAll, threadIdx.x, blockDim.x, heightBlockStartIndex) = alpha;
 
         // Switch Qs
         auto QsT = QsAll;
         QsAll = QsCopyAll;
         QsCopyAll = QsT;
-        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]);
+        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, threadIdx.x, blockDim.x, widthBlockStartIndex);
     }
     
     // Backward propagation
-    fillUnpaddedArrayColumn(c.width, 100, QsAll, tidx, blockSize, ScannedWidths[bidx]);
+    fillUnpaddedArrayColumn(c.width, 100, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex);
 
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
         auto jhigh = min(i, c.jmax);
-        auto alpha = *getUnpaddedArrayAt(i, alphasAll, tidx, blockSize, ScannedHeights[bidx]);
+        auto alpha = *getUnpaddedArrayAt(i, alphasAll, threadIdx.x, blockDim.x, heightBlockStartIndex);
         
         auto isMaturity = i == ((int)(c.t / c.dt));
 
@@ -166,30 +165,30 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
             if (j == c.jmax)
             {
                 // Top edge branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 2, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
             else if (j == -c.jmax)
             {
                 // Bottom edge branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 2, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
             else
             {
                 // Standard branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 1, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind, QsAll, tidx, blockSize, ScannedWidths[bidx]) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 1, QsAll, tidx, blockSize, ScannedWidths[bidx])) *
+                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            *getUnpaddedArrayAt(jind, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]) = computeCallValue(isMaturity, c, res);
+            *getUnpaddedArrayAt(jind, QsCopyAll, threadIdx.x, blockDim.x, widthBlockStartIndex) = computeCallValue(isMaturity, c, res);
         }
 
         // Switch call arrays
@@ -197,10 +196,10 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
         QsAll = QsCopyAll;
         QsCopyAll = QsT;
 
-        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, tidx, blockSize, ScannedWidths[bidx]);
+        fillUnpaddedArrayColumn(c.width, 0, QsCopyAll, threadIdx.x, blockDim.x, widthBlockStartIndex);
     }
 
-    res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, tidx, blockSize, ScannedWidths[bidx]);
+    res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex);
 }
 
 void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &options, const vector<Yield> &yield, vector<real> &results, bool isTest = false)
