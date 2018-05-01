@@ -229,6 +229,21 @@ void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &opti
         }     
     }
     
+    if (isTest)
+    {
+        ofstream h("heights.txt");
+        for (auto &height : maxHeights) {
+            h << height << endl;
+        }
+        h.close();
+        
+        ofstream w("widths.txt");
+        for (auto &width : maxWidths) {
+            w << width << endl;
+        }
+        w.close();
+    }
+
     int totalQsCount = 0;
     int totalAlphasCount = 0;
 

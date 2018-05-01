@@ -23,7 +23,10 @@ void computeAllOptions(const Args &args)
         optionConstants.push_back(constant);
     }
 
-    OptionConstants::sortConstants(optionConstants, args.sort);
+    if (args.test)
+        cout << "Cuda option version " << args.version << endl;
+
+    OptionConstants::sortConstants(optionConstants, args.sort, args.test);
 
     vector<real> results;
     results.resize(options.size());

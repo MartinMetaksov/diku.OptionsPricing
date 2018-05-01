@@ -60,7 +60,7 @@ struct Option
 
         if (!in)
         {
-            throw invalid_argument("File does not exist.");
+            throw invalid_argument("File '" + filename + "' does not exist.");
         }
 
         vector<real> strikes;
