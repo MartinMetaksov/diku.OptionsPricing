@@ -2,45 +2,37 @@
 // Define this to turn on error checking
 #define CUDA_ERROR_CHECK
 
-#include "CudaOption.cuh"
-#include "../common/Arrays.hpp"
-#include "../common/Args.hpp"
+#include "Version1.cuh"
+#include "Version2.cuh"
+#include "Version3.cuh"
 
 using namespace std;
 using namespace trinom;
 
 void computeAllOptions(const Args &args)
 {
-    // Read options from filename, allocate the result array
-    auto options = Option::readOptions(args.options);
-    auto yield = Yield::readYieldCurve(args.yield);
-    vector<OptionConstants> optionConstants;
-    optionConstants.reserve(options.size());
-
-    for (auto &option : options)
-    {
-        auto constant = OptionConstants::computeConstants(option);
-        optionConstants.push_back(constant);
-    }
-
     if (args.test)
+    {
         cout << "Cuda option version " << args.version << endl;
-
-    OptionConstants::sortConstants(optionConstants, args.sort, args.test);
+    }
+    
+    int yieldSize;
+    vector<OptionConstants> optionConstants;
+    cuda::init(args, optionConstants, yieldSize);
 
     vector<real> results;
-    results.resize(options.size());
+    results.resize(optionConstants.size());
 
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(optionConstants, yield, results, args.test);
+            cuda::computeOptionsNaive(optionConstants, yieldSize, results, args.test);
             break;
         case 2:
-            cuda::computeOptionsCoalesced(optionConstants, yield, results, args.test);
+            cuda::computeOptionsCoalesced(optionConstants, yieldSize, results, args.test);
             break;
         case 3:
-            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yield, results, args.test);
+            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yieldSize, results, args.test);
             break;
     }
 

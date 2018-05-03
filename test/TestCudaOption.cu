@@ -1,5 +1,8 @@
 #include "catch.hpp"
-#include "../cuda-option/CudaOption.cuh"
+#include "../cuda/CudaDomain.cuh"
+#include "../cuda-option/Version1.cuh"
+#include "../cuda-option/Version2.cuh"
+#include "../cuda-option/Version3.cuh"
 #include "../seq/Seq.hpp"
 #include "Mock.hpp"
 
@@ -21,6 +24,7 @@ void compareVectors(vector<real> test, vector<real> gold)
 TEST_CASE("One option per thread cuda")
 {
     auto yield = Yield::readYieldCurve(YIELD_CURVE_PATH);
+    CudaSafeCall(cudaMemcpyToSymbol(cuda::YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
 
     int bookCount = 100;
     vector<real> bookResults;
@@ -29,7 +33,7 @@ TEST_CASE("One option per thread cuda")
     book.reserve(bookCount);
     for (int i = 0; i < bookCount; ++i)
     {
-        Option o;
+        trinom::Option o;
         o.Length = 3;
         o.Maturity = 9;
         o.StrikePrice = 63;
@@ -46,7 +50,7 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(bookCount);
-        cuda::computeOptionsCoalesced(book, yield, results.data());
+        cuda::computeOptionsWithPaddingPerThreadBlock(book, yield.size(), results);
 
         compareVectors(results, bookResults);
     }
@@ -67,7 +71,7 @@ TEST_CASE("One option per thread cuda")
 
         vector<real> results;
         results.resize(count);
-        cuda::computeOptionsCoalesced(options, yield, results.data());
+        cuda::computeOptionsWithPaddingPerThreadBlock(options, yield.size(), results);
 
         compareVectors(results, goldResults);
     }
