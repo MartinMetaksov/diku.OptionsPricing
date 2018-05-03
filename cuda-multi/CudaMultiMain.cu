@@ -3,8 +3,6 @@
 #define CUDA_ERROR_CHECK
 
 #include "Version1.cuh"
-#include "Version2.cuh"
-#include "Version3.cuh"
 
 using namespace std;
 using namespace trinom;
@@ -13,7 +11,7 @@ void computeAllOptions(const Args &args)
 {
     if (args.test)
     {
-        cout << "Cuda one option per thread version " << args.version << endl;
+        cout << "Cuda multiple options per thread block version " << args.version << endl;
     }
     
     int yieldSize;
@@ -27,12 +25,6 @@ void computeAllOptions(const Args &args)
     {
         case 1:
             cuda::computeOptionsNaive(optionConstants, yieldSize, results, args.test);
-            break;
-        case 2:
-            cuda::computeOptionsCoalesced(optionConstants, yieldSize, results, args.test);
-            break;
-        case 3:
-            cuda::computeOptionsWithPaddingPerThreadBlock(optionConstants, yieldSize, results, args.test);
             break;
     }
 
