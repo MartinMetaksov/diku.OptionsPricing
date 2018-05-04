@@ -67,12 +67,12 @@ struct OptionConstants
         case SortType::WIDTH:
             if (isTest)
                 cout << "Sorting options by width first, height second" << endl;
-            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.width < b.width || (a.width == b.width && a.n < b.n)); });
+            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.width > b.width || (a.width == b.width && a.n > b.n)); });
             break;
         case SortType::HEIGHT:
             if (isTest)
                 cout << "Sorting options by height first, width second" << endl;
-            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.n < b.n || (a.n == b.n && a.width < b.width)); });
+            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.n > b.n || (a.n == b.n && a.width > b.width)); });
             break;
         }
     }
