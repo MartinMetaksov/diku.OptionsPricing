@@ -2,6 +2,7 @@
 // Define this to turn on error checking
 #define CUDA_ERROR_CHECK
 
+#include "../common/Args.hpp"
 #include "Version1.cuh"
 
 using namespace std;
@@ -14,29 +15,38 @@ void computeAllOptions(const Args &args)
         cout << "Cuda multiple options per thread block version " << args.version << endl;
     }
     
-    int yieldSize;
-    vector<OptionConstants> optionConstants;
-    cuda::init(args, optionConstants, yieldSize);
+    // Read options and yield curve.
+    Options options(args.options);
+    Yield yield(args.yield);
+
+    cudaFree(0);
+    auto time_begin = steady_clock::now();
 
     vector<real> results;
-    results.resize(optionConstants.size());
+    results.resize(options.N);
 
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(optionConstants, yieldSize, results, args.test);
+            cuda::computeOptionsNaive(options, yield, results, 64, args.test);
             break;
     }
+
+    auto time_end = steady_clock::now();
 
     if (!args.test)
     {
         Arrays::write_array(cout, results);
     }
+    else
+    {
+        cout << "Total execution time " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl;
+    }
 }
 
 int main(int argc, char *argv[])
 {
-    auto args = Args::parseArgs(argc, argv);
+    Args args(argc, argv);
 
     computeAllOptions(args);
 
