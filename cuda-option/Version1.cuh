@@ -3,14 +3,20 @@
 
 #include "../cuda/CudaDomain.cuh"
 #include <thrust/scan.h>
-#include <thrust/fill.h>
-#include <thrust/execution_policy.h>
 
 using namespace chrono;
 using namespace trinom;
 
 namespace cuda
 {
+
+__device__ inline void fill_n(real *array, const int count, const int value)
+{
+    for (auto i = 0; i < count; ++i)
+    {
+        array[i] = value;
+    }
+}
 
 __global__ void
 kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, real *alphasAll)
@@ -21,28 +27,7 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
     if (idx >= options.N) return;
 
     OptionConstants c;
-    c.termUnit = options.TermUnits[idx];
-    auto T = options.Maturities[idx];
-    auto termUnitsInYearCount = ceil((real)year / c.termUnit);
-    auto termStepCount = options.TermStepCounts[idx];
-    c.t = options.Lengths[idx];
-    c.n = termStepCount * termUnitsInYearCount * T;
-    c.dt = termUnitsInYearCount / (real)termStepCount; // [years]
-    c.type = options.Types[idx];
-
-    auto a = options.ReversionRates[idx];
-    c.X = options.StrikePrices[idx];
-    auto sigma = options.Volatilities[idx];
-    auto V = sigma * sigma * (one - exp(-two * a * c.dt)) / (two * a);
-    c.dr = sqrt(three * V);
-    c.M = exp(-a * c.dt) - one;
-
-    // simplified computations
-    // c.dr = sigma * sqrt(three * c.dt);
-    // c.M = -a * c.dt;
-
-    c.jmax = (int)(minus184 / c.M) + 1;
-    c.width = 2 * c.jmax + 1;
+    computeConstants(c, options, idx);
 
     auto QsInd = idx == 0 ? 0 : options.Widths[idx - 1];
     auto alphasInd = idx == 0 ? 0 : options.Heights[idx - 1];
@@ -130,14 +115,15 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
         auto QsT = Qs;
         Qs = QsCopy;
         QsCopy = QsT;
-        thrust::fill_n(thrust::device, QsCopy, c.width, 0);
+        
+        fill_n(QsCopy, c.width, 0);
     }
     
     // Backward propagation
     auto call = Qs; // call[j]
     auto callCopy = QsCopy;
 
-    thrust::fill_n(thrust::device, call, c.width, 100); // initialize to 100$
+    fill_n(call, c.width, 100); // initialize to 100$
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
@@ -186,7 +172,7 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
         call = callCopy;
         callCopy = callT;
 
-        thrust::fill_n(thrust::device, callCopy, c.width, 0);
+        fill_n(callCopy, c.width, 0);
     }
 
     res[idx] = call[c.jmax];
@@ -243,16 +229,15 @@ void computeOptionsNaive(const Options &options, const Yield &yield, vector<real
     kernelNaive<<<blockCount, blockSize>>>(cudaOptions, d_result, d_Qs, d_QsCopy, d_alphas);
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
+    if (isTest)
+    {
+        cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
+    }
 
     CudaCheckError();
 
     // Copy result
     thrust::copy(result.begin(), result.end(), results.begin());
-
-    if (isTest)
-    {
-        cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
-    }
 }
 
 }

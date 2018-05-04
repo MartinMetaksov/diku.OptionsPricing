@@ -92,5 +92,31 @@ struct CudaOptions
     }
 };
 
+__device__ void computeConstants(OptionConstants &c, const CudaOptions &options, const int idx)
+{
+    c.termUnit = options.TermUnits[idx];
+    auto T = options.Maturities[idx];
+    auto termUnitsInYearCount = ceil((real)year / c.termUnit);
+    auto termStepCount = options.TermStepCounts[idx];
+    c.t = options.Lengths[idx];
+    c.n = termStepCount * termUnitsInYearCount * T;
+    c.dt = termUnitsInYearCount / (real)termStepCount; // [years]
+    c.type = options.Types[idx];
+
+    auto a = options.ReversionRates[idx];
+    c.X = options.StrikePrices[idx];
+    auto sigma = options.Volatilities[idx];
+    auto V = sigma * sigma * (one - exp(-two * a * c.dt)) / (two * a);
+    c.dr = sqrt(three * V);
+    c.M = exp(-a * c.dt) - one;
+
+    // simplified computations
+    // c.dr = sigma * sqrt(three * c.dt);
+    // c.M = -a * c.dt;
+
+    c.jmax = (int)(minus184 / c.M) + 1;
+    c.width = 2 * c.jmax + 1;
+}
+
 }
 #endif
