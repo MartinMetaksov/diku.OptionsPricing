@@ -7,6 +7,7 @@
 #include "../cuda/CudaErrors.cuh"
 #include <cuda_runtime.h>
 #include <thrust/device_vector.h>
+#include <thrust/sort.h>
 #include <chrono>
 
 using namespace trinom;
@@ -20,17 +21,35 @@ struct compute_width_height
     __host__ __device__ void operator()(Tuple t)
     {
         // Tuple(TermUnit, TermStepCount, Maturity, ReversionRate, Widths, Height)
-        auto termUnit = thrust::get<0>(t);
-        auto termStepCount = thrust::get<1>(t);
-        auto maturity = thrust::get<2>(t);
-        auto a = thrust::get<3>(t);
+        auto termUnit = t.get<0>();
+        auto termStepCount = t.get<1>();
+        auto maturity = t.get<2>();
+        auto a = t.get<3>();
         auto termUnitsInYearCount = ceil((real)year / termUnit);
-        auto dt = termUnitsInYearCount / (real)termStepCount;                       // [years]
+        auto dt = termUnitsInYearCount / (real)termStepCount;               // [years]
         auto M = exp(-a * dt) - one;
         auto jmax = (int)(minus184 / M) + 1;
 
-        thrust::get<4>(t) = 2 * jmax + 1;                                           // width
-        thrust::get<5>(t) = termStepCount * termUnitsInYearCount * maturity + 1;    // height + 1
+        t.get<4>() = 2 * jmax + 1;                                          // width
+        t.get<5>() = termStepCount * termUnitsInYearCount * maturity + 1;   // height + 1
+    }
+};
+
+struct sort_tuple_asc
+{
+    typedef thrust::tuple<int32_t, int32_t> Tuple;
+    __host__ __device__ bool operator()(const Tuple& t1, const Tuple& t2)
+    {
+        return (t1.get<0>() < t2.get<0>() || (t1.get<0>() == t2.get<0>() && t1.get<1>() < t2.get<1>()));
+    }
+};
+
+struct sort_tuple_desc
+{
+    typedef thrust::tuple<int32_t, int32_t> Tuple;
+    __host__ __device__ bool operator()(const Tuple& t1, const Tuple& t2)
+    {
+        return (t1.get<0>() > t2.get<0>() || (t1.get<0>() == t2.get<0>() && t1.get<1>() > t2.get<1>()));
     }
 };
 
@@ -56,16 +75,18 @@ struct CudaOptions
     CudaOptions(
         const Options &options,
         const int yieldSize,
-        const thrust::device_vector<uint16_t> &strikePrices,
-        const thrust::device_vector<uint16_t> &maturities,
-        const thrust::device_vector<uint16_t> &lengths,
-        const thrust::device_vector<uint16_t> &termUnits,
-        const thrust::device_vector<uint16_t> &termStepCounts,
-        const thrust::device_vector<real> &reversionRates,
-        const thrust::device_vector<real> &volatilities,
-        const thrust::device_vector<OptionType> &types,
-        const thrust::device_vector<real> &yieldPrices,
-        const thrust::device_vector<int32_t> &yieldTimeSteps,
+        const SortType sort,
+        const bool isTest,
+        thrust::device_vector<uint16_t> &strikePrices,
+        thrust::device_vector<uint16_t> &maturities,
+        thrust::device_vector<uint16_t> &lengths,
+        thrust::device_vector<uint16_t> &termUnits,
+        thrust::device_vector<uint16_t> &termStepCounts,
+        thrust::device_vector<real> &reversionRates,
+        thrust::device_vector<real> &volatilities,
+        thrust::device_vector<OptionType> &types,
+        thrust::device_vector<real> &yieldPrices,
+        thrust::device_vector<int32_t> &yieldTimeSteps,
         thrust::device_vector<int32_t> &widths,
         thrust::device_vector<int32_t> &heights)
     {
@@ -88,6 +109,35 @@ struct CudaOptions
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(termUnits.begin(), termStepCounts.begin(), maturities.begin(), reversionRates.begin(), widths.begin(), heights.begin())),
                      thrust::make_zip_iterator(thrust::make_tuple(termUnits.end(), termStepCounts.end(), maturities.end(), reversionRates.end(), heights.end(), heights.end())),
                      compute_width_height());
+
+        if (sort != SortType::NONE)
+        {
+            auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(strikePrices.begin(), maturities.begin(), lengths.begin(), termUnits.begin(), 
+                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin(), yieldPrices.begin(), yieldTimeSteps.begin()));
+    
+            auto keysBegin = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
+                ? thrust::make_zip_iterator(thrust::make_tuple(widths.begin(), heights.begin()))
+                : thrust::make_zip_iterator(thrust::make_tuple(heights.begin(), widths.begin()));
+            auto keysEnd = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
+                ? thrust::make_zip_iterator(thrust::make_tuple(widths.end(), heights.end()))
+                : thrust::make_zip_iterator(thrust::make_tuple(heights.end(), widths.end()));
+
+            switch (sort)
+            {
+                case SortType::WIDTH_ASC:
+                    if (isTest) cout << "Ascending sort, width first, height second" << endl;
+                case SortType::HEIGHT_ASC:
+                    if (isTest && sort == SortType::HEIGHT_ASC) cout << "Ascending sort, height first, width second" << endl;
+                    thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_asc());
+                    break;
+                case SortType::WIDTH_DESC:
+                    if (isTest) cout << "Descending sort, width first, height second" << endl;
+                case SortType::HEIGHT_DESC:
+                    if (isTest && sort == SortType::HEIGHT_DESC) cout << "Descending sort, height first, width second" << endl;
+                    thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_desc());
+                    break;
+            }
+        }
     }
 };
 

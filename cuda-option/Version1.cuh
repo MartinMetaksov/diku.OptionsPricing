@@ -177,7 +177,8 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
     res[idx] = call[c.jmax];
 }
 
-void computeOptionsNaive(const Options &options, const Yield &yield, vector<real> &results, const int blockSize = 64, bool isTest = false)
+void computeOptionsNaive(const Options &options, const Yield &yield, vector<real> &results, 
+    const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
 {
     size_t memoryFreeStart, memoryFree, memoryTotal;
     cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
@@ -197,7 +198,7 @@ void computeOptionsNaive(const Options &options, const Yield &yield, vector<real
     thrust::device_vector<int32_t> widths(options.N);
     thrust::device_vector<int32_t> heights(options.N);
 
-    CudaOptions cudaOptions(options, yield.N, strikePrices, maturities, lengths, termUnits, 
+    CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
         termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
     // Compute indices.

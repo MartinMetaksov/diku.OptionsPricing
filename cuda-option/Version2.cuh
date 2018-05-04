@@ -176,7 +176,8 @@ kernelCoalesced(const CudaOptions options, real *res, real *QsAll, real *QsCopyA
     res[idx] = *getArrayAt(c.jmax, QsAll, options.N, idx);
 }
 
-void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<real> &results, const int blockSize = 64, bool isTest = false)
+void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<real> &results, 
+    const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
 {
     size_t memoryFreeStart, memoryFree, memoryTotal;
     cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
@@ -196,7 +197,7 @@ void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<
     thrust::device_vector<int32_t> widths(options.N);
     thrust::device_vector<int32_t> heights(options.N);
 
-    CudaOptions cudaOptions(options, yield.N, strikePrices, maturities, lengths, termUnits, 
+    CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
         termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
     
     // Compute padding

@@ -30,13 +30,13 @@ void computeAllOptions(const Args &args)
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(options, yield, results, 64, args.test);
+            cuda::computeOptionsNaive(options, yield, results, 64, args.sort, args.test);
             break;
         case 2:
-            cuda::computeOptionsCoalesced(options, yield, results, 64, args.test);
+            cuda::computeOptionsCoalesced(options, yield, results, 64, args.sort, args.test);
             break;
         case 3:
-            cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results, 64, args.test);
+            cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results, 64, args.sort, args.test);
             break;
     }
 

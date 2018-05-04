@@ -14,8 +14,10 @@ namespace trinom
 
 enum class SortType : char
 {
-    WIDTH = 'W',
-    HEIGHT = 'H',
+    WIDTH_DESC = 'W',
+    WIDTH_ASC = 'w',
+    HEIGHT_DESC = 'H',
+    HEIGHT_ASC = 'h',
     NONE = '-'
 };
 
@@ -58,23 +60,6 @@ struct OptionConstants
 
         jmax = (int)(minus184 / M) + 1;
         width = 2 * jmax + 1;
-    }
-
-    static void sortConstants(vector<OptionConstants> &v, const SortType sortType, const bool isTest = false)
-    {
-        switch (sortType)
-        {
-        case SortType::WIDTH:
-            if (isTest)
-                cout << "Sorting options by width first, height second" << endl;
-            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.width > b.width || (a.width == b.width && a.n > b.n)); });
-            break;
-        case SortType::HEIGHT:
-            if (isTest)
-                cout << "Sorting options by height first, width second" << endl;
-            sort(v.begin(), v.end(), [](const OptionConstants &a, const OptionConstants &b) -> bool { return (a.n > b.n || (a.n == b.n && a.width > b.width)); });
-            break;
-        }
     }
 };
 }

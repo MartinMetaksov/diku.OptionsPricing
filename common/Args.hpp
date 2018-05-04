@@ -23,7 +23,7 @@ struct Args
     {
         GetOpt_pp cmd(argc, argv);
         string s;
-        
+
         version = 1;
         sort = SortType::NONE;
 
@@ -33,13 +33,13 @@ struct Args
         cmd >> GetOpt::Option('v', "version", version);
         cmd >> GetOpt::OptionPresent('t', "test", test);
 
-        if (strcasecmp(s.c_str(), string(1, (char)SortType::WIDTH).c_str()) == 0)
+        if (s.length() == 1)
         {
-            sort = SortType::WIDTH;
-        }
-        else if (strcasecmp(s.c_str(), string(1, (char)SortType::HEIGHT).c_str()) == 0)
-        {
-            sort = SortType::HEIGHT;
+            auto sortType = (SortType)s[0];
+            if (sortType == SortType::HEIGHT_ASC || sortType == SortType::HEIGHT_DESC || sortType == SortType::WIDTH_ASC || sortType == SortType::WIDTH_DESC)
+            {
+                sort = sortType;
+            }
         }
     }
 };

@@ -199,7 +199,8 @@ struct times_block_size
     __host__ __device__ int32_t operator()(const int32_t &x) const {return x * BlockSize;}
 };
 
-void computeOptionsWithPaddingPerThreadBlock(const Options &options, const Yield &yield, vector<real> &results, const int blockSize = 64, bool isTest = false)
+void computeOptionsWithPaddingPerThreadBlock(const Options &options, const Yield &yield, vector<real> &results, 
+    const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
 {
     size_t memoryFreeStart, memoryFree, memoryTotal;
     cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
@@ -219,7 +220,7 @@ void computeOptionsWithPaddingPerThreadBlock(const Options &options, const Yield
     thrust::device_vector<int32_t> widths(options.N);
     thrust::device_vector<int32_t> heights(options.N);
 
-    CudaOptions cudaOptions(options, yield.N, strikePrices, maturities, lengths, termUnits, 
+    CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
         termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
     
     // Create block indices.
