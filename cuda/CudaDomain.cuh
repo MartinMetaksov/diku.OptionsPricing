@@ -15,23 +15,5 @@ namespace cuda
 {
     __constant__ Yield YieldCurve[100];
 
-    void init(const Args &args, vector<OptionConstants> &optionConstants, int &yieldSize)
-    {
-        // Read options from filename, allocate the result array
-        auto options = Option::readOptions(args.options);
-        auto yield = Yield::readYieldCurve(args.yield);
-        yieldSize = yield.size();
-
-        optionConstants.reserve(options.size());
-        for (auto &option : options)
-        {
-            auto constant = OptionConstants::computeConstants(option);
-            optionConstants.push_back(constant);
-        }
-
-        OptionConstants::sortConstants(optionConstants, args.sort, args.test);
-        CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
-    }
-
 }
 #endif
