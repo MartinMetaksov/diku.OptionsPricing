@@ -178,8 +178,11 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
     res[idx] = call[c.jmax];
 }
 
-void computeOptionsNaive(const Options &options, const Yield &yield, vector<real> &results, const int blockSize, bool isTest = false)
+void computeOptionsNaive(const Options &options, const Yield &yield, vector<real> &results, const int blockSize = 64, bool isTest = false)
 {
+    size_t memoryFreeStart, memoryFree, memoryTotal;
+    cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
+
     thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
     thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
     thrust::device_vector<uint16_t> lengths(options.Lengths.begin(), options.Lengths.end());
@@ -214,10 +217,10 @@ void computeOptionsNaive(const Options &options, const Yield &yield, vector<real
 
     if (isTest)
     {
-        int memorySize = options.N * sizeof(real) + options.N * sizeof(OptionConstants) + 2 * options.N * sizeof(int)
-                        + 2 * totalQsCount * sizeof(real) + totalAlphasCount * sizeof(real);
         cout << "Running trinomial option pricing for " << options.N << " options with block size " << blockSize << endl;
-        cout << "Global memory size " << memorySize / (1024.0 * 1024.0) << " MB" << endl;
+        cudaDeviceSynchronize();
+        cudaMemGetInfo(&memoryFree, &memoryTotal);
+        cout << "Memory used " << (memoryFreeStart - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
     }
 
     auto d_result = thrust::raw_pointer_cast(result.data());

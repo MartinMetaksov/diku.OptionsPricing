@@ -49,6 +49,19 @@ struct Options
     vector<real> Volatilities;
     vector<OptionType> Types;
 
+    Options(const int count)
+    {
+        N = count;
+        Lengths.reserve(N);
+        Maturities.reserve(N);
+        StrikePrices.reserve(N);
+        TermUnits.reserve(N);
+        TermStepCounts.reserve(N);
+        ReversionRates.reserve(N);
+        Volatilities.reserve(N);
+        Types.reserve(N);
+    }
+
     Options(const string &filename)
     {
         if (filename.empty())

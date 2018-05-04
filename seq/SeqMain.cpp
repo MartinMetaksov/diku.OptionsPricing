@@ -17,12 +17,7 @@ void computeAllOptions(const Args &args)
     vector<real> results;
     results.reserve(options.N);
 
-    for (auto i = 0; i < options.N; ++i)
-    {
-        OptionConstants c(options, i);
-        auto result = seq::computeSingleOption(c, yield);
-        results.push_back(result);
-    }
+    seq::computeOptions(options, yield, results);
 
     auto time_end = steady_clock::now();
 

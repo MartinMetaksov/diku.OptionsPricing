@@ -177,6 +177,17 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
 
     return result;
 }
+
+void computeOptions(const Options &options, const Yield &yield, vector<real> &results)
+{
+    for (auto i = 0; i < options.N; ++i)
+    {
+        OptionConstants c(options, i);
+        auto result = computeSingleOption(c, yield);
+        results.push_back(result);
+    }
+}
+
 }
 
 #endif

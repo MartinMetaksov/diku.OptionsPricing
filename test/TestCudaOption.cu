@@ -1,10 +1,10 @@
 #include "catch.hpp"
-#include "../cuda/CudaDomain.cuh"
+
+#define USE_DOUBLE
 #include "../cuda-option/Version1.cuh"
 #include "../cuda-option/Version2.cuh"
-#include "../cuda-option/Version3.cuh"
+// #include "../cuda-option/Version3.cuh"
 #include "../seq/Seq.hpp"
-#include "Mock.hpp"
 
 using namespace trinom;
 
@@ -16,63 +16,45 @@ void compareVectors(vector<real> test, vector<real> gold)
 
     for (auto i = 0; i < test.size(); i++)
     {
-        // epsilon serves to set the percentage by which a result can be erroneous, before it is rejected.
-        CHECK(test[i] == Approx(gold[i]).epsilon(0.0001));
+        CHECK(test[i] == Approx(gold[i]));
     }
 }
 
 TEST_CASE("One option per thread cuda")
 {
-    auto yield = Yield::readYieldCurve(YIELD_CURVE_PATH);
-    CudaSafeCall(cudaMemcpyToSymbol(cuda::YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
+    Yield yield(YIELD_CURVE_PATH);
 
-    int bookCount = 100;
-    vector<real> bookResults;
-    vector<OptionConstants> book;
-    bookResults.reserve(bookCount);
-    book.reserve(bookCount);
-    for (int i = 0; i < bookCount; ++i)
+    Options options(100);
+    for (int i = 0; i < options.N; ++i)
     {
-        trinom::Option o;
-        o.Length = 3;
-        o.Maturity = 9;
-        o.StrikePrice = 63;
-        o.TermUnit = 365;
-        o.TermStepCount = i + 1;
-        o.ReversionRate = 0.1;
-        o.Volatility = 0.01;
-
-        book.push_back(OptionConstants::computeConstants(o));
-        bookResults.push_back(seq::computeSingleOption(book[i], yield));
+        options.Lengths.push_back(3);
+        options.Maturities.push_back(9);
+        options.StrikePrices.push_back(63);
+        options.TermUnits.push_back(365);
+        options.TermStepCounts.push_back(i + 1);
+        options.ReversionRates.push_back(0.1);
+        options.Volatilities.push_back(0.01);
+        options.Types.push_back(OptionType::PUT);
     }
+    
+    vector<real> seqResults, cudaResults;
+    seqResults.reserve(options.N);
 
-    SECTION("Compute book options with more precision")
+    seq::computeOptions(options, yield, seqResults);
+
+    SECTION("Version 1")
     {
         vector<real> results;
-        results.resize(bookCount);
-        cuda::computeOptionsWithPaddingPerThreadBlock(book, yield.size(), results);
-
-        compareVectors(results, bookResults);
+        results.resize(options.N);
+        cuda::computeOptionsNaive(options, yield, results);
+        compareVectors(results, seqResults);
     }
-    SECTION("Compute random options")
+
+    SECTION("Version 2")
     {
-        int count = 104;
-        vector<OptionConstants> options;
-        options.resize(count);
-
-        Mock::mockConstants(options.data(), count, 1001, 12);
-
-        vector<real> goldResults;
-        goldResults.reserve(count);
-        for (auto &option : options)
-        {
-            goldResults.push_back(seq::computeSingleOption(option, yield));
-        }
-
         vector<real> results;
-        results.resize(count);
-        cuda::computeOptionsWithPaddingPerThreadBlock(options, yield.size(), results);
-
-        compareVectors(results, goldResults);
+        results.resize(options.N);
+        cuda::computeOptionsCoalesced(options, yield, results);
+        compareVectors(results, seqResults);
     }
 }
