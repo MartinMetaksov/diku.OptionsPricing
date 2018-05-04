@@ -5,7 +5,7 @@
 #include "../common/Args.hpp"
 #include "Version1.cuh"
 #include "Version2.cuh"
-// #include "Version3.cuh"
+#include "Version3.cuh"
 
 using namespace std;
 using namespace trinom;
@@ -35,9 +35,9 @@ void computeAllOptions(const Args &args)
         case 2:
             cuda::computeOptionsCoalesced(options, yield, results, 64, args.test);
             break;
-        // case 3:
-        //     cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results, 64, args.test);
-            // break;
+        case 3:
+            cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results, 64, args.test);
+            break;
     }
 
     auto time_end = steady_clock::now();

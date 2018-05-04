@@ -2,7 +2,6 @@
 #define CUDA_VERSION_1_CUH
 
 #include "../cuda/CudaDomain.cuh"
-#include <thrust/scan.h>
 
 using namespace chrono;
 using namespace trinom;

@@ -220,8 +220,6 @@ void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<
         cout << "Memory used " << (memoryFreeStart - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
     }
 
-    const auto time_begin = steady_clock::now();
-
     auto d_result = thrust::raw_pointer_cast(result.data());
     auto d_Qs = thrust::raw_pointer_cast(Qs.data());
     auto d_QsCopy = thrust::raw_pointer_cast(QsCopy.data());

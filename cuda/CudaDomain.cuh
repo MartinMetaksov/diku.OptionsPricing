@@ -17,8 +17,7 @@ namespace cuda
 struct compute_width_height
 {
     template <typename Tuple>
-    __host__ __device__
-    void operator()(Tuple t)
+    __host__ __device__ void operator()(Tuple t)
     {
         // Tuple(TermUnit, TermStepCount, Maturity, ReversionRate, Widths, Height)
         auto termUnit = thrust::get<0>(t);

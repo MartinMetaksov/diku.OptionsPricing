@@ -3,7 +3,7 @@
 #define USE_DOUBLE
 #include "../cuda-option/Version1.cuh"
 #include "../cuda-option/Version2.cuh"
-// #include "../cuda-option/Version3.cuh"
+#include "../cuda-option/Version3.cuh"
 #include "../seq/Seq.hpp"
 
 using namespace trinom;
@@ -55,6 +55,14 @@ TEST_CASE("One option per thread cuda")
         vector<real> results;
         results.resize(options.N);
         cuda::computeOptionsCoalesced(options, yield, results);
+        compareVectors(results, seqResults);
+    }
+
+    SECTION("Version 3")
+    {
+        vector<real> results;
+        results.resize(options.N);
+        cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results);
         compareVectors(results, seqResults);
     }
 }

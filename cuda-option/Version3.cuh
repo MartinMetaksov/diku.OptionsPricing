@@ -2,6 +2,7 @@
 #define CUDA_VERSION_3_CUH
 
 #include "../cuda/CudaDomain.cuh"
+#include <thrust/transform_scan.h>
 
 using namespace chrono;
 using namespace trinom;
@@ -25,17 +26,20 @@ __device__ void fillUnpaddedArrayColumn(const int count, const real value, real 
 }
 
 __global__ void
-kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, int *ScannedWidths, int *ScannedHeights, const int totalCount, const int yieldCurveSize)
+kernelPaddingPerThreadBlock(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, real *alphasAll, int32_t *QsInds, int32_t *alphasInds)
 {
     const int idx = threadIdx.x + blockDim.x * blockIdx.x;
-    // const int blockSize = ;
-    const int widthBlockStartIndex = ScannedWidths[blockIdx.x];
-    const int heightBlockStartIndex = ScannedHeights[blockIdx.x];
-    // Out of options check
-    if (idx >= totalCount) return;
 
-    auto c = options[idx];
-    auto alpha = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+    // Out of options check
+    if (idx >= options.N) return;
+    
+    const int widthBlockStartIndex = blockIdx.x == 0 ? 0 : QsInds[blockIdx.x - 1];
+    const int heightBlockStartIndex = blockIdx.x == 0 ? 0 : alphasInds[blockIdx.x - 1];
+
+    OptionConstants c;
+    computeConstants(c, options, idx);
+
+    auto alpha = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
     *getUnpaddedArrayAt(c.jmax, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) = one;
     *getUnpaddedArrayAt(0, alphasAll, threadIdx.x, blockDim.x, heightBlockStartIndex) = alpha;
 
@@ -110,7 +114,7 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
             alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+        alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
         *getUnpaddedArrayAt(i, alphasAll, threadIdx.x, blockDim.x, heightBlockStartIndex) = alpha;
 
         // Switch Qs
@@ -177,113 +181,97 @@ kernelPaddingPerThreadBlock(real *res, const OptionConstants *options, real *QsA
     res[idx] = *getUnpaddedArrayAt(c.jmax, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex);
 }
 
-void computeOptionsWithPaddingPerThreadBlock(const vector<OptionConstants> &options, const int yieldSize, vector<real> &results, bool isTest = false)
+struct same_block_indices
 {
-    const auto count = options.size();
-    const auto blockSize = 64;
-    const auto blockCount = ceil(count / ((float)blockSize));
+    const int32_t BlockSize;
 
-    // Compute padding
-    vector<int> maxWidths(blockCount, 0);
-    vector<int> maxHeights(blockCount, 0);
-    int blockCounter = 0;
+    same_block_indices(int32_t blockSize) : BlockSize(blockSize) {}
+
+    __host__ __device__ bool operator()(const int32_t &lhs, const int32_t &rhs) const {return lhs / BlockSize == rhs / BlockSize;}
+};
+
+struct times_block_size
+{
+    const int32_t BlockSize;
+
+    times_block_size(int32_t blockSize) : BlockSize(blockSize) {}
+
+    __host__ __device__ int32_t operator()(const int32_t &x) const {return x * BlockSize;}
+};
+
+void computeOptionsWithPaddingPerThreadBlock(const Options &options, const Yield &yield, vector<real> &results, const int blockSize = 64, bool isTest = false)
+{
+    size_t memoryFreeStart, memoryFree, memoryTotal;
+    cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
+
+    thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
+    thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
+    thrust::device_vector<uint16_t> lengths(options.Lengths.begin(), options.Lengths.end());
+    thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
+    thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
+    thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
+    thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
+    thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
+
+    thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
+    thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+
+    thrust::device_vector<int32_t> widths(options.N);
+    thrust::device_vector<int32_t> heights(options.N);
+
+    CudaOptions cudaOptions(options, yield.N, strikePrices, maturities, lengths, termUnits, 
+        termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
     
-    for (int i = 0; i < options.size(); ++i) {
-        auto &option = options.at(i);
-        if (option.width > maxWidths.at(blockCounter))
-        {
-            maxWidths.at(blockCounter) = option.width;
-        }
-        if (option.n >= maxHeights.at(blockCounter))
-        {
-            maxHeights.at(blockCounter) = option.n + 1; // n + 1 alphas
-        }   
+    // Create block indices.
+    const auto blockCount = ceil(options.N / ((float)blockSize));
+    thrust::device_vector<int32_t> keys(options.N);
+    thrust::sequence(keys.begin(), keys.end());
 
-        if ((i+1) % blockSize == 0) {
-            blockCounter++;
-        }     
-    }
+    thrust::device_vector<int32_t> QsInds(blockCount);
+    thrust::device_vector<int32_t> alphasInds(blockCount);
+    thrust::device_vector<int32_t> keysOut(blockCount);
+    thrust::reduce_by_key(keys.begin(), keys.end(), widths.begin(), keysOut.begin(), QsInds.begin(), same_block_indices(blockSize), thrust::maximum<int32_t>());
+    thrust::reduce_by_key(keys.begin(), keys.end(), heights.begin(), keysOut.begin(), alphasInds.begin(), same_block_indices(blockSize), thrust::maximum<int32_t>());
 
-    int totalQsCount = 0;
-    int totalAlphasCount = 0;
+    thrust::transform_inclusive_scan(QsInds.begin(), QsInds.end(), QsInds.begin(), times_block_size(blockSize), thrust::plus<int32_t>());
+    thrust::transform_inclusive_scan(alphasInds.begin(), alphasInds.end(), alphasInds.begin(), times_block_size(blockSize), thrust::plus<int32_t>());
 
-    // todo: this can maybe be done better in c++ ? :D 
-    vector<int> scannedWidths(blockCount, 0);
-    vector<int> scannedHeights(blockCount, 0);
-    if (maxWidths.size() == 1) {
-        totalQsCount += maxWidths.at(0) * blockSize;
-    }
-    for (int i = 1; i < maxWidths.size(); i++) {
-        auto& n = maxWidths.at(i-1);
-        totalQsCount += n * blockSize;
-        scannedWidths.at(i) = scannedWidths.at(i-1) + n * blockSize;
-        if (i == maxWidths.size()-1) {
-            totalQsCount += maxWidths.at(i) * blockSize;
-        }
-    }
+    const int totalQsCount = QsInds[blockCount - 1];
+    const int totalAlphasCount = alphasInds[blockCount - 1];
 
-    if (maxHeights.size() == 1) {
-        totalAlphasCount += maxHeights.at(0) * blockSize;
-    }
-    for (int i = 1; i < maxHeights.size(); i++) {
-        auto& n = maxHeights.at(i-1);
-        totalAlphasCount += n * blockSize;
-        scannedHeights.at(i) = scannedHeights.at(i-1) + n * blockSize;
-        if (i == maxHeights.size()-1) {
-            totalAlphasCount += maxHeights.at(i) * blockSize;
-        }
-    }
+    thrust::device_vector<real> Qs(totalQsCount);
+    thrust::device_vector<real> QsCopy(totalQsCount);
+    thrust::device_vector<real> alphas(totalAlphasCount);
+    thrust::device_vector<real> result(options.N);
 
     if (isTest)
     {
-        int memorySize = count * sizeof(real) + count * sizeof(OptionConstants)
-                        + 2 * totalQsCount * sizeof(real) + totalAlphasCount * sizeof(real);
-        cout << "Running trinomial option pricing for " << count << " options with block size " << blockSize << endl;
-        cout << "Global memory size " << memorySize / (1024.0 * 1024.0) << " MB" << endl;
+        cout << "Running trinomial option pricing for " << options.N << " options with block size " << blockSize << endl;
+        cudaDeviceSynchronize();
+        cudaMemGetInfo(&memoryFree, &memoryTotal);
+        cout << "Memory used " << (memoryFreeStart - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
     }
 
-    const auto time_begin = steady_clock::now();
-
-    real *d_result, *d_Qs, *d_QsCopy, *d_alphas;
-    int *d_ScannedWidths, *d_ScannedHeights;
-    OptionConstants *d_options;
-    CudaSafeCall(cudaMalloc((void **)&d_result, count * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_options, count * sizeof(OptionConstants)));
-    CudaSafeCall(cudaMalloc((void **)&d_Qs, totalQsCount * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_QsCopy, totalQsCount * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_ScannedWidths, blockCount * sizeof(int)));
-    CudaSafeCall(cudaMalloc((void **)&d_ScannedHeights, blockCount * sizeof(int)));
-    CudaSafeCall(cudaMalloc((void **)&d_alphas, totalAlphasCount * sizeof(real)));
-
-    CudaSafeCall(cudaMemcpy(d_options, options.data(), count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_ScannedWidths, scannedWidths.data(), blockCount * sizeof(int), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_ScannedHeights, scannedHeights.data(), blockCount * sizeof(int), cudaMemcpyHostToDevice));
+    auto d_result = thrust::raw_pointer_cast(result.data());
+    auto d_Qs = thrust::raw_pointer_cast(Qs.data());
+    auto d_QsCopy = thrust::raw_pointer_cast(QsCopy.data());
+    auto d_alphas = thrust::raw_pointer_cast(alphas.data());
+    auto d_QsInds = thrust::raw_pointer_cast(QsInds.data());
+    auto d_alphasInds = thrust::raw_pointer_cast(alphasInds.data());
 
     auto time_begin_kernel = steady_clock::now();
-    kernelPaddingPerThreadBlock<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_ScannedWidths, d_ScannedHeights, count, yieldSize);
+    kernelPaddingPerThreadBlock<<<blockCount, blockSize>>>(cudaOptions, d_result, d_Qs, d_QsCopy, d_alphas, d_QsInds, d_alphasInds);
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
+    if (isTest)
+    {
+        cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
+    }
 
     CudaCheckError();
 
     // Copy result
-    cudaMemcpy(results.data(), d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_result);
-    cudaFree(d_options);
-    cudaFree(d_Qs);
-    cudaFree(d_QsCopy);
-    cudaFree(d_alphas);
-    cudaFree(d_ScannedWidths);
-    cudaFree(d_ScannedHeights);
-
-    auto time_end = steady_clock::now();
-    if (isTest)
-    {
-        cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
-        cout << "Total GPU time: " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl
-            << endl;
-    }
+    thrust::copy(result.begin(), result.end(), results.begin());
 }
 }
 
