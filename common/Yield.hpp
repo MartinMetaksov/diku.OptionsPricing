@@ -14,10 +14,11 @@ namespace trinom
 
 struct Yield
 {
-    real p;
-    int t;
+    int N;
+    vector<real> Prices;
+    vector<int32_t> TimeSteps;
 
-    static vector<Yield> readYieldCurve(const string &filename)
+    Yield(const string &filename)
     {
         if (filename.empty())
         {
@@ -31,26 +32,11 @@ struct Yield
             throw invalid_argument("File does not exist.");
         }
 
-        vector<real> prices;
-        vector<int> timesteps;
-
-        Arrays::read_array(in, prices);
-        Arrays::read_array(in, timesteps);
+        Arrays::read_array(in, Prices);
+        Arrays::read_array(in, TimeSteps);
+        N = Prices.size();
 
         in.close();
-
-        int size = prices.size();
-        vector<Yield> curve;
-        curve.reserve(size);
-
-        for (int i = 0; i < size; ++i)
-        {
-            Yield y;
-            y.p = prices.at(i);
-            y.t = timesteps.at(i);
-            curve.push_back(y);
-        }
-        return curve;
     }
 };
 }

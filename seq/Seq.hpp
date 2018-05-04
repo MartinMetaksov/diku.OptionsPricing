@@ -21,11 +21,8 @@ struct jvalue
  *  Sequential version that computes the bond tree until bond maturity
  *  and prices the option on maturity during backward propagation.
  **/
-real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
+real computeSingleOption(const OptionConstants &c, const Yield &yield)
 {
-    const Yield *curve = yield.data();
-    const int curveSize = yield.size();
-
     // Precompute probabilities and rates for all js.
     auto jvalues = new jvalue[c.width];
     auto jmin = -c.jmax;
@@ -58,7 +55,7 @@ real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
     Qs[c.jmax] = one;                  // Qs[0] = 1$
 
     auto alphas = new real[c.n + 1]();                              // alphas[i]
-    alphas[0] = getYieldAtYear(c.dt, c.termUnit, curve, curveSize); // initial dt-period interest rate
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit, yield.Prices.data(), yield.TimeSteps.data(), yield.N); // initial dt-period interest rate
 
     for (auto i = 0; i < c.n; ++i)
     {
@@ -106,7 +103,7 @@ real computeSingleOption(const OptionConstants &c, const vector<Yield> &yield)
             alpha_val += QsCopy[jind] * exp(-jval.rate * c.dt);
         }
 
-        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, c.termUnit, curve, curveSize);
+        alphas[i + 1] = computeAlpha(alpha_val, i, c.dt, c.termUnit, yield.Prices.data(), yield.TimeSteps.data(), yield.N);
 
         // Switch Qs
         auto QsT = Qs;

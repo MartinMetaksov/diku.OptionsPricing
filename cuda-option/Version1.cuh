@@ -50,7 +50,7 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
     auto QsCopy = QsCopyAll + QsInd;
     auto alphas = alphasAll + alphasInd;
     Qs[c.jmax] = one;
-    alphas[0] = getYieldAtYear(c.dt, c.termUnit, YieldCurve, options.YieldSize);
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
 
     for (auto i = 1; i <= c.n; ++i)
     {
@@ -124,7 +124,7 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
             alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, options.YieldSize);
+        alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
 
         // Switch Qs
         auto QsT = Qs;
@@ -192,7 +192,7 @@ kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, 
     res[idx] = call[c.jmax];
 }
 
-void computeOptionsNaive(const Options &options, const int yieldSize, vector<real> &results, const int blockSize, bool isTest = false)
+void computeOptionsNaive(const Options &options, const Yield &yield, vector<real> &results, const int blockSize, bool isTest = false)
 {
     thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
     thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
@@ -203,10 +203,14 @@ void computeOptionsNaive(const Options &options, const int yieldSize, vector<rea
     thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
     thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
 
+    thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
+    thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+
     thrust::device_vector<int32_t> widths(options.N);
     thrust::device_vector<int32_t> heights(options.N);
 
-    CudaOptions cudaOptions(options, yieldSize, strikePrices, maturities, lengths, termUnits, termStepCounts, reversionRates, volatilities, types, widths, heights);
+    CudaOptions cudaOptions(options, yield.N, strikePrices, maturities, lengths, termUnits, 
+        termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
     // Compute indices.
     thrust::inclusive_scan(widths.begin(), widths.end(), widths.begin());

@@ -17,10 +17,11 @@ void computeAllOptions(const Args &args)
         cout << "Cuda one option per thread version " << args.version << endl;
     }
     
-    // Read options and yield curve, allocate the result array.
-    auto options = Options(args.options);
-    auto yieldSize = cuda::readYieldCurve(args.yield);
+    // Read options and yield curve.
+    Options options(args.options);
+    Yield yield(args.yield);
 
+    cudaFree(0);
     auto time_begin = steady_clock::now();
 
     vector<real> results;
@@ -29,7 +30,7 @@ void computeAllOptions(const Args &args)
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(options, yieldSize, results, 64, args.test);
+            cuda::computeOptionsNaive(options, yield, results, 64, args.test);
             break;
         // case 2:
         //     cuda::computeOptionsCoalesced(options, yieldSize, results, args.test);

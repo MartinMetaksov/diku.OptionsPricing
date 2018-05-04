@@ -40,13 +40,13 @@ inline istream &operator>>(istream &is, OptionType &t)
 struct Options
 {
     int N;
-    vector<float> StrikePrices;
-    vector<float> Maturities;
-    vector<float> Lengths;
+    vector<real> StrikePrices;
+    vector<real> Maturities;
+    vector<real> Lengths;
     vector<uint16_t> TermUnits;
     vector<uint16_t> TermStepCounts;
-    vector<float> ReversionRates;
-    vector<float> Volatilities;
+    vector<real> ReversionRates;
+    vector<real> Volatilities;
     vector<OptionType> Types;
 
     Options(const string &filename)
@@ -62,7 +62,7 @@ struct Options
         {
             throw invalid_argument("File '" + filename + "' does not exist.");
         }
-        
+
         Arrays::read_array(in, StrikePrices);
         Arrays::read_array(in, Maturities);
         Arrays::read_array(in, Lengths);

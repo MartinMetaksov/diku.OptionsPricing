@@ -10,31 +10,35 @@ using namespace std;
 namespace trinom
 {
 
-DEVICE real getYieldAtYear(const real t, const int termUnit, const Yield *curve, const int size)
+DEVICE real getYieldAtYear(const real t, const int termUnit, const real *prices, const int32_t *timeSteps, const int size)
 {
     const int tDays = (int)ROUND(t * termUnit);
-    auto first = curve[0];
-    auto second = curve[0];
+    auto first = 0;
+    auto second = 0;
 
     for (auto i = 0; i < size; ++i)
     {
-        const auto yield = curve[i];
-        if (yield.t >= tDays)
+        const auto t = timeSteps[i];
+        if (t >= tDays)
         {
-            second = yield;
+            second = i;
             break;
         }
-        first = yield;
+        first = i;
     }
 
     // Prevent division by zero
-    if (first.t == second.t)
+    if (first == second)
     {
-        return first.p;
+        return prices[0];
     }
 
-    auto coefficient = (tDays - first.t) / (real)(second.t - first.t);
-    return first.p + coefficient * (second.p - first.p);
+    auto t1 = timeSteps[first];
+    auto t2 = timeSteps[second];
+    auto p1 = prices[first];
+    auto p2 = prices[second];
+    auto coefficient = (tDays - t1) / (real)(t2 - t1);
+    return p1 + coefficient * (p2 - p1);
 }
 
 // Probability Equations
@@ -87,12 +91,12 @@ DEVICE inline real PD_C(int j, real M)
     return one / six + (j * j * M * M + j * M) * half;
 }
 
-DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt, const int termUnit, const Yield *curve, const int size)
+DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real dt, const int termUnit, const real *prices, const int32_t *timeSteps, const int size)
 {
     auto ti = (i + 2) * dt;
-    auto R = getYieldAtYear(ti, termUnit, curve, size); // discount rate
-    auto P = exp(-R * ti);                              // discount bond price
-    return log(aggregatedQs / P) / dt;                  // new alpha
+    auto R = getYieldAtYear(ti, termUnit, prices, timeSteps, size); // discount rate
+    auto P = exp(-R * ti);                                          // discount bond price
+    return log(aggregatedQs / P) / dt;                              // new alpha
 }
 
 DEVICE inline real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)

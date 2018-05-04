@@ -14,8 +14,6 @@ using namespace trinom;
 namespace cuda
 {
 
-__constant__ Yield YieldCurve[100];
-
 struct compute_width_height
 {
     template <typename Tuple>
@@ -50,6 +48,9 @@ struct CudaOptions
     const real *Volatilities;
     const OptionType *Types;
 
+    const real *YieldPrices;
+    const int32_t *YieldTimeSteps;
+
     const int32_t *Widths;
     const int32_t *Heights;
 
@@ -64,6 +65,8 @@ struct CudaOptions
         const thrust::device_vector<real> &reversionRates,
         const thrust::device_vector<real> &volatilities,
         const thrust::device_vector<OptionType> &types,
+        const thrust::device_vector<real> &yieldPrices,
+        const thrust::device_vector<int32_t> &yieldTimeSteps,
         thrust::device_vector<int32_t> &widths,
         thrust::device_vector<int32_t> &heights)
     {
@@ -77,6 +80,8 @@ struct CudaOptions
         ReversionRates = thrust::raw_pointer_cast(reversionRates.data());
         Volatilities = thrust::raw_pointer_cast(volatilities.data());
         Types = thrust::raw_pointer_cast(types.data());
+        YieldPrices = thrust::raw_pointer_cast(yieldPrices.data());
+        YieldTimeSteps = thrust::raw_pointer_cast(yieldTimeSteps.data());
         Widths = thrust::raw_pointer_cast(widths.data());
         Heights = thrust::raw_pointer_cast(heights.data());
 
@@ -86,14 +91,6 @@ struct CudaOptions
                      compute_width_height());
     }
 };
-
-int readYieldCurve(const string &filename)
-{
-    // Read yield curve from file and copy it to constant memory.
-    auto yield = Yield::readYieldCurve(filename);
-    CudaSafeCall(cudaMemcpyToSymbol(YieldCurve, yield.data(), yield.size() * sizeof(Yield)));
-    return yield.size();
-}
 
 }
 #endif
