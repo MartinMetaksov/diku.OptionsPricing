@@ -113,7 +113,7 @@ struct CudaOptions
         if (sort != SortType::NONE)
         {
             auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(strikePrices.begin(), maturities.begin(), lengths.begin(), termUnits.begin(), 
-                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin(), yieldPrices.begin(), yieldTimeSteps.begin()));
+                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin()));
     
             auto keysBegin = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
                 ? thrust::make_zip_iterator(thrust::make_tuple(widths.begin(), heights.begin()))
