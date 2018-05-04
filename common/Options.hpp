@@ -89,7 +89,7 @@ struct Options
         in.close();
     }
 
-    static void writeOptions(const string &filename, const Options &options)
+    void writeToFile(const string &filename)
     {
         if (filename.empty())
         {
@@ -103,14 +103,14 @@ struct Options
             throw invalid_argument("File does not exist.");
         }
 
-        Arrays::write_array(out, options.StrikePrices);
-        Arrays::write_array(out, options.Maturities);
-        Arrays::write_array(out, options.Lengths);
-        Arrays::write_array(out, options.TermUnits);
-        Arrays::write_array(out, options.TermStepCounts);
-        Arrays::write_array(out, options.ReversionRates);
-        Arrays::write_array(out, options.Volatilities);
-        Arrays::write_array(out, options.Types);
+        Arrays::write_array(out, StrikePrices);
+        Arrays::write_array(out, Maturities);
+        Arrays::write_array(out, Lengths);
+        Arrays::write_array(out, TermUnits);
+        Arrays::write_array(out, TermStepCounts);
+        Arrays::write_array(out, ReversionRates);
+        Arrays::write_array(out, Volatilities);
+        Arrays::write_array(out, Types);
 
         out.close();
     }
