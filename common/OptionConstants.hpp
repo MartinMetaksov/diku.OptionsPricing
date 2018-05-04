@@ -1,7 +1,8 @@
 #ifndef OPTION_CONSTANTS_HPP
 #define OPTION_CONSTANTS_HPP
 
-#include "Option.hpp"
+#include "CudaInterop.h"
+#include "Options.hpp"
 #include <algorithm>
 #include <vector>
 #include <cmath>
@@ -20,7 +21,6 @@ enum class SortType : char
 
 struct OptionConstants
 {
-  public:
     real t;
     real dt; // [years]
     real dr;
@@ -31,33 +31,33 @@ struct OptionConstants
     int32_t width;
     uint16_t termUnit;
     OptionType type; // char
-    uint8_t padding;
 
-    static OptionConstants computeConstants(const Option &option)
+    DEVICE HOST OptionConstants() {}
+
+    OptionConstants(const Options &options, const int ind)
     {
-        OptionConstants c;
-        auto T = option.Maturity;
-        auto termUnitsInYearCount = ceil((real)year / option.TermUnit);
-        c.termUnit = option.TermUnit;
-        c.t = option.Length;
-        c.n = option.TermStepCount * termUnitsInYearCount * T;
-        c.dt = termUnitsInYearCount / (real)option.TermStepCount; // [years]
-        c.type = option.Type;
+        termUnit = options.TermUnits.at(ind);
+        auto T = options.Maturities.at(ind);
+        auto termUnitsInYearCount = ceil((real)year / termUnit);
+        auto termStepCount = options.TermStepCounts.at(ind);
+        n = termStepCount * termUnitsInYearCount * T;
+        t = options.Lengths.at(ind);
+        dt = termUnitsInYearCount / (real)termStepCount; // [years]
+        type = options.Types.at(ind);
 
-        auto a = option.ReversionRate;
-        c.X = option.StrikePrice;
-        auto sigma = option.Volatility;
-        auto V = sigma * sigma * (one - exp(-two * a * c.dt)) / (two * a);
-        c.dr = sqrt(three * V);
-        c.M = exp(-a * c.dt) - one;
+        auto a = options.ReversionRates.at(ind);
+        X = options.StrikePrices.at(ind);
+        auto sigma = options.Volatilities.at(ind);
+        auto V = sigma * sigma * (one - exp(-two * a * dt)) / (two * a);
+        dr = sqrt(three * V);
+        M = exp(-a * dt) - one;
 
         // simplified computations
-        // c.dr = sigma * sqrt(three * c.dt);
-        // c.M = -a * c.dt;
+        // dr = sigma * sqrt(three * dt);
+        // M = -a * dt;
 
-        c.jmax = (int)(minus184 / c.M) + 1;
-        c.width = 2 * c.jmax + 1;
-        return c;
+        jmax = (int)(minus184 / M) + 1;
+        width = 2 * jmax + 1;
     }
 
     static void sortConstants(vector<OptionConstants> &v, const SortType sortType, const bool isTest = false)

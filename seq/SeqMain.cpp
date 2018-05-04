@@ -1,31 +1,33 @@
-#include "../common/Domain.hpp"
-#include "../common/OptionConstants.hpp"
+#include "Seq.hpp"
 #include "../common/Arrays.hpp"
 #include "../common/Args.hpp"
-#include "Seq.hpp"
 
 using namespace trinom;
 
 void computeAllOptions(const Args &args)
 {
     // Read options from filename, allocate the result array
-    auto options = Option::readOptions(args.options);
+    Options options(args.options);
     auto yield = Yield::readYieldCurve(args.yield);
     vector<real> results;
-    results.reserve(options.size());
+    results.reserve(options.N);
 
-    for (auto &option : options)
+    for (auto i = 0; i < options.N; ++i)
     {
-        auto c = OptionConstants::computeConstants(option);
-        results.push_back(seq::computeSingleOption(c, yield));
+        OptionConstants c(options, i);
+        auto result = seq::computeSingleOption(c, yield);
+        results.push_back(result);
     }
 
-    Arrays::write_array(cout, results);
+    if (!args.test)
+    {
+        Arrays::write_array(cout, results);
+    }
 }
 
 int main(int argc, char *argv[])
 {
-    auto args = Args::parseArgs(argc, argv);
+    Args args(argc, argv);
 
     computeAllOptions(args);
 

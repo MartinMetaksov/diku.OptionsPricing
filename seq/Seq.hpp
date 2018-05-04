@@ -1,6 +1,9 @@
 #ifndef SEQ_HPP
 #define SEQ_HPP
 
+#include "../common/OptionConstants.hpp"
+#include "../common/Domain.hpp"
+
 using namespace trinom;
 
 namespace seq

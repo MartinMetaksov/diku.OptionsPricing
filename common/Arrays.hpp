@@ -11,10 +11,9 @@ using namespace std;
 namespace trinom
 {
 
-class Arrays
+struct Arrays
 {
 
-  public:
 	template <class T,
 			  class = decltype(declval<istream &>() >> declval<T &>())>
 	static void read_array(istream &in, vector<T> &array)

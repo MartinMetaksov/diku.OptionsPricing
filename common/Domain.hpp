@@ -1,6 +1,7 @@
 #ifndef DOMAIN_HPP
 #define DOMAIN_HPP
 
+#include "CudaInterop.h"
 #include "Yield.hpp"
 #include "OptionConstants.hpp"
 
@@ -8,18 +9,6 @@ using namespace std;
 
 namespace trinom
 {
-
-#ifdef __CUDA_ARCH__
-#define CONSTANT __constant__
-#else
-#define CONSTANT const
-#endif
-
-#ifdef __CUDA_ARCH__
-#define DEVICE __device__
-#else
-#define DEVICE
-#endif
 
 DEVICE real getYieldAtYear(const real t, const int termUnit, const Yield *curve, const int size)
 {

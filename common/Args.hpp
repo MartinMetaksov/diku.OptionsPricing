@@ -13,38 +13,34 @@ namespace trinom
 
 struct Args
 {
-  public:
     string options;
     string yield;
     SortType sort;
     bool test;
     int version;
 
-    static Args parseArgs(int argc, char *argv[])
+    Args(int argc, char *argv[])
     {
         GetOpt_pp cmd(argc, argv);
-        Args args;
-        string sort;
+        string s;
         
-        args.version = 1;
-        args.sort = SortType::NONE;
+        version = 1;
+        sort = SortType::NONE;
 
-        cmd >> GetOpt::Option('o', "options", args.options);
-        cmd >> GetOpt::Option('y', "yield", args.yield);
-        cmd >> GetOpt::Option('s', "sort", sort);
-        cmd >> GetOpt::Option('v', "version", args.version);
-        cmd >> GetOpt::OptionPresent('t', "test", args.test);
+        cmd >> GetOpt::Option('o', "options", options);
+        cmd >> GetOpt::Option('y', "yield", yield);
+        cmd >> GetOpt::Option('s', "sort", s);
+        cmd >> GetOpt::Option('v', "version", version);
+        cmd >> GetOpt::OptionPresent('t', "test", test);
 
-        if (strcasecmp(sort.c_str(), string(1, (char)SortType::WIDTH).c_str()) == 0)
+        if (strcasecmp(s.c_str(), string(1, (char)SortType::WIDTH).c_str()) == 0)
         {
-            args.sort = SortType::WIDTH;
+            sort = SortType::WIDTH;
         }
-        else if (strcasecmp(sort.c_str(), string(1, (char)SortType::HEIGHT).c_str()) == 0)
+        else if (strcasecmp(s.c_str(), string(1, (char)SortType::HEIGHT).c_str()) == 0)
         {
-            args.sort = SortType::HEIGHT;
+            sort = SortType::HEIGHT;
         }
-
-        return args;
     }
 };
 }

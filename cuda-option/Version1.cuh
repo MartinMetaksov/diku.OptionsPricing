@@ -2,6 +2,7 @@
 #define CUDA_VERSION_1_CUH
 
 #include "../cuda/CudaDomain.cuh"
+#include <thrust/scan.h>
 #include <thrust/fill.h>
 #include <thrust/execution_policy.h>
 
@@ -12,20 +13,44 @@ namespace cuda
 {
 
 __global__ void
-kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, real *alphasAll, 
-    int *QsInd, int *alphasInd, int totalCount, int yieldCurveSize)
+kernelNaive(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, real *alphasAll)
 {
     auto idx = threadIdx.x + blockDim.x * blockIdx.x;
 
     // Out of options check
-    if (idx >= totalCount) return;
+    if (idx >= options.N) return;
 
-    auto c = options[idx];
-    auto Qs = QsAll + QsInd[idx];
-    auto QsCopy = QsCopyAll + QsInd[idx];
-    auto alphas = alphasAll + alphasInd[idx];
+    OptionConstants c;
+    c.termUnit = options.TermUnits[idx];
+    auto T = options.Maturities[idx];
+    auto termUnitsInYearCount = ceil((real)year / c.termUnit);
+    auto termStepCount = options.TermStepCounts[idx];
+    c.t = options.Lengths[idx];
+    c.n = termStepCount * termUnitsInYearCount * T;
+    c.dt = termUnitsInYearCount / (real)termStepCount; // [years]
+    c.type = options.Types[idx];
+
+    auto a = options.ReversionRates[idx];
+    c.X = options.StrikePrices[idx];
+    auto sigma = options.Volatilities[idx];
+    auto V = sigma * sigma * (one - exp(-two * a * c.dt)) / (two * a);
+    c.dr = sqrt(three * V);
+    c.M = exp(-a * c.dt) - one;
+
+    // simplified computations
+    // c.dr = sigma * sqrt(three * c.dt);
+    // c.M = -a * c.dt;
+
+    c.jmax = (int)(minus184 / c.M) + 1;
+    c.width = 2 * c.jmax + 1;
+
+    auto QsInd = idx == 0 ? 0 : options.Widths[idx - 1];
+    auto alphasInd = idx == 0 ? 0 : options.Heights[idx - 1];
+    auto Qs = QsAll + QsInd;
+    auto QsCopy = QsCopyAll + QsInd;
+    auto alphas = alphasAll + alphasInd;
     Qs[c.jmax] = one;
-    alphas[0] = getYieldAtYear(c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+    alphas[0] = getYieldAtYear(c.dt, c.termUnit, YieldCurve, options.YieldSize);
 
     for (auto i = 1; i <= c.n; ++i)
     {
@@ -99,7 +124,7 @@ kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, r
             alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
         }
 
-        alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, yieldCurveSize);
+        alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, YieldCurve, options.YieldSize);
 
         // Switch Qs
         auto QsT = Qs;
@@ -167,79 +192,62 @@ kernelNaive(real *res, OptionConstants *options, real *QsAll, real *QsCopyAll, r
     res[idx] = call[c.jmax];
 }
 
-void computeOptionsNaive(const vector<OptionConstants> &options, const int yieldSize, vector<real> &results, bool isTest = false)
+void computeOptionsNaive(const Options &options, const int yieldSize, vector<real> &results, const int blockSize, bool isTest = false)
 {
-    // Compute indices
-    const auto count = options.size();
-    int* QsInd = new int[count];
-    int* alphasInd = new int[count];
-    QsInd[0] = 0;
-    alphasInd[0] = 0;
-    int totalQsCount = 0;
-    int totalAlphasCount = 0;
-    for (auto i = 0; i < count - 1; ++i)
-    {
-        auto &option = options.at(i);
-        totalQsCount += option.width;
-        totalAlphasCount += option.n + 1;
-        QsInd[i + 1] = totalQsCount;
-        alphasInd[i + 1] = totalAlphasCount;
-    }
-    totalQsCount += options.at(count - 1).width;
-    totalAlphasCount += options.at(count - 1).n + 1;
+    thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
+    thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
+    thrust::device_vector<uint16_t> lengths(options.Lengths.begin(), options.Lengths.end());
+    thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
+    thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
+    thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
+    thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
+    thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
+
+    thrust::device_vector<int32_t> widths(options.N);
+    thrust::device_vector<int32_t> heights(options.N);
+
+    CudaOptions cudaOptions(options, yieldSize, strikePrices, maturities, lengths, termUnits, termStepCounts, reversionRates, volatilities, types, widths, heights);
+
+    // Compute indices.
+    thrust::inclusive_scan(widths.begin(), widths.end(), widths.begin());
+    thrust::inclusive_scan(heights.begin(), heights.end(), heights.begin());
+
+    // Allocate temporary vectors.
+    const int totalQsCount = widths[options.N - 1];
+    const int totalAlphasCount = heights[options.N - 1];
+    thrust::device_vector<real> Qs(totalQsCount);
+    thrust::device_vector<real> QsCopy(totalQsCount);
+    thrust::device_vector<real> alphas(totalAlphasCount);
+    thrust::device_vector<real> result(options.N);
     
-    auto blockSize = 64;
-    auto blockCount = ceil(count / ((float)blockSize));
+    const auto blockCount = ceil(options.N / ((float)blockSize));
 
     if (isTest)
     {
-        int memorySize = count * sizeof(real) + count * sizeof(OptionConstants) + 2 * count * sizeof(int)
+        int memorySize = options.N * sizeof(real) + options.N * sizeof(OptionConstants) + 2 * options.N * sizeof(int)
                         + 2 * totalQsCount * sizeof(real) + totalAlphasCount * sizeof(real);
-        cout << "Running trinomial option pricing for " << count << " options with block size " << blockSize << endl;
+        cout << "Running trinomial option pricing for " << options.N << " options with block size " << blockSize << endl;
         cout << "Global memory size " << memorySize / (1024.0 * 1024.0) << " MB" << endl;
     }
 
-    auto time_begin = steady_clock::now();
-
-    real *d_result, *d_Qs, *d_QsCopy, *d_alphas;
-    int *d_QsInd, *d_alphasInd;
-    OptionConstants *d_options;
-    CudaSafeCall(cudaMalloc((void **)&d_result, count * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_options, count * sizeof(OptionConstants)));
-    CudaSafeCall(cudaMalloc((void **)&d_QsInd, count * sizeof(int)));
-    CudaSafeCall(cudaMalloc((void **)&d_alphasInd, count * sizeof(int)));
-    CudaSafeCall(cudaMalloc((void **)&d_Qs, totalQsCount * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_QsCopy, totalQsCount * sizeof(real)));
-    CudaSafeCall(cudaMalloc((void **)&d_alphas, totalAlphasCount * sizeof(real)));
-
-    CudaSafeCall(cudaMemcpy(d_options, options.data(), count * sizeof(OptionConstants), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_QsInd, QsInd, count * sizeof(int), cudaMemcpyHostToDevice));
-    CudaSafeCall(cudaMemcpy(d_alphasInd, alphasInd, count * sizeof(int), cudaMemcpyHostToDevice));
+    auto d_result = thrust::raw_pointer_cast(result.data());
+    auto d_Qs = thrust::raw_pointer_cast(Qs.data());
+    auto d_QsCopy = thrust::raw_pointer_cast(QsCopy.data());
+    auto d_alphas = thrust::raw_pointer_cast(alphas.data());
 
     auto time_begin_kernel = steady_clock::now();
-    kernelNaive<<<blockCount, blockSize>>>(d_result, d_options, d_Qs, d_QsCopy, d_alphas, d_QsInd, d_alphasInd, count, yieldSize);
+    kernelNaive<<<blockCount, blockSize>>>(cudaOptions, d_result, d_Qs, d_QsCopy, d_alphas);
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
 
     CudaCheckError();
 
     // Copy result
-    cudaMemcpy(results.data(), d_result, count * sizeof(real), cudaMemcpyDeviceToHost);
+    thrust::copy(result.begin(), result.end(), results.begin());
 
-    cudaFree(d_result);
-    cudaFree(d_options);
-    cudaFree(d_QsInd);
-    cudaFree(d_alphasInd);
-    cudaFree(d_Qs);
-    cudaFree(d_QsCopy);
-    cudaFree(d_alphas);
-
-    auto time_end = steady_clock::now();
     if (isTest)
     {
         cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
-        cout << "Total GPU time: " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl
-            << endl;
     }
 }
 

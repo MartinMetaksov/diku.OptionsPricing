@@ -17,7 +17,6 @@ struct Yield
     real p;
     int t;
 
-  public:
     static vector<Yield> readYieldCurve(const string &filename)
     {
         if (filename.empty())
