@@ -115,6 +115,6 @@ struct Options
         out.close();
     }
 };
-}
+} // namespace trinom
 
 #endif

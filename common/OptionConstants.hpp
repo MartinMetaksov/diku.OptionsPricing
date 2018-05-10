@@ -39,9 +39,9 @@ struct OptionConstants
     OptionConstants(const Options &options, const int ind)
     {
         termUnit = options.TermUnits.at(ind);
-        auto T = options.Maturities.at(ind);
-        auto termUnitsInYearCount = ceil((real)year / termUnit);
-        auto termStepCount = options.TermStepCounts.at(ind);
+        const auto T = options.Maturities.at(ind);
+        const int32_t termUnitsInYearCount = ceil((real)year / termUnit);
+        const auto termStepCount = options.TermStepCounts.at(ind);
         n = termStepCount * termUnitsInYearCount * T;
         t = options.Lengths.at(ind);
         dt = termUnitsInYearCount / (real)termStepCount; // [years]
@@ -62,6 +62,6 @@ struct OptionConstants
         width = 2 * jmax + 1;
     }
 };
-}
+} // namespace trinom
 
 #endif

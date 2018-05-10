@@ -227,10 +227,10 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
     )
 
   -- make the flag array (probably usefull for segmented scan/reduce operations)
-  let map_lens   = map  (\m i -> if i < optionsInChunk then 2*m + 1 else 0) 
+  let map_lens   = map2  (\m i -> if i < optionsInChunk then 2*m + 1 else 0) 
                         ms (iota maxOptionsInChunk)
   let scanned_lens = scan (+) 0 map_lens
-  let len_valinds= map  (\i m -> if i == 0 then (0, m) 
+  let len_valinds= map2  (\i m -> if i == 0 then (0, m) 
                                  else if i < optionsInChunk
                                       then (scanned_lens[i-1], m)
                                       else let last_ind = scanned_lens[optionsInChunk-1]
@@ -252,10 +252,10 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
   let iota2mp1    = map (\x->x-1) iota2mp1_p1
 
   -- make the replicated segment lengths
-  let len_flat = sgmScanPlus flags flags
+  -- let len_flat = sgmScanPlus flags flags
 
   -- Q = map (\i -> if i == m then one else zero) (iota (2 * m + 1))
-  let Qs = map (\i k -> if i == ms[sgm_inds[k]] then 1.0 else 0.0 
+  let Qs = map2 (\i k -> if i == ms[sgm_inds[k]] then 1.0 else 0.0 
                ) iota2mp1 (iota w)
 
   -- alphas = replicate (n + 1) zero
@@ -288,7 +288,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
       --                then zero -- Q[j + m]
       --                else fwdHelper M dr dt (alphas[i]) QCopy m i imax jmax j
       --         ) (map (-m) (iota (2*m+1)))
-      let Qs'= map (\jj w_ind->let sgm_ind = sgm_inds[w_ind] in
+      let Qs'= map2 (\jj w_ind -> let sgm_ind = sgm_inds[w_ind] in
                                if sgm_ind >= optionsInChunk || i >= ns[sgm_ind]
                                then 0.0
                                else let imax = imaxs[sgm_ind]
@@ -311,7 +311,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
       --                   else unsafe Q[j+m] * r_exp(-(i2r j)*dr*dt)
       --           ) (iota (2*m+1))--(iota (2*imax+1))
       -- alpha_val = reduce (+) zero tmps
-      let tmpss = map (\ jj w_ind ->
+      let tmpss = map2 (\ jj w_ind ->
                             let sgm_ind = sgm_inds[w_ind]
                             let imax    = imaxs[sgm_ind]
                             let j       = jj - imax in
@@ -355,7 +355,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
                              in  P
                    ) (iota maxOptionsInChunk)      
       
-      let alpha_vals = map (\alpha_val P -> r_log (alpha_val / P)) alpha_vals Ps
+      let alpha_vals = map2 (\alpha_val P -> r_log (alpha_val / P)) alpha_vals Ps
 
       -------------------------------  
       -- alphas[i + 1] = alpha_val --
@@ -381,7 +381,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
   --            ) (iota (2*m+1))
   -- CallCopy = replicate (2 * m + 1) zero
 
-  let Calls = map (\ j w_ind -> let sgm_ind = sgm_inds[w_ind]
+  let Calls = map2 (\ j w_ind -> let sgm_ind = sgm_inds[w_ind]
                                 let (jmax,m) = (jmaxs[sgm_ind],ms[sgm_ind]) in
                                 if (j >= -jmax+m) && (j <= jmax + m)
                                 then 1.0 else 0.0
@@ -395,7 +395,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
       let is = map (\sgm_ind -> if sgm_ind >= optionsInChunk then 0
                                 else ns[sgm_ind] - 1 - ii 
                    ) (iota maxOptionsInChunk)
-      let imaxs = map (\jmax i -> i32.min (i+1) jmax) jmaxs is
+      let imaxs = map2 (\jmax i -> i32.min (i+1) jmax) jmaxs is
       
       ----------------------------------------------------------
       -- Copy array values to avoid overwriting during update --
@@ -411,7 +411,7 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
       --                     then zero -- Call[j + m]
       --                     else bkwdHelper X M dr dt (alphas[i]) CallCopy m i jmax j
       --              ) (map (-m) (iota (2*m+1)))
-      let Calls' = map  (\jj w_ind -> 
+      let Calls' = map2  (\jj w_ind -> 
                             let sgm_ind = sgm_inds[w_ind] in
                             let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1] in
                             if  sgm_ind >= optionsInChunk || ii >= ns[sgm_ind]
@@ -482,7 +482,7 @@ let formatOptions [numOptions]
                 let n  = option.NumberOfTerms
                 let dt = T / (i2r n)
                 let a  = option.ReversionRateParameter
-                let sigma = option.VolatilityParameter
+                -- let sigma = option.VolatilityParameter
                 let M  = (r_exp (0.0 - a*dt)) - 1.0
                 let jmax = r2i (- 0.184 / M) + 1
                 let m  = jmax + 2
@@ -518,7 +518,7 @@ let main [q] (strikes    : [q]real)
              (vols       : [q]real) 
            : [q]real =
 
-  let options = map (\s m n r v -> { StrikePrice=s, Maturity=m, NumberOfTerms=n,
+  let options = map5 (\s m n r v -> { StrikePrice=s, Maturity=m, NumberOfTerms=n,
                                        ReversionRateParameter=r, VolatilityParameter=v }
                     ) strikes maturities numofterms rrps vols
 

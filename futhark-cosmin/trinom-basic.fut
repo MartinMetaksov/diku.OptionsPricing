@@ -28,19 +28,19 @@ import "header32"
 --- Pushing the compiler in a direction or another ---
 ------------------------------------------------------
 let FORCE_PER_OPTION_THREAD  = true
-let WITH_ONLY_STRIKE_VARIANT = true
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
 -------------------------------------------------------------
-let zero=i2r 0
-let one= i2r 1
-let two= i2r 2
-let half= one / two
-let three= i2r 3
-let six= i2r 6
-let seven= i2r 7
+let zero = i2r 0
+let one = i2r 1
+let two = i2r 2
+let half = one / two
+let three = i2r 3
+let six = i2r 6
+let seven = i2r 7
 let year = i2r 365
+let hundred = i2r 100
 
 -----------------------
 --- Data Structures ---
@@ -52,12 +52,18 @@ type YieldCurveData = {
 }
 
 type TOptionData = {
-    StrikePrice   : real  -- X
-  , Maturity      : real  -- T, [years]
-  , NumberOfTerms : i32   -- n
-  , ReversionRateParameter : real -- a, parameter in HW-1F model
-  , VolatilityParameter    : real -- sigma, volatility parameter in HW-1F model
+    StrikePrice                 : real   -- X
+  , Maturity                    : real   -- T, [years]
+  , Length                      : real   -- t, [years]
+  , ReversionRateParameter      : real  -- a, parameter in HW-1F model
+  , VolatilityParameter         : real  -- sigma, volatility parameter in HW-1F model
+  , TermUnit                    : u16
+  , TermStepCount               : u16
+  , OptionType                  : i8    -- option type, [0 - Put | 1 - Call]
 }
+
+let OptionType_PUT = i8.i32 0
+let OptionType_CALL = i8.i32 1
 
 -----------------------------
 --- Probability Equations ---
@@ -135,10 +141,11 @@ let fwdHelper (M : real) (dr : real) (dt : real) (alphai : real) (QCopy : []real
                      let pu = PU_A(j - 1, M)
                      in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1
 
+
 -----------------------------------
 --- backward propagation helper ---
 -----------------------------------
-let bkwdHelper (X : real) (M : real) (dr : real) (dt : real) (alphai : real) 
+let bkwdHelper (X : real) (op : i8) (t : real) (M : real) (dr : real) (dt : real) (alphai : real) 
                (CallCopy : []real) (m : i32) (i : i32) (jmax : i32) (j : i32) : real = 
                 let eRdt = r_exp(-((i2r j)*dr + alphai)*dt)
                 let res =
@@ -166,9 +173,11 @@ let bkwdHelper (X : real) (M : real) (dr : real) (dt : real) (alphai : real)
                              let pd = PD_A(j, M)
                              in  (pu*CallCopy[j+m+1] + pm*CallCopy[j+m] + pd*CallCopy[j+m-1]) * eRdt
 
-                -- TODO (WMP) This should be parametrized; length of contract, here 3 years
-                in if (i == (r2i (three / dt))) 
-                    then r_max(X - res, zero)
+                in if (i == (r2i (t / dt))) 
+                    then
+                        if (op == OptionType_PUT)
+                        then r_max(X - res, zero)
+                        else r_max(res - X, zero)
                     else res
 
 
@@ -178,9 +187,12 @@ let trinomialOptionsHW1FCPU_single [ycCount]
                                    (optionData : TOptionData) : real = unsafe
   let X  = optionData.StrikePrice
   let T  = optionData.Maturity
-  let n  = optionData.NumberOfTerms
-  let dt = T / (i2r n)
-  let a  = optionData.ReversionRateParameter
+  let len  = optionData.Length
+  let op = optionData.OptionType
+  let termUnitsInYearCount = r2i (r_ceil(year / ui2r optionData.TermUnit))
+  let dt = (i2r termUnitsInYearCount) / (ui2r optionData.TermStepCount)
+  let n = r2i ((ui2r optionData.TermStepCount) * (i2r termUnitsInYearCount) * T)
+  let a = optionData.ReversionRateParameter
   let sigma = optionData.VolatilityParameter
   let V  = sigma*sigma*( one - (r_exp (zero - two*a*dt)) ) / (two*a)
   let dr = r_sqrt( (one+two)*V )
@@ -188,7 +200,7 @@ let trinomialOptionsHW1FCPU_single [ycCount]
   let jmax = r2i (- 0.184 / M) + 1
   let m  = jmax + 2
 
-  in if FORCE_PER_OPTION_THREAD && X < zero 
+  in if FORCE_PER_OPTION_THREAD && X < zero
      then zero else
   ------------------------
   -- Compute Q values
@@ -248,7 +260,7 @@ let trinomialOptionsHW1FCPU_single [ycCount]
     --- The computation is similar for put options.
     ------------------------------------------------------------
     let Call = map (\j -> if (j >= -jmax+m) && (j <= jmax + m)
-                          then one else zero
+                          then hundred else zero
                    ) 
                    (iota Qlen)
     
@@ -268,7 +280,7 @@ let trinomialOptionsHW1FCPU_single [ycCount]
       let Call = -- 1. result of size independent of i (hoistable)
              map (\j -> if (j < (-imax)) || (j > imax)
                         then zero -- Call[j + m]
-                        else bkwdHelper X M dr dt (alphas[i]) CallCopy m i jmax j
+                        else bkwdHelper X op len M dr dt (alphas[i]) CallCopy m i jmax j
                  ) (map (\a->a-m) (iota Qlen))
 
       in  Call
@@ -292,27 +304,25 @@ let h_YieldCurve = [ { P = 0.0501772, t = 3.0    }
                    , { P = 0.0749015, t = 3653.0 }
                    ]
 
+-- | As `map5`@term, but with three more arrays.
+let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =
+        map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip as bs cs ds es fs gs hs)
+
 -----------------
 -- Entry point
 -----------------
-let main [q] (strikes     : [q]real)
-             (maturities0 : [q]real) 
-             (numofterms0 : [q]i32 ) 
-             (rrps0       : [q]real) 
-             (vols0       : [q]real) : [q]real =
-
-  let (maturities, numofterms, rrps, vols) =
-      if WITH_ONLY_STRIKE_VARIANT
-      then ( replicate q (maturities0[0])
-           , replicate q (numofterms0[0])
-           , replicate q (rrps0[0])
-           , vols0 -- replicate q (vols0[0])
-           )
-      else ( maturities0, numofterms0, rrps0, vols0)
-
-  let options = map (\s m n r v -> { StrikePrice=s, Maturity=m, NumberOfTerms=n,
-                                       ReversionRateParameter=r, VolatilityParameter=v }
-                    ) strikes maturities numofterms rrps vols
+let main [q] (strikes           : [q]real)
+             (maturities        : [q]real) 
+             (lenghts           : [q]real)
+             (termunits         : [q]u16 ) 
+             (termstepcounts    : [q]u16 ) 
+             (rrps              : [q]real) 
+             (vols              : [q]real) 
+             (types             : [q]i8) : [q]real =
+        
+  let options = map8 (\s m l u c r v t -> {StrikePrice=s, Maturity=m, Length=l, TermUnit=u, TermStepCount=c,
+                                        ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }
+                ) strikes maturities lenghts termunits termstepcounts rrps vols types
 
   in  map (trinomialOptionsHW1FCPU_single h_YieldCurve) options
 
