@@ -13,21 +13,21 @@ using namespace std;
 namespace trinom
 {
 
-enum class OptionType : char
+enum class OptionType : int8_t
 {
-    PUT = 'P',
-    CALL = 'C'
+    PUT = 0,
+    CALL = 1
 };
 
 inline ostream &operator<<(ostream &os, const OptionType t)
 {
-    os << static_cast<char>(t);
+    os << static_cast<int>(t);
     return os;
 }
 
 inline istream &operator>>(istream &is, OptionType &t)
 {
-    char c;
+    int c;
     is >> c;
     t = static_cast<OptionType>(c);
     if (OptionType::CALL != t && OptionType::PUT != t)

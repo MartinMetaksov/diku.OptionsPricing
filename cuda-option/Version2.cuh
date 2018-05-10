@@ -2,6 +2,7 @@
 #define CUDA_VERSION_2_CUH
 
 #include "../cuda/CudaDomain.cuh"
+#include <thrust/extrema.h>
 
 using namespace chrono;
 using namespace trinom;
