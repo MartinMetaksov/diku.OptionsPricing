@@ -18,16 +18,11 @@ import "/futlib/array"
 --    default(f32)
 --    import "header32"
 ------------------------------------------------
---default(f64)
---import "header64"
+default(f64)
+import "header64"
 
-default(f32)
-import "header32"
-
-------------------------------------------------------
---- Pushing the compiler in a direction or another ---
-------------------------------------------------------
-let FORCE_PER_OPTION_THREAD  = true
+-- default(f32)
+-- import "header32"
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
@@ -47,8 +42,8 @@ let hundred = i2r 100
 -----------------------
 
 type YieldCurveData = {
-    P : real -- Discount Factor function, P(t) gives the yield (interest rate) for a specific period of time t
-  , t : real -- Time [days]
+    P : real    -- Discount Factor function, P(t) gives the yield (interest rate) for a specific period of time t
+  , t : i32     -- Time [days]
 }
 
 type TOptionData = {
@@ -64,6 +59,27 @@ type TOptionData = {
 
 let OptionType_PUT = i8.i32 0
 let OptionType_CALL = i8.i32 1
+
+----------------------------------
+--- yield curve interpolation ---
+----------------------------------
+let getYieldAtYear [ycCount]
+                (t : real)
+                (termUnit : real)
+                (h_YieldCurve : [ycCount]YieldCurveData) : real =
+        let tDays = r2i (r_round (t * termUnit) )
+        let (p1, t1, p2, t2, _) = loop res = (zero, -1, zero, -1, false) for yield in h_YieldCurve do
+                let pi = yield.P
+                let ti = yield.t
+                let (_, _, p2, t2, done) = res
+                in if done then res
+                   else if (ti >= tDays) then (p2, t2, pi, ti, true)
+                   else (p2, t2, pi, ti, false)
+
+        in if (t1 == -1) then p2        -- result is the first item
+           else                         -- linearly interpolate between two consecutive items
+                let coefficient = (i2r (tDays - t1)) / (i2r (t2 - t1))
+                in p1 + coefficient * (p2 - p1)
 
 -----------------------------
 --- Probability Equations ---
@@ -89,7 +105,7 @@ let PD_C (j:i32, M:real) : real = one/six + ((i2r (j*j))*M*M + (i2r j)*M)*half
 ----------------------------------
 
 let fwdHelper (M : real) (dr : real) (dt : real) (alphai : real) (QCopy : []real) 
-              (m : i32) (i : i32) (imax : i32) (jmax : i32) (j : i32) : real = 
+              (i : i32) (imax : i32) (jmax : i32) (j : i32) : real = 
     let eRdt_u1 = r_exp(-((i2r (j+1))*dr + alphai)*dt)
     let eRdt    = r_exp(-((i2r j    )*dr + alphai)*dt)
     let eRdt_d1 = r_exp(-((i2r (j-1))*dr + alphai)*dt)
@@ -97,56 +113,56 @@ let fwdHelper (M : real) (dr : real) (dt : real) (alphai : real) (QCopy : []real
         then let pu = PU_A(j-1, M)
              let pm = PM_A(j  , M)
              let pd = PD_A(j+1, M)
-             in  if (i == 0 && j == 0 ) then pm*QCopy[j+m]*eRdt
-                 else if (j == -imax+1) then pd*QCopy[j+m+1]*eRdt_u1 + pm*QCopy[j+m]*eRdt
-                 else if (j == imax-1 ) then pm*QCopy[j+m]*eRdt + pu*QCopy[j+m-1]*eRdt_d1
-                 else if (j == 0-imax ) then pd*QCopy[j+m+1]*eRdt_u1
-                 else if (j == imax   ) then pu*QCopy[j+m-1]*eRdt_d1
-                 else pd*QCopy[j+m+1]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j+m-1]*eRdt_d1
+             in  if (i == 0 && j == 0 ) then pm*QCopy[j+jmax]*eRdt
+                 else if (j == -imax+1) then pd*QCopy[j+jmax+1]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt
+                 else if (j == imax-1 ) then pm*QCopy[j+jmax]*eRdt + pu*QCopy[j+jmax-1]*eRdt_d1
+                 else if (j == 0-imax ) then pd*QCopy[j+jmax+1]*eRdt_u1
+                 else if (j == imax   ) then pu*QCopy[j+jmax-1]*eRdt_d1
+                 else pd*QCopy[j+jmax+1]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j+jmax-1]*eRdt_d1
         else if (j == jmax) 
                 then let pm = PU_C(j  , M)
                      let pu = PU_A(j-1, M)
-                     in  pm*QCopy[j+m]*eRdt +  pu*QCopy[j-1+m] * eRdt_d1
+                     in  pm*QCopy[j+jmax]*eRdt +  pu*QCopy[j-1+jmax] * eRdt_d1
              else if(j == jmax - 1)
                 then let pd = PM_C(j+1, M)
                      let pm = PM_A(j  , M)
                      let pu = PU_A(j-1, M)
-                     in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1
+                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
              else if (j == jmax - 2)
                 then let eRdt_u2 = r_exp(-( (i2r(j+2))*dr + alphai ) * dt)
                      let pd_c = PD_C(j + 2, M)
                      let pd   = PD_A(j + 1, M)
                      let pm   = PM_A(j, M)
                      let pu   = PU_A(j - 1, M)
-                     in  pd_c*QCopy[j+2+m]*eRdt_u2 + pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1
+                     in  pd_c*QCopy[j+2+jmax]*eRdt_u2 + pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
              else if (j == -jmax + 2)
                 then let eRdt_d2 = r_exp(-((i2r (j-2))*dr + alphai)*dt)
                      let pd   = PD_A(j + 1, M)
                      let pm   = PM_A(j, M)
                      let pu   = PU_A(j - 1, M)
                      let pu_b = PU_B(j - 2, M)
-                     in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1 + pu_b*QCopy[j-2+m]*eRdt_d2
+                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1 + pu_b*QCopy[j-2+jmax]*eRdt_d2
              else if (j == -jmax + 1)
                 then let pd = PD_A(j + 1, M)
                      let pm = PM_A(j, M)
                      let pu = PM_B(j - 1, M)
-                     in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1
+                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
              else if (j == -jmax)
                 then let pd = PD_A(j + 1, M)
                      let pm = PD_B(j, M)
-                     in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt                                            
+                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt                                            
              else    
                      let pd = PD_A(j + 1, M)
                      let pm = PM_A(j, M)
                      let pu = PU_A(j - 1, M)
-                     in  pd*QCopy[j+1+m]*eRdt_u1 + pm*QCopy[j+m]*eRdt + pu*QCopy[j-1+m]*eRdt_d1
+                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
 
 
 -----------------------------------
 --- backward propagation helper ---
 -----------------------------------
 let bkwdHelper (X : real) (op : i8) (t : real) (M : real) (dr : real) (dt : real) (alphai : real) 
-               (CallCopy : []real) (m : i32) (i : i32) (jmax : i32) (j : i32) : real = 
+               (CallCopy : []real) (i : i32) (jmax : i32) (j : i32) : real = 
                 let eRdt = r_exp(-((i2r j)*dr + alphai)*dt)
                 let res =
                   if (i < jmax)
@@ -154,24 +170,24 @@ let bkwdHelper (X : real) (op : i8) (t : real) (M : real) (dr : real) (dt : real
                      let pu = PU_A(j, M)
                      let pm = PM_A(j, M)
                      let pd = PD_A(j, M)
-                     in  (pu*CallCopy[j+m+1] + pm*CallCopy[j+m] + pd*CallCopy[j+m-1]) * eRdt
+                     in  (pu*CallCopy[j+jmax+1] + pm*CallCopy[j+jmax] + pd*CallCopy[j+jmax-1]) * eRdt
                   else if (j == jmax)
                         then -- top node
                              let pu = PU_C(j, M)
                              let pm = PM_C(j, M)
                              let pd = PD_C(j, M)
-                             in  (pu*CallCopy[j+m] + pm*CallCopy[j+m-1] + pd*CallCopy[j+m-2]) * eRdt
+                             in  (pu*CallCopy[j+jmax] + pm*CallCopy[j+jmax-1] + pd*CallCopy[j+jmax-2]) * eRdt
                        else if (j == -jmax)
                         then -- bottom node
                              let pu = PU_B(j, M)
                              let pm = PM_B(j, M)
                              let pd = PD_B(j, M)
-                             in  (pu*CallCopy[j+m+2] + pm*CallCopy[j+m+1] + pd*CallCopy[j+m]) * eRdt
+                             in  (pu*CallCopy[j+jmax+2] + pm*CallCopy[j+jmax+1] + pd*CallCopy[j+jmax]) * eRdt
                        else    -- central node
                              let pu = PU_A(j, M)
                              let pm = PM_A(j, M)
                              let pd = PD_A(j, M)
-                             in  (pu*CallCopy[j+m+1] + pm*CallCopy[j+m] + pd*CallCopy[j+m-1]) * eRdt
+                             in  (pu*CallCopy[j+jmax+1] + pm*CallCopy[j+jmax] + pd*CallCopy[j+jmax-1]) * eRdt
 
                 in if (i == (r2i (t / dt))) 
                     then
@@ -189,7 +205,8 @@ let trinomialOptionsHW1FCPU_single [ycCount]
   let T  = optionData.Maturity
   let len  = optionData.Length
   let op = optionData.OptionType
-  let termUnitsInYearCount = r2i (r_ceil(year / ui2r optionData.TermUnit))
+  let termUnit = ui2r optionData.TermUnit
+  let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
   let dt = (i2r termUnitsInYearCount) / (ui2r optionData.TermStepCount)
   let n = r2i ((ui2r optionData.TermStepCount) * (i2r termUnitsInYearCount) * T)
   let a = optionData.ReversionRateParameter
@@ -198,26 +215,24 @@ let trinomialOptionsHW1FCPU_single [ycCount]
   let dr = r_sqrt( (one+two)*V )
   let M  = (r_exp (zero - a*dt)) - one
   let jmax = r2i (- 0.184 / M) + 1
-  let m  = jmax + 2
 
-  in if FORCE_PER_OPTION_THREAD && X < zero
-     then zero else
   ------------------------
   -- Compute Q values
   -------------------------
   -- Define initial tree values
-  let Qlen = 2 * m + 1
-  let Q = map (\i -> if i == m then one else zero) (iota Qlen)
+  let Qlen = 2 * jmax + 1
+  let Q = replicate Qlen zero
+  let Q[jmax] = one
 
   let alphas = replicate (n + 1) zero
-  let alphas[0] = (h_YieldCurve[0]).P 
+  let alphas[0] = getYieldAtYear dt termUnit h_YieldCurve
   
   -- time stepping
   let (_,alphas) =
     loop (Q: *[Qlen]real, alphas: *[]real) for i < n do
       let imax = i32.min (i+1) jmax
+      let alphai = alphas[i]
       -- Reset
-      -- let QCopy[m - imax : m + imax + 1] = Q[m - imax : m + imax + 1]
       let QCopy = copy Q
 
       ----------------------------
@@ -225,31 +240,22 @@ let trinomialOptionsHW1FCPU_single [ycCount]
       ----------------------------
       let Q = -- 1. result of size independent of i (hoistable)
               map (\j -> if (j < (-imax)) || (j > imax)
-                         then zero -- Q[j + m]
-                         else fwdHelper M dr dt (alphas[i]) QCopy m i imax jmax j
-                  ) (map (\a->a-m) (iota Qlen))
+                         then zero
+                         else fwdHelper M dr dt alphai QCopy i imax jmax j
+                  ) (map (\a->a-jmax) (iota Qlen))
             
       -- determine new alphas
-      let tmps= map (\jj -> let j = jj - imax in
-                            if (j < (-imax)) || (j > imax) then zero 
-                            else  Q[j+m] * r_exp(-(i2r j)*dr*dt)
-                    ) (iota Qlen)
+      let tmps= map (\(q, i) -> if (q == zero) then zero
+                                else q * r_exp(-(i2r (i - jmax))*dr*dt)
+                    ) (zip Q (iota Qlen))
       let alpha_val = reduce (+) zero tmps
 
       -- interpolation of yield curve
-      let t  = (i2r (i+1))*dt + one -- plus one year
-      let t2 = r2i t-- round t
-      let t1 = t2 - 1
-      let (t2, t1) = if (t2 >= ycCount)
-                     then (ycCount - 1, ycCount - 2)
-                     else (t2         , t1         )
-      let R = 
-              ( ((h_YieldCurve[t2]).P ) - ((h_YieldCurve[t1]).P ) ) / 
-              ( ((h_YieldCurve[t2]).t ) - ((h_YieldCurve[t1]).t ) ) *
-              ( t*year - ((h_YieldCurve[t1]).t ) ) + ((h_YieldCurve[t1]).P )
-      let P = r_exp(-R*t)
+      let t = (i2r (i+2)) * dt
+      let R = getYieldAtYear t termUnit h_YieldCurve
+      let P = r_exp(-R * t)
       let alpha_val = r_log (alpha_val / P)
-      let alphas[i + 1] = alpha_val
+      let alphas[i + 1] = alpha_val / dt
 
       in  (Q,alphas)
 
@@ -259,19 +265,16 @@ let trinomialOptionsHW1FCPU_single [ycCount]
     --- if S(T) is greater than X, or zero otherwise.
     --- The computation is similar for put options.
     ------------------------------------------------------------
-    let Call = map (\j -> if (j >= -jmax+m) && (j <= jmax + m)
-                          then hundred else zero
-                   ) 
-                   (iota Qlen)
+    let Call = replicate Qlen hundred
     
     -- back propagation
     let Call =
     loop (Call: *[Qlen]real) for ii < n do
       let i = n - 1 - ii
       let imax = i32.min (i+1) jmax
+      let alphai = alphas[i]
       
       -- Copy array values to avoid overwriting during update
-      -- let CallCopy[m - imax : m + imax + 1] = Call[m - imax : m + imax + 1]
       let CallCopy = copy Call
 
       -----------------------------
@@ -279,30 +282,14 @@ let trinomialOptionsHW1FCPU_single [ycCount]
       -----------------------------
       let Call = -- 1. result of size independent of i (hoistable)
              map (\j -> if (j < (-imax)) || (j > imax)
-                        then zero -- Call[j + m]
-                        else bkwdHelper X op len M dr dt (alphas[i]) CallCopy m i jmax j
-                 ) (map (\a->a-m) (iota Qlen))
+                        then zero
+                        else bkwdHelper X op len M dr dt alphai CallCopy i jmax j
+                 ) (map (\a->a-jmax) (iota Qlen))
 
       in  Call
 
-    in Call[m] -- r_abs(Call[m] - 0.0000077536006753f64)
+    in Call[jmax]
 
--------------------------
--- Static Yield Curve
--------------------------
-
-let h_YieldCurve = [ { P = 0.0501772, t = 3.0    }
-                   , { P = 0.0509389, t = 367.0  }
-                   , { P = 0.0579733, t = 731.0  }
-                   , { P = 0.0630595, t = 1096.0 }
-                   , { P = 0.0673464, t = 1461.0 }
-                   , { P = 0.0694816, t = 1826.0 }
-                   , { P = 0.0708807, t = 2194.0 }
-                   , { P = 0.0727527, t = 2558.0 }
-                   , { P = 0.0730852, t = 2922.0 }
-                   , { P = 0.0739790, t = 3287.0 }
-                   , { P = 0.0749015, t = 3653.0 }
-                   ]
 
 -- | As `map5`@term, but with three more arrays.
 let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =
@@ -311,18 +298,22 @@ let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h
 -----------------
 -- Entry point
 -----------------
-let main [q] (strikes           : [q]real)
-             (maturities        : [q]real) 
-             (lenghts           : [q]real)
-             (termunits         : [q]u16 ) 
-             (termstepcounts    : [q]u16 ) 
-             (rrps              : [q]real) 
-             (vols              : [q]real) 
-             (types             : [q]i8) : [q]real =
+let main [q] [y] (strikes           : [q]real)
+                 (maturities        : [q]real) 
+                 (lenghts           : [q]real)
+                 (termunits         : [q]u16 ) 
+                 (termstepcounts    : [q]u16 ) 
+                 (rrps              : [q]real) 
+                 (vols              : [q]real) 
+                 (types             : [q]i8)
+                 (yield_p           : [y]real)
+                 (yield_t           : [y]i32) : [q]real =
         
+  let yield = map2 (\p d -> {P = p, t = d}) yield_p yield_t
+
   let options = map8 (\s m l u c r v t -> {StrikePrice=s, Maturity=m, Length=l, TermUnit=u, TermStepCount=c,
                                         ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }
                 ) strikes maturities lenghts termunits termstepcounts rrps vols types
 
-  in  map (trinomialOptionsHW1FCPU_single h_YieldCurve) options
+  in  map (trinomialOptionsHW1FCPU_single yield) options
 
