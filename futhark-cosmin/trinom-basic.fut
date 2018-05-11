@@ -86,178 +86,189 @@ let getYieldAtYear [ycCount]
 -----------------------------
 
 -- Exhibit 1A (-jmax < j < jmax)
-let PU_A (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M + (i2r j)*M)*half
-let PM_A (j:i32, M:real) : real = two/three - ((i2r(j*j))*M*M )
-let PD_A (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
+let PU_A (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M + (i2r j)*M)*half
+let PM_A (j:i32) (M:real) : real = two/three - ((i2r(j*j))*M*M )
+let PD_A (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
 
 -- Exhibit 1B (j == -jmax)
-let PU_B (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
-let PM_B (j:i32, M:real) : real = -one/three - ((i2r(j*j))*M*M) + two*(i2r j)*M
-let PD_B (j:i32, M:real) : real = seven/six + ((i2r(j*j))*M*M - three*(i2r j)*M)*half
+let PU_B (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
+let PM_B (j:i32) (M:real) : real = -one/three - ((i2r(j*j))*M*M) + two*(i2r j)*M
+let PD_B (j:i32) (M:real) : real = seven/six + ((i2r(j*j))*M*M - three*(i2r j)*M)*half
 
 -- Exhibit 1C (j == jmax)
-let PU_C (j:i32, M:real) : real = seven/six + ((i2r(j*j))*M*M + three*(i2r j)*M)*half
-let PM_C (j:i32, M:real) : real = -one/three - ((i2r(j*j))*M*M) - two*(i2r j)*M
-let PD_C (j:i32, M:real) : real = one/six + ((i2r (j*j))*M*M + (i2r j)*M)*half
+let PU_C (j:i32) (M:real) : real = seven/six + ((i2r(j*j))*M*M + three*(i2r j)*M)*half
+let PM_C (j:i32) (M:real) : real = -one/three - ((i2r(j*j))*M*M) - two*(i2r j)*M
+let PD_C (j:i32) (M:real) : real = one/six + ((i2r (j*j))*M*M + (i2r j)*M)*half
+
+-- Wrapper for all the equations
+let computeJValue (j : i32) (jmax : i32) (M : real) (expout : i32) : real =
+    if (j == -jmax)
+    then 
+        if (expout == 1) then PU_B j M      -- up
+        else if (expout == 2) then PM_B j M -- mid
+        else PD_B j M                       -- down
+    else if (j == jmax)
+    then
+        if (expout == 1) then PU_C j M      -- up
+        else if (expout == 2) then PM_C j M -- mid
+        else PD_C j M                       -- down
+    else
+        if (expout == 1) then PU_A j M      -- up
+        else if (expout == 2) then PM_A j M -- mid
+        else PD_A j M                       -- down
 
 ----------------------------------
 --- forward propagation helper ---
 ----------------------------------
 
-let fwdHelper (M : real) (dr : real) (dt : real) (alphai : real) (QCopy : []real) 
-              (i : i32) (imax : i32) (jmax : i32) (j : i32) : real = 
-    let eRdt_u1 = r_exp(-((i2r (j+1))*dr + alphai)*dt)
-    let eRdt    = r_exp(-((i2r j    )*dr + alphai)*dt)
-    let eRdt_d1 = r_exp(-((i2r (j-1))*dr + alphai)*dt)
-    in  if i < jmax
-        then let pu = PU_A(j-1, M)
-             let pm = PM_A(j  , M)
-             let pd = PD_A(j+1, M)
-             in  if (i == 0 && j == 0 ) then pm*QCopy[j+jmax]*eRdt
-                 else if (j == -imax+1) then pd*QCopy[j+jmax+1]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt
-                 else if (j == imax-1 ) then pm*QCopy[j+jmax]*eRdt + pu*QCopy[j+jmax-1]*eRdt_d1
-                 else if (j == 0-imax ) then pd*QCopy[j+jmax+1]*eRdt_u1
-                 else if (j == imax   ) then pu*QCopy[j+jmax-1]*eRdt_d1
-                 else pd*QCopy[j+jmax+1]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j+jmax-1]*eRdt_d1
-        else if (j == jmax) 
-                then let pm = PU_C(j  , M)
-                     let pu = PU_A(j-1, M)
-                     in  pm*QCopy[j+jmax]*eRdt +  pu*QCopy[j-1+jmax] * eRdt_d1
-             else if(j == jmax - 1)
-                then let pd = PM_C(j+1, M)
-                     let pm = PM_A(j  , M)
-                     let pu = PU_A(j-1, M)
-                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
-             else if (j == jmax - 2)
-                then let eRdt_u2 = r_exp(-( (i2r(j+2))*dr + alphai ) * dt)
-                     let pd_c = PD_C(j + 2, M)
-                     let pd   = PD_A(j + 1, M)
-                     let pm   = PM_A(j, M)
-                     let pu   = PU_A(j - 1, M)
-                     in  pd_c*QCopy[j+2+jmax]*eRdt_u2 + pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
-             else if (j == -jmax + 2)
-                then let eRdt_d2 = r_exp(-((i2r (j-2))*dr + alphai)*dt)
-                     let pd   = PD_A(j + 1, M)
-                     let pm   = PM_A(j, M)
-                     let pu   = PU_A(j - 1, M)
-                     let pu_b = PU_B(j - 2, M)
-                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1 + pu_b*QCopy[j-2+jmax]*eRdt_d2
-             else if (j == -jmax + 1)
-                then let pd = PD_A(j + 1, M)
-                     let pm = PM_A(j, M)
-                     let pu = PM_B(j - 1, M)
-                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
-             else if (j == -jmax)
-                then let pd = PD_A(j + 1, M)
-                     let pm = PD_B(j, M)
-                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt                                            
-             else    
-                     let pd = PD_A(j + 1, M)
-                     let pm = PM_A(j, M)
-                     let pu = PU_A(j - 1, M)
-                     in  pd*QCopy[j+1+jmax]*eRdt_u1 + pm*QCopy[j+jmax]*eRdt + pu*QCopy[j-1+jmax]*eRdt_d1
+let fwdHelper (M : real) (dr : real) (dt : real) (alpha : real) (Qs : []real) 
+              (i : i32) (jhigh : i32) (jmax : i32) (j : i32) (jind : i32) : real =  
+
+    let expp1 = if (j == jhigh) then zero else Qs[jind + 1] * r_exp (-(alpha + (i2r (j + 1)) * dr) * dt)
+    let expm = Qs[jind] * r_exp (-(alpha + (i2r j) * dr) * dt)
+    let expm1 = if (j == -jhigh) then zero else Qs[jind - 1] * r_exp(-(alpha + (i2r (j - 1)) * dr) * dt)
+
+    in
+    if (i == 1)
+    then
+        if (j == -jhigh) then (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == jhigh) then (computeJValue (j - 1) jmax M 1) * expm1
+        else (computeJValue j jmax M 2) * expm
+    else if (i <= jmax)
+    then
+        if (j == -jhigh) then (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == -jhigh + 1)
+            then (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == jhigh) then (computeJValue (j - 1) jmax M 1) * expm1
+        else if (j == jhigh - 1)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 2) * expm
+        else
+            (computeJValue (j - 1) jmax M 1) * expm1 +
+            (computeJValue j jmax M 2) * expm +
+            (computeJValue (j + 1) jmax M 3) * expp1
+    else
+        if (j == -jhigh)
+            then (computeJValue j jmax M 3) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == -jhigh + 1)
+            then (computeJValue (j - 1) jmax M 2) * expm1 +
+                (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+                    
+        else if (j == jhigh)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 1) * expm
+        else if (j == jhigh - 1)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 2) * expp1
+                    
+        else
+            (if (j == -jhigh + 2) then (computeJValue (j - 2) jmax M 1) * Qs[jind - 2] * r_exp (-(alpha + (i2r (j - 2)) * dr) * dt) else zero) +
+            (computeJValue (j - 1) jmax M 1) * expm1 +
+            (computeJValue j jmax M 2) * expm +
+            (computeJValue (j + 1) jmax M 3) * expp1 +
+            (if (j == jhigh - 2) then (computeJValue (j + 2) jmax M 3) * Qs[jind + 2] * r_exp (-(alpha + (i2r (j + 2)) * dr) * dt) else zero)
 
 
 -----------------------------------
 --- backward propagation helper ---
 -----------------------------------
-let bkwdHelper (X : real) (op : i8) (t : real) (M : real) (dr : real) (dt : real) (alphai : real) 
-               (CallCopy : []real) (i : i32) (jmax : i32) (j : i32) : real = 
-                let eRdt = r_exp(-((i2r j)*dr + alphai)*dt)
-                let res =
-                  if (i < jmax)
-                  then -- central node
-                     let pu = PU_A(j, M)
-                     let pm = PM_A(j, M)
-                     let pd = PD_A(j, M)
-                     in  (pu*CallCopy[j+jmax+1] + pm*CallCopy[j+jmax] + pd*CallCopy[j+jmax-1]) * eRdt
-                  else if (j == jmax)
-                        then -- top node
-                             let pu = PU_C(j, M)
-                             let pm = PM_C(j, M)
-                             let pd = PD_C(j, M)
-                             in  (pu*CallCopy[j+jmax] + pm*CallCopy[j+jmax-1] + pd*CallCopy[j+jmax-2]) * eRdt
-                       else if (j == -jmax)
-                        then -- bottom node
-                             let pu = PU_B(j, M)
-                             let pm = PM_B(j, M)
-                             let pd = PD_B(j, M)
-                             in  (pu*CallCopy[j+jmax+2] + pm*CallCopy[j+jmax+1] + pd*CallCopy[j+jmax]) * eRdt
-                       else    -- central node
-                             let pu = PU_A(j, M)
-                             let pm = PM_A(j, M)
-                             let pd = PD_A(j, M)
-                             in  (pu*CallCopy[j+jmax+1] + pm*CallCopy[j+jmax] + pd*CallCopy[j+jmax-1]) * eRdt
+let bkwdHelper (X : real) (op : i8) (M : real) (dr : real) (dt : real) (alpha : real) 
+               (call : []real) (jmax : i32) (j : i32) (jind : i32) (isMaturity : bool) : real = 
+    let callExp = r_exp(-(alpha + (i2r j) * dr) * dt)
+    let res =
+        if (j == jmax) then
+            -- Top edge branching
+            ((computeJValue j jmax M 1) * call[jind] +
+            (computeJValue j jmax M 2) * call[jind - 1] +
+            (computeJValue j jmax M 3) * call[jind - 2]) *
+                callExp
+        else if (j == -jmax) then
+            -- Bottom edge branching
+            ((computeJValue j jmax M 1) * call[jind + 2] +
+            (computeJValue j jmax M 2) * call[jind + 1] +
+            (computeJValue j jmax M 3) * call[jind]) *
+                callExp
+        else
+            -- Standard branching
+            ((computeJValue j jmax M 1) * call[jind + 1] +
+            (computeJValue j jmax M 2) * call[jind] +
+            (computeJValue j jmax M 3) * call[jind - 1]) *
+                callExp
 
-                in if (i == (r2i (t / dt))) 
-                    then
-                        if (op == OptionType_PUT)
-                        then r_max(X - res, zero)
-                        else r_max(res - X, zero)
-                    else res
+    in if isMaturity
+        then
+            if (op == OptionType_PUT)
+            then r_max(X - res, zero)
+            else r_max(res - X, zero)
+        else res
 
 
 
 let trinomialOptionsHW1FCPU_single [ycCount]
                                    (h_YieldCurve : [ycCount]YieldCurveData)
                                    (optionData : TOptionData) : real = unsafe
-  let X  = optionData.StrikePrice
-  let T  = optionData.Maturity
-  let len  = optionData.Length
-  let op = optionData.OptionType
-  let termUnit = ui2r optionData.TermUnit
-  let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
-  let dt = (i2r termUnitsInYearCount) / (ui2r optionData.TermStepCount)
-  let n = r2i ((ui2r optionData.TermStepCount) * (i2r termUnitsInYearCount) * T)
-  let a = optionData.ReversionRateParameter
-  let sigma = optionData.VolatilityParameter
-  let V  = sigma*sigma*( one - (r_exp (zero - two*a*dt)) ) / (two*a)
-  let dr = r_sqrt( (one+two)*V )
-  let M  = (r_exp (zero - a*dt)) - one
-  let jmax = r2i (- 0.184 / M) + 1
+    let X  = optionData.StrikePrice
+    let T  = optionData.Maturity
+    let len  = optionData.Length
+    let op = optionData.OptionType
+    let termUnit = ui2r optionData.TermUnit
+    let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
+    let dt = (i2r termUnitsInYearCount) / (ui2r optionData.TermStepCount)
+    let n = r2i ((ui2r optionData.TermStepCount) * (i2r termUnitsInYearCount) * T)
+    let a = optionData.ReversionRateParameter
+    let sigma = optionData.VolatilityParameter
+    let V  = sigma*sigma*( one - (r_exp (zero - two*a*dt)) ) / (two*a)
+    let dr = r_sqrt( (one+two)*V )
+    let M  = (r_exp (zero - a*dt)) - one
+    let jmax = r2i (- 0.184 / M) + 1
 
-  ------------------------
-  -- Compute Q values
-  -------------------------
-  -- Define initial tree values
-  let Qlen = 2 * jmax + 1
-  let Q = replicate Qlen zero
-  let Q[jmax] = one
+    ------------------------
+    -- Compute Q values
+    -------------------------
+    -- Define initial tree values
+    let Qlen = 2 * jmax + 1
+    let Q = replicate Qlen zero
+    let Q[jmax] = one
 
-  let alphas = replicate (n + 1) zero
-  let alphas[0] = getYieldAtYear dt termUnit h_YieldCurve
-  
-  -- time stepping
-  let (_,alphas) =
+    let alphas = replicate (n + 1) zero
+    let alphas[0] = getYieldAtYear dt termUnit h_YieldCurve
+
+    -- time stepping
+    let (_,alphas) =
     loop (Q: *[Qlen]real, alphas: *[]real) for i < n do
-      let imax = i32.min (i+1) jmax
-      let alphai = alphas[i]
-      -- Reset
-      let QCopy = copy Q
+        let jhigh = i32.min (i+1) jmax
+        let alphai = alphas[i]
+        -- Reset
+        let QCopy = copy Q
 
-      ----------------------------
-      -- forward iteration step --
-      ----------------------------
-      let Q = -- 1. result of size independent of i (hoistable)
-              map (\j -> if (j < (-imax)) || (j > imax)
-                         then zero
-                         else fwdHelper M dr dt alphai QCopy i imax jmax j
-                  ) (map (\a->a-jmax) (iota Qlen))
+        ----------------------------
+        -- forward iteration step --
+        ----------------------------
+        let Q = -- 1. result of size independent of i (hoistable)
+                map (\jind -> 
+                        let j = jind - jmax in
+                        if (j < (-jhigh)) || (j > jhigh) then zero
+                        else fwdHelper M dr dt alphai QCopy (i + 1) jhigh jmax j jind
+                    ) (iota Qlen)
             
-      -- determine new alphas
-      let tmps= map (\(q, i) -> if (q == zero) then zero
+        -- determine new alphas
+        let tmps= map (\(q, i) -> if (q == zero) then zero
                                 else q * r_exp(-(i2r (i - jmax))*dr*dt)
                     ) (zip Q (iota Qlen))
-      let alpha_val = reduce (+) zero tmps
+        let alpha_val = reduce (+) zero tmps
 
-      -- interpolation of yield curve
-      let t = (i2r (i+2)) * dt
-      let R = getYieldAtYear t termUnit h_YieldCurve
-      let P = r_exp(-R * t)
-      let alpha_val = r_log (alpha_val / P)
-      let alphas[i + 1] = alpha_val / dt
+        -- interpolation of yield curve
+        let t = (i2r (i+2)) * dt
+        let R = getYieldAtYear t termUnit h_YieldCurve
+        let P = r_exp(-R * t)
+        let alpha_val = r_log (alpha_val / P)
+        let alphas[i + 1] = alpha_val / dt
 
-      in  (Q,alphas)
+        in  (Q,alphas)
 
     ------------------------------------------------------------
     --- Compute values at expiration date:
@@ -270,23 +281,25 @@ let trinomialOptionsHW1FCPU_single [ycCount]
     -- back propagation
     let Call =
     loop (Call: *[Qlen]real) for ii < n do
-      let i = n - 1 - ii
-      let imax = i32.min (i+1) jmax
-      let alphai = alphas[i]
-      
-      -- Copy array values to avoid overwriting during update
-      let CallCopy = copy Call
+        let i = n - 1 - ii
+        let jhigh = i32.min i jmax
+        let alphai = alphas[i]
+        let isMaturity = i == (r2i (len / dt))
+        
+        -- Copy array values to avoid overwriting during update
+        let CallCopy = copy Call
 
-      -----------------------------
-      -- backward iteration step --
-      -----------------------------
-      let Call = -- 1. result of size independent of i (hoistable)
-             map (\j -> if (j < (-imax)) || (j > imax)
-                        then zero
-                        else bkwdHelper X op len M dr dt alphai CallCopy i jmax j
-                 ) (map (\a->a-jmax) (iota Qlen))
+        -----------------------------
+        -- backward iteration step --
+        -----------------------------
+        let Call = -- 1. result of size independent of i (hoistable)
+                map (\jind -> 
+                        let j = jind - jmax in
+                        if (j < (-jhigh)) || (j > jhigh) then zero
+                        else bkwdHelper X op M dr dt alphai CallCopy jmax j jind isMaturity
+                    ) (iota Qlen)
 
-      in  Call
+        in  Call
 
     in Call[jmax]
 
@@ -315,5 +328,4 @@ let main [q] [y] (strikes           : [q]real)
                                         ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }
                 ) strikes maturities lenghts termunits termstepcounts rrps vols types
 
-  in  map (trinomialOptionsHW1FCPU_single yield) options
-
+  in map (trinomialOptionsHW1FCPU_single yield) options
