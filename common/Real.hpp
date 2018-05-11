@@ -23,6 +23,6 @@ const real six = 6;
 const real seven = 7;
 const real year = 365;
 const real minus184 = -0.184;
-}
+} // namespace trinom
 
 #endif

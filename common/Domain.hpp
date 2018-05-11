@@ -99,42 +99,34 @@ DEVICE inline real computeAlpha(const real aggregatedQs, const int i, const real
     return log(aggregatedQs / P) / dt;                              // new alpha
 }
 
-DEVICE inline real computeJValue(const int i, const real dr, const real M, const int width, const int jmax, const int expout)
+DEVICE real computeJValue(const int j, const int jmax, const real M, const int expout)
 {
-    // this i is only local and has nothing to do with the height of the tree.
-    if (i == 0)
+    if (j == -jmax)
     {
         switch (expout)
         {
         case 1:
-            return PU_B((-jmax), M); // up
+            return PU_B(j, M); // up
         case 2:
-            return PM_B((-jmax), M); // mid
+            return PM_B(j, M); // mid
         case 3:
-            return PD_B((-jmax), M); // down
-        case 0:
-        default:
-            return (-jmax) * dr; // rate
+            return PD_B(j, M); // down
         }
     }
-    else if (i == width - 1)
+    else if (j == jmax)
     {
         switch (expout)
         {
         case 1:
-            return PU_C(jmax, M); // up
+            return PU_C(j, M); // up
         case 2:
-            return PM_C(jmax, M); // mid
+            return PM_C(j, M); // mid
         case 3:
-            return PD_C(jmax, M); // down
-        case 0:
-        default:
-            return jmax * dr; // rate
+            return PD_C(j, M); // down
         }
     }
     else
     {
-        auto j = i + (-jmax);
         switch (expout)
         {
         case 1:
@@ -143,11 +135,9 @@ DEVICE inline real computeJValue(const int i, const real dr, const real M, const
             return PM_A(j, M); // mid
         case 3:
             return PD_A(j, M); // down
-        case 0:
-        default:
-            return j * dr; // rate
         }
     }
+    return 0;
 }
 
 DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, const real res)
@@ -164,6 +154,6 @@ DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, c
     }
     return isMaturity ? max(c.X - res, zero) : res;
 }
-}
+} // namespace trinom
 
 #endif

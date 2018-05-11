@@ -53,65 +53,65 @@ kernelPaddingPerThreadBlock(const CudaOptions options, real *res, real *QsAll, r
         {
             auto jind = j - (-c.jmax); // array index for j
             
-            auto expp1 = j == jhigh ? zero : *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm = *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
-            auto expm1 = j == -jhigh ? zero : *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)  * exp(-(alpha + computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto expp1 = j == jhigh ? zero : *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + (j + 1) * c.dr) * c.dt);
+            auto expm = *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + j * c.dr) * c.dt);
+            auto expm1 = j == -jhigh ? zero : *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + (j - 1) * c.dr) * c.dt);
             real Q;
 
             if (i == 1) {
                 if (j == -jhigh) {
-                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                 } else if (j == jhigh) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
                 } else {
-                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                    Q = computeJValue(j, c.jmax, c.M, 2) * expm;
                 }
             }
             else if (i <= c.jmax) {
                 if (j == -jhigh) {
-                    Q = computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                 } else if (j == -jhigh + 1) {
-                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                 } else if (j == jhigh) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
                 } else if (j == jhigh - 1) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm;
                 } else {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                 }
             } else {
                 if (j == -jhigh) {
-                    Q = computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j, c.jmax, c.M, 3) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                 } else if (j == -jhigh + 1) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 2) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 2) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
                             
                 } else if (j == jhigh) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * expm;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 1) * expm;
                 } else if (j == jhigh - 1) {
-                    Q = computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 2) * expp1;
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
                             
                 } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind - 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero) +
-                        computeJValue(jind - 1, c.dr, c.M, c.width, c.jmax, 1) * expm1 +
-                        computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * expm +
-                        computeJValue(jind + 1, c.dr, c.M, c.width, c.jmax, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + computeJValue(jind + 2, c.dr, c.M, c.width, c.jmax, 0)) * c.dt) : zero);
+                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
+                        computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
                 }
             }
             // Determine the new alpha using equation 30.22
             // by summing up Qs from the next time step
             *getUnpaddedArrayAt(jind, QsCopyAll, threadIdx.x, blockDim.x, widthBlockStartIndex) = Q;
-            alpha_val += Q * exp(-computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0) * c.dt);
+            alpha_val += Q * exp(-j * c.dr * c.dt);
         }
 
         alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
@@ -138,31 +138,31 @@ kernelPaddingPerThreadBlock(const CudaOptions options, real *res, real *QsAll, r
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
             auto jind = j + c.jmax;      // array index for j
-            auto callExp = exp(-(alpha + computeJValue(jind, c.dr, c.M, c.width, c.jmax, 0)) * c.dt);
+            auto callExp = exp(-(alpha + j * c.dr) * c.dt);
 
             real res;
             if (j == c.jmax)
             {
                 // Top edge branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 2) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 3) * *getUnpaddedArrayAt(jind - 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
             else if (j == -c.jmax)
             {
                 // Bottom edge branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * *getUnpaddedArrayAt(jind + 2, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 2) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 3) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
             else
             {
                 // Standard branching
-                res = (computeJValue(jind, c.dr, c.M, c.width, c.jmax, 1) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 2) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
-                    computeJValue(jind, c.dr, c.M, c.width, c.jmax, 3) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * *getUnpaddedArrayAt(jind + 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 2) * *getUnpaddedArrayAt(jind, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex) +
+                    computeJValue(j, c.jmax, c.M, 3) * *getUnpaddedArrayAt(jind - 1, QsAll, threadIdx.x, blockDim.x, widthBlockStartIndex)) *
                       callExp;
             }
 
