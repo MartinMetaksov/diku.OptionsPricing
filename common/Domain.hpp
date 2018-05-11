@@ -27,10 +27,16 @@ DEVICE real getYieldAtYear(const real t, const int termUnit, const real *prices,
         first = i;
     }
 
-    // Prevent division by zero
+    // tDays <= timeSteps[0]
     if (first == second)
     {
         return prices[0];
+    }
+
+    // tDays > timeSteps[size-1]
+    if (first == size - 1)
+    {
+        return prices[size - 1];
     }
 
     auto t1 = timeSteps[first];
@@ -152,7 +158,7 @@ DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, c
             return max(res - c.X, zero);
         }
     }
-    return isMaturity ? max(c.X - res, zero) : res;
+    return res;
 }
 } // namespace trinom
 

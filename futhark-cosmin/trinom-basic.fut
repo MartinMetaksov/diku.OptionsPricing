@@ -1,10 +1,6 @@
 -- Trinomial option pricing
 -- ==
--- compiled input @ data/small.in
--- output @ data/small.out
--- compiled input @ data/options-60000.in
--- output @ data/options-60000.out
-
+-- Run as e.g. $cat options.in yield.in | ./trinom-basic
 
 import "/futlib/math"
 
@@ -12,16 +8,12 @@ import "/futlib/array"
 
 ------------------------------------------------
 -- For using double-precision floats select
---    default(f64)
 --    import "header64"
 -- For unsing single-precision floats select
---    default(f32)
 --    import "header32"
 ------------------------------------------------
-default(f64)
 import "header64"
 
--- default(f32)
 -- import "header32"
 
 -------------------------------------------------------------
@@ -50,11 +42,11 @@ type TOptionData = {
     StrikePrice                 : real   -- X
   , Maturity                    : real   -- T, [years]
   , Length                      : real   -- t, [years]
-  , ReversionRateParameter      : real  -- a, parameter in HW-1F model
-  , VolatilityParameter         : real  -- sigma, volatility parameter in HW-1F model
+  , ReversionRateParameter      : real   -- a, parameter in HW-1F model
+  , VolatilityParameter         : real   -- sigma, volatility parameter in HW-1F model
   , TermUnit                    : u16
   , TermStepCount               : u16
-  , OptionType                  : i8    -- option type, [0 - Put | 1 - Call]
+  , OptionType                  : i8     -- option type, [0 - Put | 1 - Call]
 }
 
 let OptionType_PUT = i8.i32 0
@@ -68,7 +60,7 @@ let getYieldAtYear [ycCount]
                 (termUnit : real)
                 (h_YieldCurve : [ycCount]YieldCurveData) : real =
         let tDays = r2i (r_round (t * termUnit) )
-        let (p1, t1, p2, t2, _) = loop res = (zero, -1, zero, -1, false) for yield in h_YieldCurve do
+        let (p1, t1, p2, t2, done) = loop res = (zero, -1, zero, -1, false) for yield in h_YieldCurve do
                 let pi = yield.P
                 let ti = yield.t
                 let (_, _, p2, t2, done) = res
@@ -76,8 +68,8 @@ let getYieldAtYear [ycCount]
                    else if (ti >= tDays) then (p2, t2, pi, ti, true)
                    else (p2, t2, pi, ti, false)
 
-        in if (t1 == -1) then p2        -- result is the first item
-           else                         -- linearly interpolate between two consecutive items
+        in if (t1 == -1 || done == false) then p2   -- result is the first or last yield curve price
+           else                                     -- linearly interpolate between two consecutive items
                 let coefficient = (i2r (tDays - t1)) / (i2r (t2 - t1))
                 in p1 + coefficient * (p2 - p1)
 
@@ -271,10 +263,10 @@ let trinomialOptionsHW1FCPU_single [ycCount]
         in  (Q,alphas)
 
     ------------------------------------------------------------
-    --- Compute values at expiration date:
-    --- call option value at period end is V(T) = S(T) - X
-    --- if S(T) is greater than X, or zero otherwise.
-    --- The computation is similar for put options.
+    -- Compute values at expiration date:
+    -- call option value at period end is V(T) = S(T) - X
+    -- if S(T) is greater than X, or zero otherwise.
+    -- The computation is similar for put options.
     ------------------------------------------------------------
     let Call = replicate Qlen hundred
     

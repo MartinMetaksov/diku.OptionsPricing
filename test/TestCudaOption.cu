@@ -29,17 +29,16 @@ TEST_CASE("One option per thread cuda")
     {
         options.Lengths.push_back(3);
         options.Maturities.push_back(9);
-        options.StrikePrices.push_back(63);
+        options.StrikePrices.push_back(63 + i * 20);
         options.TermUnits.push_back(365);
         options.TermStepCounts.push_back(i + 1);
         options.ReversionRates.push_back(0.1);
         options.Volatilities.push_back(0.01);
-        options.Types.push_back(OptionType::PUT);
+        options.Types.push_back(i % 2 == 0 ? OptionType::PUT : OptionType::CALL);
     }
     
     vector<real> seqResults, cudaResults;
     seqResults.reserve(options.N);
-
     seq::computeOptions(options, yield, seqResults);
 
     SECTION("Version 1")
