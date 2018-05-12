@@ -233,7 +233,7 @@ void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<
     auto time_end_kernel = steady_clock::now();
     if (isTest)
     {
-        cout << "Kernel executed in " << duration_cast<milliseconds>(time_end_kernel - time_begin_kernel).count() << " ms" << endl;
+        cout << "Kernel executed in " << duration_cast<microseconds>(time_end_kernel - time_begin_kernel).count() << " microsec" << endl;
     }
 
     CudaCheckError();

@@ -10,22 +10,9 @@
 using namespace std;
 using namespace trinom;
 
-void computeAllOptions(const Args &args)
+void run(const Options &options, const Yield &yield, vector<real> &results, const Args &args)
 {
-    if (args.test)
-    {
-        cout << "Cuda one option per thread version " << args.version << endl;
-    }
-    
-    // Read options and yield curve.
-    Options options(args.options);
-    Yield yield(args.yield);
-
-    cudaFree(0);
     auto time_begin = steady_clock::now();
-
-    vector<real> results;
-    results.resize(options.N);
 
     switch (args.version)
     {
@@ -41,14 +28,46 @@ void computeAllOptions(const Args &args)
     }
 
     auto time_end = steady_clock::now();
+    
+    if (args.test)
+    {
+        cout << "Total execution time " << duration_cast<microseconds>(time_end - time_begin).count() << " microsec" << endl;
+    }
+}
 
+void computeAllOptions(const Args &args)
+{
+    if (args.test)
+    {
+        cout << "Cuda one option per thread version " << args.version << endl;
+    }
+    
+    // Read options and yield curve.
+    Options options(args.options);
+    Yield yield(args.yield);
+
+    cudaFree(0);
+
+    if (args.test && args.runs > 0)
+    {
+        cout << "Performing " << args.runs << " runs" << endl;
+        for (auto i = 0; i < args.runs; ++i)
+        {
+            cout << "----------------" << endl;
+            vector<real> results;
+            results.resize(options.N);
+            run(options, yield, results, args);
+            cout << "----------------" << endl;
+        }
+    }
+
+    vector<real> results;
+    results.resize(options.N);
+    run(options, yield, results, args);
+    
     if (!args.test)
     {
         Arrays::write_array(cout, results);
-    }
-    else
-    {
-        cout << "Total execution time " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl;
     }
 }
 

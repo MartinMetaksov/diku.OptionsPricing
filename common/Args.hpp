@@ -18,6 +18,7 @@ struct Args
     SortType sort;
     bool test;
     int version;
+    int runs;
 
     Args(int argc, char *argv[])
     {
@@ -31,6 +32,7 @@ struct Args
         cmd >> GetOpt::Option('y', "yield", yield);
         cmd >> GetOpt::Option('s', "sort", s);
         cmd >> GetOpt::Option('v', "version", version);
+        cmd >> GetOpt::Option('r', "runs", runs);
         cmd >> GetOpt::OptionPresent('t', "test", test);
 
         if (s.length() == 1)
@@ -43,6 +45,6 @@ struct Args
         }
     }
 };
-}
+} // namespace trinom
 
 #endif
