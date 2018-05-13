@@ -247,13 +247,15 @@ let trinomialOptionsHW1FCPU_single [ycCount]
                         else fwdHelper M dr dt alphai QCopy (i + 1) jhigh jmax j jind
                     ) (iota Qlen)
             
-        -- determine new alphas
-        let tmps= map (\(q, i) -> if (q == zero) then zero
-                                else q * r_exp(-(i2r (i - jmax))*dr*dt)
+        -- sum up Qs
+        let tmps = map (\(q, jind) -> 
+                                let j = jind - jmax in
+                                if (j < (-jhigh)) || (j > jhigh) then zero
+                                else q * r_exp (-(i2r j) * dr * dt)
                     ) (zip Q (iota Qlen))
         let alpha_val = reduce (+) zero tmps
 
-        -- interpolation of yield curve
+        -- determine new alpha
         let t = (i2r (i+2)) * dt
         let R = getYieldAtYear t termUnit h_YieldCurve
         let P = r_exp(-R * t)
