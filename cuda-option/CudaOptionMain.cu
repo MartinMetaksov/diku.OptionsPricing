@@ -23,7 +23,7 @@ void run(const Options &options, const Yield &yield, vector<real> &results, cons
             cuda::computeOptionsCoalesced(options, yield, results, 64, args.sort, args.test);
             break;
         case 3:
-            cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results, 64, args.sort, args.test);
+            cuda::computeOptionsCoalescedBlock(options, yield, results, 64, args.sort, args.test);
             break;
     }
 

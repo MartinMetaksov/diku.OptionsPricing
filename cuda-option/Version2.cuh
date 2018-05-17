@@ -1,6 +1,7 @@
 #ifndef CUDA_VERSION_2_CUH
 #define CUDA_VERSION_2_CUH
 
+#include "Kernel.cuh"
 #include "../cuda/CudaDomain.cuh"
 #include <thrust/extrema.h>
 
@@ -10,172 +11,57 @@ using namespace trinom;
 namespace cuda
 {
 
-__device__ inline real* getArrayAt(const int index, real *array, const int count, const int threadId)
+class KernelArgsCoalesced : public KernelArgsBase
 {
-    return array + index * count + threadId;
-}
+private:
+    int N;
 
-__device__ inline void fillArrayColumn(const int count, const real value, real *array, const int totalCount, const int threadId)
-{
-    auto ptr = getArrayAt(0, array, totalCount, threadId);
+public:
 
-    for (auto i = 0; i < count; ++i)
+    KernelArgsCoalesced(real *res, real *QsAll, real *QsCopyAll, real *alphasAll)
+        : KernelArgsBase(res, QsAll, QsCopyAll, alphasAll)
+    { }
+
+    __device__ inline void init(const CudaOptions &options) override
     {
-        *ptr = value;
-        ptr += totalCount;
+        N = options.N;
     }
-}
-    
-__global__ void
-kernelCoalesced(const CudaOptions options, real *res, real *QsAll, real *QsCopyAll, real *alphasAll)
-{
-    const int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
-    // Out of options check
-    if (idx >= options.N) return;
-
-    OptionConstants c;
-    computeConstants(c, options, idx);
-
-    auto alpha = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
-    *getArrayAt(c.jmax, QsAll, options.N, idx) = one;
-    *getArrayAt(0, alphasAll, options.N, idx) = alpha;
-
-    for (auto i = 1; i <= c.n; ++i)
+    __device__ void fillQs(const int count, const int value) override
     {
-        const auto jhigh = min(i, c.jmax);
-        real alpha_val = 0;
+        auto ptr = QsAll + getIdx();
 
-        // Forward iteration step, compute Qs in the next time step
-        for (auto j = -jhigh; j <= jhigh; ++j)
+        for (auto i = 0; i < count; ++i)
         {
-            auto jind = j + c.jmax;      // array index for j
-            
-            auto expp1 = j == jhigh ? zero : *getArrayAt(jind + 1, QsAll, options.N, idx) * exp(-(alpha + (j + 1) * c.dr) * c.dt);
-            auto expm = *getArrayAt(jind, QsAll, options.N, idx) * exp(-(alpha + j * c.dr) * c.dt);
-            auto expm1 = j == -jhigh ? zero : *getArrayAt(jind - 1, QsAll, options.N, idx) * exp(-(alpha + (j - 1) * c.dr) * c.dt);
-            real Q;
-
-            if (i == 1) {
-                if (j == -jhigh) {
-                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
-                } else {
-                    Q = computeJValue(j, c.jmax, c.M, 2) * expm;
-                }
-            }
-            else if (i <= c.jmax) {
-                if (j == -jhigh) {
-                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    Q = computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
-                } else if (j == jhigh - 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm;
-                } else {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                }
-            } else {
-                if (j == -jhigh) {
-                    Q = computeJValue(j, c.jmax, c.M, 3) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 2) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                            
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 1) * expm;
-                } else if (j == jhigh - 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
-                            
-                } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * *getArrayAt(jind - 2, QsAll, options.N, idx) * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
-                        computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * *getArrayAt(jind + 2, QsAll, options.N, idx) * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
-                }
-            }
-            // Determine the new alpha using equation 30.22
-            // by summing up Qs from the next time step
-            *getArrayAt(jind, QsCopyAll, options.N, idx) = Q;
-            alpha_val += Q * exp(-j * c.dr * c.dt);
+            *ptr = value;
+            ptr += N;
         }
-
-        alpha = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
-        *getArrayAt(i, alphasAll, options.N, idx) = alpha;
-
-        // Switch Qs
-        auto QsT = QsAll;
-        QsAll = QsCopyAll;
-        QsCopyAll = QsT;
-        fillArrayColumn(c.width, 0, QsCopyAll, options.N, idx);
     }
-    
-    // Backward propagation
-    fillArrayColumn(c.width, 100, QsAll, options.N, idx); // initialize to 100$
 
-    for (auto i = c.n - 1; i >= 0; --i)
+    __device__ inline void setQAt(const int index, const real value) override
     {
-        auto jhigh = min(i, c.jmax);
-        auto alpha = *getArrayAt(i, alphasAll, options.N, idx);
-        auto isMaturity = i == ((int)(c.t / c.dt));
-
-        for (auto j = -jhigh; j <= jhigh; ++j)
-        {
-            auto jind = j + c.jmax;      // array index for j
-            auto callExp = exp(-(alpha + j * c.dr) * c.dt);
-
-            real res;
-            if (j == c.jmax)
-            {
-                // Top edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * *getArrayAt(jind, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 2) * *getArrayAt(jind - 1, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 3) * *getArrayAt(jind - 2, QsAll, options.N, idx)) *
-                      callExp;
-            }
-            else if (j == - c.jmax)
-            {
-                // Bottom edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * *getArrayAt(jind + 2, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 2) * *getArrayAt(jind + 1, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 3) * *getArrayAt(jind, QsAll, options.N, idx)) *
-                      callExp;
-            }
-            else
-            {
-                // Standard branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * *getArrayAt(jind + 1, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 2) * *getArrayAt(jind, QsAll, options.N, idx) +
-                    computeJValue(j, c.jmax, c.M, 3) * *getArrayAt(jind - 1, QsAll, options.N, idx)) *
-                      callExp;
-            }
-
-            // after obtaining the result from (i+1) nodes, set the call for ith node
-            *getArrayAt(jind, QsCopyAll, options.N, idx) = computeCallValue(isMaturity, c, res);
-        }
-
-        // Switch call arrays
-        auto QsT = QsAll;
-        QsAll = QsCopyAll;
-        QsCopyAll = QsT;
-
-        fillArrayColumn(c.width, 0, QsCopyAll, options.N, idx);
+        QsAll[index * N + getIdx()] = value;
     }
 
-    res[idx] = *getArrayAt(c.jmax, QsAll, options.N, idx);
-}
+    __device__ inline void setQCopyAt(const int index, const real value) override
+    {
+        QsCopyAll[index * N + getIdx()] = value;
+    }
+
+    __device__ inline void setAlphaAt(const int index, const real value) override
+    {
+        alphasAll[index * N + getIdx()] = value;
+    }
+
+    __device__ inline void setResult(const int jmax) override
+    {
+        res[getIdx()] = QsAll[jmax * N + getIdx()];
+    }
+
+    __device__ inline real getQAt(const int index) const override { return QsAll[index * N + getIdx()]; }
+
+    __device__ inline real getAlphaAt(const int index) const override { return alphasAll[index * N + getIdx()]; }
+};
 
 void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<real> &results, 
     const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
@@ -226,9 +112,10 @@ void computeOptionsCoalesced(const Options &options, const Yield &yield, vector<
     auto d_Qs = thrust::raw_pointer_cast(Qs.data());
     auto d_QsCopy = thrust::raw_pointer_cast(QsCopy.data());
     auto d_alphas = thrust::raw_pointer_cast(alphas.data());
+    KernelArgsCoalesced kernelArgs(d_result, d_Qs, d_QsCopy, d_alphas);
 
     auto time_begin_kernel = steady_clock::now();
-    kernelCoalesced<<<blockCount, blockSize>>>(cudaOptions, d_result, d_Qs, d_QsCopy, d_alphas);
+    kernelOneOptionPerThread<<<blockCount, blockSize>>>(cudaOptions, kernelArgs);
     cudaThreadSynchronize();
     auto time_end_kernel = steady_clock::now();
     if (isTest)
