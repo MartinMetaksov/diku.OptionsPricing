@@ -42,13 +42,13 @@ struct RandOption
     }
 };
 
-// real randRealInRange(real a, real b)
-// {
-//     real random = ((real)rand()) / (real)RAND_MAX;
-//     real diff = b - a;
-//     real r = random * diff;
-//     return a + r;
-// }
+real randRealInRange(real a, real b)
+{
+    real random = ((real)rand()) / (real)RAND_MAX;
+    real diff = b - a;
+    real r = random * diff;
+    return a + r;
+}
 
 int randIntInRange(int a, int b)
 {
@@ -100,6 +100,79 @@ void genMultLargeOptions(vector<RandOption> &options, int &totalHeight, int &tot
     }
 }
 
+void genCompletelyRandomOptions(vector<RandOption> &options, int &totalHeight, int &totalWidth, int &currentTotalHeight, int &currentTotalWidth)
+{
+    int stepMin = 1;
+    int stepMax = 277; // max allowed term ste count in order to keep tree widths < 1024
+    int maxWidth = 1021;
+    while (true)
+    {
+        try
+        {
+            vector<RandOption> tempOptions;
+            while (currentTotalHeight < totalHeight)
+            {
+                // generate option
+                RandOption o(randIntInRange(1, 36), randIntInRange(stepMin, stepMax), randRealInRange(0.1, 0.9));
+
+                if (currentTotalHeight + o.Height > totalHeight)
+                {
+                    // width filler option
+                    RandOption widthFiller(0, stepMax, 0.1);
+                    while (totalWidth - currentTotalWidth > maxWidth)
+                    {
+                        if (currentTotalWidth + widthFiller.Width > totalWidth)
+                        {
+                            break;
+                        }
+                        addOption(tempOptions, widthFiller, currentTotalHeight, currentTotalWidth);
+                    }
+                    break;
+                }
+                addOption(tempOptions, o, currentTotalHeight, currentTotalWidth);
+            }
+
+            int remainingWidth = totalWidth - currentTotalWidth;
+            int remainingHeight = totalHeight - currentTotalHeight;
+            if (remainingWidth < 0 || remainingHeight < 0)
+            {
+                throw 100; // invalid total width or total height
+            }
+            else if (remainingWidth % 2 == 0)
+            {
+                throw 101; // remaining width cannot be filled
+            }
+
+            real rr = 0.1;
+            for (real i = 0.1; i > 0; i -= 0.00001)
+            {
+                // width filler option
+                int maturity = 1;
+                RandOption o(1, 1, i);
+
+                if (o.Width == remainingWidth)
+                {
+                    rr = i;
+                    break;
+                }
+                if (o.Width > maxWidth)
+                {
+                    throw 102; //could not find a suitable width for the fill
+                }
+            }
+            RandOption o(remainingHeight - 1, 1, rr);
+            addOption(tempOptions, o, currentTotalHeight, currentTotalWidth);
+            options.insert(options.end(), tempOptions.begin(), tempOptions.end());
+            break;
+        }
+        catch (int e)
+        {
+            currentTotalHeight = 0;
+            currentTotalWidth = 0;
+        }
+    }
+}
+
 int sumWidth(const int x, const RandOption y) { return x + y.Width; }
 int sumHeight(const int x, const RandOption y) { return x + y.Height; }
 
@@ -133,6 +206,7 @@ int main(int argc, char *argv[])
     int currentTotalHeight = 0;
     int currentTotalWidth = 0;
     int maxWidth = 1021;
+    bool toBeContinued = true;
 
     vector<RandOption> randOptions;
 
@@ -145,8 +219,13 @@ int main(int argc, char *argv[])
     {
         genMultLargeOptions(randOptions, totalHeight, totalWidth, currentTotalHeight, currentTotalWidth);
     }
+    else if (type == 3)
+    {
+        genCompletelyRandomOptions(randOptions, totalHeight, totalWidth, currentTotalHeight, currentTotalWidth);
+        toBeContinued = false;
+    }
 
-    while (true)
+    while (true && toBeContinued)
     {
         try
         {
