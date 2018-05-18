@@ -4,8 +4,6 @@
 #include "Kernel.cuh"
 #include "../cuda/CudaDomain.cuh"
 
-using namespace trinom;
-
 namespace cuda
 {
 

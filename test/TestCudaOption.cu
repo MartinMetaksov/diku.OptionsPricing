@@ -24,7 +24,7 @@ TEST_CASE("One option per thread cuda")
 {
     Yield yield(YIELD_CURVE_PATH);
 
-    Options options(100);
+    Options options(200);
     for (int i = 0; i < options.N; ++i)
     {
         options.Lengths.push_back(3);
@@ -45,7 +45,8 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::computeOptionsNaive(options, yield, results);
+        cuda::KernelRunNaive kernelRun;
+        kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 
@@ -53,7 +54,8 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::computeOptionsCoalesced(options, yield, results);
+        cuda::KernelRunCoalesced kernelRun;
+        kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 
@@ -61,7 +63,17 @@ TEST_CASE("One option per thread cuda")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::computeOptionsWithPaddingPerThreadBlock(options, yield, results);
+        cuda::KernelRunCoalescedChunk kernelRun(64);
+        kernelRun.run(options, yield, results, 64);
+        compareVectors(results, seqResults);
+    }
+
+    SECTION("Version 4")
+    {
+        vector<real> results;
+        results.resize(options.N);
+        cuda::KernelRunCoalescedChunk kernelRun(32);
+        kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 }

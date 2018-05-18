@@ -5,9 +5,6 @@
 #include "../cuda/CudaDomain.cuh"
 #include <thrust/extrema.h>
 
-using namespace chrono;
-using namespace trinom;
-
 namespace cuda
 {
 

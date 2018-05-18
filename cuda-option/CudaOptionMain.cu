@@ -30,7 +30,13 @@ void run(const Options &options, const Yield &yield, vector<real> &results, cons
         }
         case 3:
         {
-            cuda::KernelRunCoalescedBlock kernelRun;
+            cuda::KernelRunCoalescedChunk kernelRun(64);
+            kernelRun.run(options, yield, results, 64, args.sort, args.test);
+            break;
+        }
+        case 4:
+        {
+            cuda::KernelRunCoalescedChunk kernelRun(32);
             kernelRun.run(options, yield, results, 64, args.sort, args.test);
             break;
         }
