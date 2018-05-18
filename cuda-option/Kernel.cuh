@@ -3,32 +3,34 @@
 
 #include "../cuda/CudaDomain.cuh"
 
+using namespace chrono;
 using namespace trinom;
 
 namespace cuda
 {
 
-/**
-Base class for kernel arguments.
-Important! Don't call defined pure virtual functions within your implementation.
-**/
-class KernelArgsBase
+struct KernelArgsValues
 {
-protected:
     real *res;
     real *QsAll;
     real *QsCopyAll;
     real *alphasAll;
+};
+
+/**
+Base class for kernel arguments.
+Important! Don't call defined pure virtual functions within your implementation.
+**/
+template<class KernelArgsValuesT>
+class KernelArgsBase
+{
+
+protected:
+    KernelArgsValuesT values;
 
 public:
 
-    KernelArgsBase(real *res, real *QsAll, real *QsCopyAll, real *alphasAll)
-    {
-        this->res = res;
-        this->QsAll = QsAll;
-        this->QsCopyAll = QsCopyAll;
-        this->alphasAll = alphasAll;
-    }
+    KernelArgsBase(KernelArgsValuesT &v) : values(v) { }
     
     __device__ inline int getIdx() const { return threadIdx.x + blockDim.x * blockIdx.x; }
 
@@ -36,9 +38,9 @@ public:
 
     __device__ virtual void switchQs()
     {
-        auto QsT = QsAll;
-        QsAll = QsCopyAll;
-        QsCopyAll = QsT;
+        auto QsT = values.QsAll;
+        values.QsAll = values.QsCopyAll;
+        values.QsCopyAll = QsT;
     }
 
     __device__ virtual void fillQs(const int count, const int value) = 0;
@@ -202,6 +204,89 @@ __global__ void kernelOneOptionPerThread(const CudaOptions options, KernelArgsT 
 
     args.setResult(c.jmax);
 }
+
+class KernelRunBase
+{
+
+protected:
+    size_t memoryFreeStart, memoryTotal;
+    bool isTest;
+    int blockSize;
+
+    virtual void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
+        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
+
+    template<class KernelArgsT, class KernelArgsValuesT>
+    void runKernel(CudaOptions &cudaOptions, vector<real> &results, const int totalQsCount, const int totalAlphasCount, KernelArgsValuesT &values)
+    {
+        thrust::device_vector<real> Qs(totalQsCount);
+        thrust::device_vector<real> QsCopy(totalQsCount);
+        thrust::device_vector<real> alphas(totalAlphasCount);
+        thrust::device_vector<real> result(cudaOptions.N);
+
+        const auto blockCount = ceil(cudaOptions.N / ((float)blockSize));
+
+        if (isTest)
+        {
+            cout << "Running trinomial option pricing for " << cudaOptions.N << " options with block size " << blockSize << endl;
+            cudaDeviceSynchronize();
+            size_t memoryFree;
+            cudaMemGetInfo(&memoryFree, &memoryTotal);
+            cout << "Memory used " << (memoryFreeStart - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
+        }
+
+        values.res = thrust::raw_pointer_cast(result.data());
+        values.QsAll = thrust::raw_pointer_cast(Qs.data());
+        values.QsCopyAll = thrust::raw_pointer_cast(QsCopy.data());
+        values.alphasAll = thrust::raw_pointer_cast(alphas.data());
+        KernelArgsT kernelArgs(values);
+
+        auto time_begin_kernel = steady_clock::now();
+        kernelOneOptionPerThread<<<blockCount, blockSize>>>(cudaOptions, kernelArgs);
+        cudaThreadSynchronize();
+        auto time_end_kernel = steady_clock::now();
+        if (isTest)
+        {
+            cout << "Kernel executed in " << duration_cast<microseconds>(time_end_kernel - time_begin_kernel).count() << " microsec" << endl;
+        }
+
+        CudaCheckError();
+
+        // Copy result
+        thrust::copy(result.begin(), result.end(), results.begin());
+    }
+
+public:
+    
+    void run(const Options &options, const Yield &yield, vector<real> &results, 
+        const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
+    {
+        this->isTest = isTest;
+        this->blockSize = blockSize;
+        cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
+
+        thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
+        thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
+        thrust::device_vector<uint16_t> lengths(options.Lengths.begin(), options.Lengths.end());
+        thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
+        thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
+        thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
+        thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
+        thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
+
+        thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
+        thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+
+        thrust::device_vector<int32_t> widths(options.N);
+        thrust::device_vector<int32_t> heights(options.N);
+
+        CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
+            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
+
+        runPreprocessing(cudaOptions, results, widths, heights);
+    }
+
+};
 
 }
 

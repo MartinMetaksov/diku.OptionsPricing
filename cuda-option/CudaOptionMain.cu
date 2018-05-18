@@ -17,14 +17,23 @@ void run(const Options &options, const Yield &yield, vector<real> &results, cons
     switch (args.version)
     {
         case 1:
-            cuda::computeOptionsNaive(options, yield, results, 64, args.sort, args.test);
+        {
+            cuda::KernelRunNaive kernelRun;
+            kernelRun.run(options, yield, results, 64, args.sort, args.test);
             break;
+        }
         case 2:
-            cuda::computeOptionsCoalesced(options, yield, results, 64, args.sort, args.test);
+        {
+            cuda::KernelRunCoalesced kernelRun;
+            kernelRun.run(options, yield, results, 64, args.sort, args.test);
             break;
+        }
         case 3:
-            cuda::computeOptionsCoalescedBlock(options, yield, results, 64, args.sort, args.test);
+        {
+            cuda::KernelRunCoalescedBlock kernelRun;
+            kernelRun.run(options, yield, results, 64, args.sort, args.test);
             break;
+        }
     }
 
     auto time_end = steady_clock::now();
