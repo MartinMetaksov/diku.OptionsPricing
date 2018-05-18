@@ -209,7 +209,6 @@ class KernelRunBase
 {
 
 protected:
-    size_t memoryFreeStart, memoryTotal;
     bool isTest;
     int blockSize;
 
@@ -228,11 +227,11 @@ protected:
 
         if (isTest)
         {
-            cout << "Running trinomial option pricing for " << cudaOptions.N << " options with block size " << blockSize << endl;
+            cout << "Running pricing for " << cudaOptions.N << " options with block size " << blockSize << endl;
             cudaDeviceSynchronize();
-            size_t memoryFree;
+            size_t memoryFree, memoryTotal;
             cudaMemGetInfo(&memoryFree, &memoryTotal);
-            cout << "Memory used " << (memoryFreeStart - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
+            cout << "Current GPU memory usage " << (memoryTotal - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
         }
 
         values.res = thrust::raw_pointer_cast(result.data());
@@ -263,7 +262,6 @@ public:
     {
         this->isTest = isTest;
         this->blockSize = blockSize;
-        cudaMemGetInfo(&memoryFreeStart, &memoryTotal);
 
         thrust::device_vector<uint16_t> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
         thrust::device_vector<uint16_t> maturities(options.Maturities.begin(), options.Maturities.end());
