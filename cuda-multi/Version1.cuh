@@ -53,7 +53,8 @@ protected:
 
         KernelArgsValues values;
 
-        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, 0, values);
+        const int sharedMemorySize = 2 * sizeof(real) * blockSize + 2 * sizeof(int) * blockSize;
+        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, sharedMemorySize, values);
     }
 };
 

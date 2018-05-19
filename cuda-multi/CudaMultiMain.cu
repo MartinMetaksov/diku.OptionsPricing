@@ -17,7 +17,7 @@ void run(const Options &options, const Yield &yield, vector<real> &results, cons
         case 1:
         {
             cuda::KernelRunNaive kernelRun;
-            kernelRun.run(options, yield, results, 256, args.sort, args.test);
+            kernelRun.run(options, yield, results, 64, args.sort, args.test);
             break;
         }
     }

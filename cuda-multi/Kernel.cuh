@@ -2,6 +2,7 @@
 #define CUDA_KERNEL_MULTI_CUH
 
 #include "../cuda/CudaDomain.cuh"
+#include "../cuda/ScanKernels.cuh"
 
 using namespace chrono;
 using namespace trinom;
@@ -12,7 +13,9 @@ namespace cuda
 struct KernelArgsValues
 {
     real *res;
+    real *alphas;
     int32_t *inds;
+    int32_t maxHeight;
 };
 
 /**
@@ -33,15 +36,66 @@ public:
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
 {
-    OptionConstants c;
+    extern __shared__ real sh_mem[];
+    volatile real *Qs = (real *)&sh_mem;
+    volatile real *QCopys = &Qs[blockDim.x];
+    volatile int *optionInds = (int *) &QCopys[blockDim.x];
+    volatile int *optionFlags = &optionInds[blockDim.x];
 
-    // Compute option index
-    auto idx = (blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1]) + threadIdx.x;
-    if (idx < args.values.inds[blockIdx.x])    // Don't fetch options from next block
+    // Compute option indices and init Qs
+    optionInds[threadIdx.x] = 0;
+    Qs[threadIdx.x] = 0;
+    __syncthreads();
+
+    const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
+    const auto idx = idxBlock + threadIdx.x;
+    const auto nextIdx = args.values.inds[blockIdx.x];
+    int width;
+    if (idx < nextIdx)    // Don't fetch options from next block
     {
-        computeConstants(c, options, idx);
-        // TODO: put option to shared memory for all threads to access
+        width = options.Widths[idx];
+        optionInds[threadIdx.x] = width;
     }
+    __syncthreads();
+
+    // Scan widths
+    optionInds[threadIdx.x] = scanIncBlock<Add<int>>(optionInds, threadIdx.x);
+    __syncthreads();
+
+    int scannedWidthIdx = -1;
+    if (idx <= nextIdx)
+    {
+        scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
+    }
+    // Set starting Qs to 1$
+    if (idx < nextIdx)
+    {
+        Qs[scannedWidthIdx + width / 2] = 1;
+    }
+    optionInds[threadIdx.x] = 0;
+    __syncthreads();
+
+    if (idx <= nextIdx)
+    {
+        optionInds[scannedWidthIdx] = threadIdx.x;
+        optionFlags[scannedWidthIdx] = idx == nextIdx ? optionInds[threadIdx.x] : width;
+    }
+    __syncthreads();
+
+    optionInds[threadIdx.x] = sgmScanIncBlock<Add<int>>(optionInds, optionFlags, threadIdx.x);
+
+    // Get the option and set inital alpha and Q
+    OptionConstants c;
+    const auto optionIdx = idxBlock + optionInds[threadIdx.x];
+    real *alphas = args.values.alphas + args.values.maxHeight * optionIdx;
+    if (optionIdx < nextIdx)
+    {
+        computeConstants(c, options, optionIdx);
+        alphas[0] = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
+    }
+    __syncthreads();
+
+    // TODO: Forward iteration
 
 }
 
@@ -51,6 +105,7 @@ class KernelRunBase
 protected:
     bool isTest;
     int blockSize;
+    int maxHeight;
 
     virtual void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
@@ -58,9 +113,9 @@ protected:
     template<class KernelArgsT, class KernelArgsValuesT>
     void runKernel(CudaOptions &cudaOptions, vector<real> &results, thrust::device_vector<int32_t> &inds, int32_t sharedMemorySize, KernelArgsValuesT &values)
     {
+        const int totalAlphasCount = cudaOptions.N * maxHeight;
+        thrust::device_vector<real> alphas(totalAlphasCount);
         thrust::device_vector<real> result(cudaOptions.N);
-
-        const auto blockCount = ceil(cudaOptions.N / ((float)blockSize));
 
         if (isTest)
         {
@@ -71,12 +126,14 @@ protected:
             cout << "Current GPU memory usage " << (memoryTotal - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << endl;
         }
 
+        values.maxHeight = maxHeight;
         values.res = thrust::raw_pointer_cast(result.data());
+        values.alphas = thrust::raw_pointer_cast(alphas.data());
         values.inds = thrust::raw_pointer_cast(inds.data());
         KernelArgsT kernelArgs(values);
 
         auto time_begin_kernel = steady_clock::now();
-        kernelMultipleOptionsPerThreadBlock<<<blockCount, blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
+        kernelMultipleOptionsPerThreadBlock<<<inds.size(), blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
         cudaThreadSynchronize();
         auto time_end_kernel = steady_clock::now();
         if (isTest)
@@ -115,6 +172,9 @@ public:
 
         CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
+
+        // Get the max height
+        maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
 
         runPreprocessing(cudaOptions, results, widths, heights);
     }
