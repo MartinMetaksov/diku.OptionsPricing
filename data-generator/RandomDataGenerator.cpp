@@ -118,7 +118,8 @@ int main(int argc, char *argv[])
     int totalHeight;
     string filename;
     GetOpt::GetOpt_pp cmd(argc, argv);
-    cmd >> GetOpt::Option('t', "type", type); // 0 - uniform; 1 - one large; 2 - mix of large and small
+    // 0 - uniform; 1 - one large; 2 - mix of large and small; 3 - scrambled, large differences b/w widths and heights
+    cmd >> GetOpt::Option('t', "type", type);
     cmd >> GetOpt::Option('f', "fileName", filename);
     cmd >> GetOpt::Option('h', "totalHeight", totalHeight);
 
@@ -154,9 +155,9 @@ int main(int argc, char *argv[])
             while (currentTotalHeight < totalHeight)
             {
                 // generate option
-                RandOption o(type == 3 ? randIntInRange(1, 36) : 9,
+                RandOption o(type == 3 ? randIntInRange(1, 18) : 9,
                              randIntInRange(stepMin, stepMax),
-                             type == 3 ? randRealInRange(0.1, 0.9) : 0.1);
+                             type == 3 ? randRealInRange(0.05, 0.17) : 0.1);
 
                 if (currentTotalHeight + o.Height > totalHeight)
                 {
