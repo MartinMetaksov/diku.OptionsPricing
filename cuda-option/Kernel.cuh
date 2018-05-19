@@ -73,6 +73,7 @@ __global__ void kernelOneOptionPerThread(const CudaOptions options, KernelArgsT 
     args.setQAt(c.jmax, one);
     args.setAlphaAt(0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
 
+    // Forward propagation
     for (auto i = 1; i <= c.n; ++i)
     {
         auto jhigh = min(i, c.jmax);
@@ -153,7 +154,6 @@ __global__ void kernelOneOptionPerThread(const CudaOptions options, KernelArgsT 
     }
     
     // Backward propagation
-
     args.fillQs(c.width, 100); // initialize to 100$
 
     for (auto i = c.n - 1; i >= 0; --i)
