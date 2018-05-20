@@ -7,6 +7,9 @@
 namespace cuda
 {
 
+namespace multi
+{
+
 class KernelArgsNaive : public KernelArgsBase<KernelArgsValues>
 {
 
@@ -57,6 +60,8 @@ protected:
         runKernel<KernelArgsNaive>(cudaOptions, results, dInds, sharedMemorySize, values);
     }
 };
+
+}
 
 }
 

@@ -9,6 +9,9 @@ using namespace trinom;
 namespace cuda
 {
 
+namespace option
+{
+
 struct KernelArgsValues
 {
     real *res;
@@ -285,6 +288,8 @@ public:
     }
 
 };
+
+}
 
 }
 

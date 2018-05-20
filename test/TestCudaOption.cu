@@ -4,6 +4,7 @@
 #include "../cuda-option/Version1.cuh"
 #include "../cuda-option/Version2.cuh"
 #include "../cuda-option/Version3.cuh"
+#include "../cuda-multi/Version1.cuh"
 #include "../seq/Seq.hpp"
 
 using namespace trinom;
@@ -20,11 +21,11 @@ void compareVectors(vector<real> test, vector<real> gold)
     }
 }
 
-TEST_CASE("One option per thread cuda")
+TEST_CASE("Book options")
 {
     Yield yield(YIELD_CURVE_PATH);
-
-    Options options(200);
+    
+    Options options(100);
     for (int i = 0; i < options.N; ++i)
     {
         options.Lengths.push_back(3);
@@ -41,39 +42,48 @@ TEST_CASE("One option per thread cuda")
     seqResults.reserve(options.N);
     seq::computeOptions(options, yield, seqResults);
 
-    SECTION("Version 1")
+    SECTION("CUDA option version 1")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::KernelRunNaive kernelRun;
+        cuda::option::KernelRunNaive kernelRun;
         kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 
-    SECTION("Version 2")
+    SECTION("CUDA option version 2")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::KernelRunCoalesced kernelRun;
+        cuda::option::KernelRunCoalesced kernelRun;
         kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 
-    SECTION("Version 3")
+    SECTION("CUDA option version 3")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::KernelRunCoalescedChunk kernelRun(64);
+        cuda::option::KernelRunCoalescedChunk kernelRun(64);
         kernelRun.run(options, yield, results, 64);
         compareVectors(results, seqResults);
     }
 
-    SECTION("Version 4")
+    SECTION("CUDA option version 4")
     {
         vector<real> results;
         results.resize(options.N);
-        cuda::KernelRunCoalescedChunk kernelRun(32);
+        cuda::option::KernelRunCoalescedChunk kernelRun(32);
         kernelRun.run(options, yield, results, 64);
+        compareVectors(results, seqResults);
+    }
+
+    SECTION("CUDA multi version 1")
+    {
+        vector<real> results;
+        results.resize(options.N);
+        cuda::multi::KernelRunNaive kernelRun;
+        kernelRun.run(options, yield, results, 1024);
         compareVectors(results, seqResults);
     }
 }

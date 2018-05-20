@@ -7,6 +7,9 @@
 namespace cuda
 {
 
+namespace option
+{
+
 class KernelArgsNaive : public KernelArgsBase<KernelArgsValues>
 {
 private:
@@ -87,6 +90,8 @@ protected:
         runKernel<KernelArgsNaive>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
     }
 };
+
+}
 
 }
 

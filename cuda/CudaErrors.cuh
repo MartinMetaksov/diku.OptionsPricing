@@ -1,5 +1,5 @@
-#ifndef CUDA_ERRORS
-#define CUDA_ERRORS
+#ifndef CUDA_ERRORS_CUH
+#define CUDA_ERRORS_CUH
 
 // CUDA error checking
 // https://codeyarns.com/2011/03/02/how-to-do-error-checking-in-cuda/
@@ -48,4 +48,4 @@ inline void __cudaCheckError(const char *file, const int line)
     return;
 }
 
-#endif
+#endif //CUDA_ERRORS_CUH

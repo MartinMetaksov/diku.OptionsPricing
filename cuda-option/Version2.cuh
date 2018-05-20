@@ -8,6 +8,9 @@
 namespace cuda
 {
 
+namespace option
+{
+
 class KernelArgsCoalesced : public KernelArgsBase<KernelArgsValues>
 {
 private:
@@ -75,6 +78,8 @@ protected:
         runKernel<KernelArgsCoalesced>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
     }
 };
+
+}
 
 }
 

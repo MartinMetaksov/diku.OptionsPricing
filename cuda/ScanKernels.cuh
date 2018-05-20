@@ -1,5 +1,5 @@
-#ifndef SCAN_KERS
-#define SCAN_KERS
+#ifndef SCAN_KERNELS_CUH
+#define SCAN_KERNELS_CUH
 
 #include <cuda_runtime.h>
 
@@ -173,4 +173,4 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
     return val;
 }
 
-#endif //SCAN_KERS
+#endif //SCAN_KERNELS_CUH

@@ -8,6 +8,9 @@
 namespace cuda
 {
 
+namespace option
+{
+
 struct KernelArgsValuesChunk
 {
     real *res;
@@ -130,6 +133,8 @@ protected:
         runKernel<KernelArgsCoalescedChunk>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
     }
 };
+
+}
 
 }
 
