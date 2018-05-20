@@ -26,16 +26,16 @@ TEST_CASE("Book options")
     Yield yield(YIELD_CURVE_PATH);
     
     Options options(100);
-    for (int i = 0; i < options.N; ++i)
+    for (int i = 1; i <= options.N; ++i)
     {
         options.Lengths.push_back(3);
         options.Maturities.push_back(9);
-        options.StrikePrices.push_back(63 + i * 20);
+        options.StrikePrices.push_back(63);
         options.TermUnits.push_back(365);
-        options.TermStepCounts.push_back(i + 1);
+        options.TermStepCounts.push_back(i);
         options.ReversionRates.push_back(0.1);
         options.Volatilities.push_back(0.01);
-        options.Types.push_back(i % 2 == 0 ? OptionType::PUT : OptionType::CALL);
+        options.Types.push_back(OptionType::PUT);
     }
     
     vector<real> seqResults, cudaResults;

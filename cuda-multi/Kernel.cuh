@@ -64,12 +64,16 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     // Scan widths
     optionInds[threadIdx.x] = scanIncBlock<Add<int>>(optionInds, threadIdx.x);
+    __syncthreads();
     
     int scannedWidthIdx = -1;
     if (idx <= nextIdx)
     {
         scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
     }
+    // Zero out Qs
+    Qs[threadIdx.x] = 0;
+    QCopys[threadIdx.x] = 0;
     __syncthreads();
 
     // Set starting Qs to 1$
@@ -80,6 +84,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     // Compute option indices
     optionInds[threadIdx.x] = 0;
+    optionFlags[threadIdx.x] = 0;
     __syncthreads();
 
     if (idx < nextIdx)
@@ -93,7 +98,9 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         optionFlags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
     }
     __syncthreads();
+
     optionInds[threadIdx.x] = sgmScanIncBlock<Add<int>>(optionInds, optionFlags, threadIdx.x);
+    __syncthreads();
 
     // Get the option and compute its constants
     OptionConstants c;
@@ -122,7 +129,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     if (threadIdx.x == scannedWidthIdx && optionIdx < nextIdx)
     {
         alphas[0] = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
-        // printf("bid %d tid %d: step %d alpha %lf\n", blockIdx.x, threadIdx.x, 0, alphas[0]);
     }
     __syncthreads();
 
@@ -209,12 +215,12 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
         Qs[threadIdx.x] = sgmScanIncBlock<Add<real>>(Qs, optionFlags, threadIdx.x);
+        __syncthreads();
         
         if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
         {
             auto alpha_val = Qs[threadIdx.x];
             alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
-            // printf("bid %d tid %d: step %d alpha %lf\n", blockIdx.x, threadIdx.x, i, alphas[i]);
         }
         __syncthreads();
 
@@ -270,7 +276,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
             QCopys[threadIdx.x] = computeCallValue(isMaturity, c, res);
-            // printf("bid %d tid %d: step %d QCopy %lf\n", blockIdx.x, threadIdx.x, i, QCopys[threadIdx.x]);
         }
         __syncthreads();
 
@@ -285,7 +290,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     if (c.n > 0 && threadIdx.x == scannedWidthIdx)
     {
-        // printf("bid %d tid %d: result %lf\n", blockIdx.x, threadIdx.x, Qs[c.jmax + scannedWidthIdx]);
         args.values.res[optionIdx] = Qs[c.jmax + scannedWidthIdx];
     }
 }
