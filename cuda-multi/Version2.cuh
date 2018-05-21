@@ -1,5 +1,5 @@
-#ifndef CUDA_MULTI_VERSION_1_CUH
-#define CUDA_MULTI_VERSION_1_CUH
+#ifndef CUDA_MULTI_VERSION_2_CUH
+#define CUDA_MULTI_VERSION_2_CUH
 
 #include "Kernel.cuh"
 #include "../cuda/CudaDomain.cuh"
@@ -10,25 +10,26 @@ namespace cuda
 namespace multi
 {
 
-class KernelArgsNaive : public KernelArgsBase<KernelArgsValues>
+class KernelArgsCoalesced : public KernelArgsBase<KernelArgsValues>
 {
 
 public:
 
-    KernelArgsNaive(KernelArgsValues &v) : KernelArgsBase(v) { }
+    KernelArgsCoalesced(KernelArgsValues &v) : KernelArgsBase(v) { }
 
     __device__ inline void setAlphaAt(const int optionIdx, const int index, const real value) override
     {
-        values.alphas[values.maxHeight * optionIdx + index] = value;
+        values.alphas[values.maxHeight * index + optionIdx] = value;
     }
 
     __device__ inline real getAlphaAt(const int optionIdx, const int index) override
     {
-        return values.alphas[values.maxHeight * optionIdx + index];
+        return values.alphas[values.maxHeight * index + optionIdx];
     }
+
 };
 
-class KernelRunNaive : public KernelRunBase
+class KernelRunCoalesced : public KernelRunBase
 {
 
 protected:
@@ -57,7 +58,7 @@ protected:
         KernelArgsValues values;
 
         const int sharedMemorySize = 2 * sizeof(real) * blockSize + 2 * sizeof(int32_t) * blockSize;
-        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, sharedMemorySize, values);
+        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, sharedMemorySize, values);
     }
 };
 

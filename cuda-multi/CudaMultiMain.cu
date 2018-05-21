@@ -4,6 +4,7 @@
 
 #include "../common/Args.hpp"
 #include "Version1.cuh"
+#include "Version2.cuh"
 
 using namespace std;
 using namespace trinom;
@@ -15,6 +16,12 @@ cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &
         case 1:
         {
             cuda::multi::KernelRunNaive kernelRun;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
+        }
+        case 2:
+        {
+            cuda::multi::KernelRunCoalesced kernelRun;
             kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
             return kernelRun.runtime;
         }

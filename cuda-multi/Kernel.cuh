@@ -3,6 +3,7 @@
 
 #include "../cuda/CudaDomain.cuh"
 #include "../cuda/ScanKernels.cuh"
+#include <sstream>
 #include <stdexcept>
 
 using namespace chrono;
@@ -32,10 +33,14 @@ class KernelArgsBase
 {
 
 public:
+
     KernelArgsValuesT values;
 
     KernelArgsBase(KernelArgsValuesT &v) : values(v) { }
 
+    __device__ virtual void setAlphaAt(const int optionIdx, const int index, const real value) = 0;
+
+    __device__ virtual real getAlphaAt(const int optionIdx, const int index) = 0;
 };
 
 template<class KernelArgsT>
@@ -125,11 +130,10 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         c.width = blockDim.x - scannedWidthIdx;
     }
 
-    // Get a pointer to alphas for this option and set the initial value
-    real *alphas = args.values.alphas + args.values.maxHeight * optionIdx;
+    // Set the initial alpha value
     if (threadIdx.x == scannedWidthIdx && optionIdx < nextIdx)
     {
-        alphas[0] = getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
+        args.setAlphaAt(optionIdx, 0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
     }
     __syncthreads();
 
@@ -143,7 +147,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
         if (i <= c.n && j >= -jhigh && j <= jhigh)
         {   
-            auto alpha = alphas[i - 1];
+            auto alpha = args.getAlphaAt(optionIdx, i - 1);
             auto expp1 = j == jhigh ? zero : Qs[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
             auto expm = Qs[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
             auto expm1 = j == -jhigh ? zero : Qs[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
@@ -220,8 +224,8 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         
         if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
         {
-            auto alpha_val = Qs[threadIdx.x];
-            alphas[i] = computeAlpha(alpha_val, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
+            real alpha = computeAlpha(Qs[threadIdx.x], i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
+            args.setAlphaAt(optionIdx, i, alpha);
         }
         __syncthreads();
 
@@ -245,7 +249,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
         if (i < c.n && j >= -jhigh && j <= jhigh)
         {
-            auto alpha = alphas[i];
+            auto alpha = args.getAlphaAt(optionIdx, i);
             auto isMaturity = i == ((int)(c.t / c.dt));
             auto callExp = exp(-(alpha + j * c.dr) * c.dt);
 

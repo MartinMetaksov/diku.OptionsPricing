@@ -5,6 +5,7 @@
 #include "../cuda-option/Version2.cuh"
 #include "../cuda-option/Version3.cuh"
 #include "../cuda-multi/Version1.cuh"
+#include "../cuda-multi/Version2.cuh"
 #include "../seq/Seq.hpp"
 
 using namespace trinom;
@@ -83,6 +84,15 @@ TEST_CASE("Book options")
         vector<real> results;
         results.resize(options.N);
         cuda::multi::KernelRunNaive kernelRun;
+        kernelRun.run(options, yield, results, 1024);
+        compareVectors(results, seqResults);
+    }
+
+    SECTION("CUDA multi version 2")
+    {
+        vector<real> results;
+        results.resize(options.N);
+        cuda::multi::KernelRunCoalesced kernelRun;
         kernelRun.run(options, yield, results, 1024);
         compareVectors(results, seqResults);
     }

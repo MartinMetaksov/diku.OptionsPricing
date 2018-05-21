@@ -1,7 +1,7 @@
 #!/bin/bash
 
 version=1
-while [ $version -le 1 ]
+while [ $version -le 2 ]
 do
     echo Testing version $version
     block=128
