@@ -141,6 +141,16 @@ struct CudaOptions
     }
 };
 
+struct CudaRuntime
+{
+    long KernelRuntime;
+    long TotalRuntime;
+};
+
+bool operator <(const CudaRuntime& x, const CudaRuntime& y) {
+    return std::tie(x.KernelRuntime, x.TotalRuntime) < std::tie(y.KernelRuntime, y.TotalRuntime);
+}
+
 __device__ void computeConstants(OptionConstants &c, const CudaOptions &options, const int idx)
 {
     c.termUnit = options.TermUnits[idx];

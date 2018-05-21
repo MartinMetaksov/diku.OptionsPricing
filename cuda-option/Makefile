@@ -1,5 +1,4 @@
-CXX        = nvcc -std=c++11 #--ptxas-options=-v
-
+CXX        = nvcc -std=c++11 #--maxrregcount=32 #--ptxas-options=-v
 
 SOURCES_CPP =CudaOptionMain.cu
 EXECUTABLE  =../build/CudaOption
@@ -15,15 +14,14 @@ compile: $(EXECUTABLE)
 $(EXECUTABLE): 
 	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
 
-compile-compare: $(COMPARE)
-$(COMPARE):
-	@futhark-opencl $(DATA)/compare.fut
-
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION)
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK)
 
 test: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -t -r 10
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -t
+
+repeat: $(EXECUTABLE)
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -r 10
 
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"

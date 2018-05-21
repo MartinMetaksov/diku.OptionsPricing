@@ -10,44 +10,36 @@
 using namespace std;
 using namespace trinom;
 
-void run(const Options &options, const Yield &yield, vector<real> &results, const Args &args)
+cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &results, const Args &args)
 {
-    auto time_begin = steady_clock::now();
-
     switch (args.version)
     {
         case 1:
         {
             cuda::option::KernelRunNaive kernelRun;
-            kernelRun.run(options, yield, results, 64, args.sort, args.test);
-            break;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
         }
         case 2:
         {
             cuda::option::KernelRunCoalesced kernelRun;
-            kernelRun.run(options, yield, results, 64, args.sort, args.test);
-            break;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
         }
         case 3:
         {
             cuda::option::KernelRunCoalescedChunk kernelRun(64);
-            kernelRun.run(options, yield, results, 64, args.sort, args.test);
-            break;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
         }
         case 4:
         {
             cuda::option::KernelRunCoalescedChunk kernelRun(32);
-            kernelRun.run(options, yield, results, 64, args.sort, args.test);
-            break;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
         }
     }
-
-    auto time_end = steady_clock::now();
-    
-    if (args.test)
-    {
-        cout << "Total execution time " << duration_cast<microseconds>(time_end - time_begin).count() << " microsec" << endl;
-    }
+    return cuda::CudaRuntime();
 }
 
 void computeAllOptions(const Args &args)
@@ -63,26 +55,32 @@ void computeAllOptions(const Args &args)
 
     cudaFree(0);
 
-    if (args.test && args.runs > 0)
+    if (args.runs > 0)
     {
-        cout << "Performing " << args.runs << " runs" << endl;
+        cout << "Performing " << args.runs << " runs..." << endl;
+        cuda::CudaRuntime best;
         for (auto i = 0; i < args.runs; ++i)
         {
-            cout << "----------------" << endl;
             vector<real> results;
             results.resize(options.N);
-            run(options, yield, results, args);
-            cout << "----------------" << endl;
+            auto runtime = run(options, yield, results, args);
+            if (runtime < best)
+            {
+                best = runtime;
+            }
         }
+        cout << "Best times: kernel " << best.KernelRuntime << " microsec, total " << best.TotalRuntime << " microsec." << endl;
     }
-
-    vector<real> results;
-    results.resize(options.N);
-    run(options, yield, results, args);
-    
-    if (!args.test)
+    else
     {
-        Arrays::write_array(cout, results);
+        vector<real> results;
+        results.resize(options.N);
+        run(options, yield, results, args);
+        
+        if (!args.test)
+        {
+            Arrays::write_array(cout, results);
+        }
     }
 }
 

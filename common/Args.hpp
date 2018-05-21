@@ -19,6 +19,7 @@ struct Args
     bool test;
     int version;
     int runs;
+    int blockSize;
 
     Args(int argc, char *argv[])
     {
@@ -26,6 +27,7 @@ struct Args
         string s;
 
         version = 1;
+        runs = 0;
         sort = SortType::NONE;
 
         cmd >> GetOpt::Option('o', "options", options);
@@ -33,6 +35,7 @@ struct Args
         cmd >> GetOpt::Option('s', "sort", s);
         cmd >> GetOpt::Option('v', "version", version);
         cmd >> GetOpt::Option('r', "runs", runs);
+        cmd >> GetOpt::Option('b', "block", blockSize);
         cmd >> GetOpt::OptionPresent('t', "test", test);
 
         if (s.length() == 1)

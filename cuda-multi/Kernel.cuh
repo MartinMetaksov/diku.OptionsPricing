@@ -3,6 +3,7 @@
 
 #include "../cuda/CudaDomain.cuh"
 #include "../cuda/ScanKernels.cuh"
+#include <stdexcept>
 
 using namespace chrono;
 using namespace cuda;
@@ -43,8 +44,8 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     extern __shared__ real sh_mem[];
     volatile real *Qs = (real *)&sh_mem;
     volatile real *QCopys = &Qs[blockDim.x];
-    volatile int *optionInds = (int *) &QCopys[blockDim.x];
-    volatile int *optionFlags = &optionInds[blockDim.x];
+    volatile int32_t *optionInds = (int32_t *) &QCopys[blockDim.x];
+    volatile int32_t *optionFlags = &optionInds[blockDim.x];
 
     // Compute option indices and init Qs
     optionInds[threadIdx.x] = 0;
@@ -297,10 +298,14 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 class KernelRunBase
 {
 
+private:
+    chrono::time_point<std::chrono::steady_clock> time_begin;
+
 protected:
     bool isTest;
     int blockSize;
     int maxHeight;
+    int maxWidth;
 
     virtual void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
@@ -331,22 +336,35 @@ protected:
         kernelMultipleOptionsPerThreadBlock<<<inds.size(), blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
         cudaThreadSynchronize();
         auto time_end_kernel = steady_clock::now();
+        runtime.KernelRuntime = duration_cast<microseconds>(time_end_kernel - time_begin_kernel).count();
+
         if (isTest)
         {
-            cout << "Kernel executed in " << duration_cast<microseconds>(time_end_kernel - time_begin_kernel).count() << " microsec" << endl;
+            cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << endl;
         }
 
         CudaCheckError();
 
         // Copy result
         thrust::copy(result.begin(), result.end(), results.begin());
+
+        auto time_end = steady_clock::now();
+        runtime.TotalRuntime = duration_cast<microseconds>(time_end - time_begin).count();
+
+        if (isTest)
+        {
+            cout << "Total execution time " << runtime.TotalRuntime << " microsec" << endl;
+        }
     }
 
 public:
+    CudaRuntime runtime;
     
     void run(const Options &options, const Yield &yield, vector<real> &results, 
         const int blockSize = 1024, const SortType sortType = SortType::NONE, bool isTest = false)
     {
+        time_begin = steady_clock::now();
+
         this->isTest = isTest;
         this->blockSize = blockSize;
 
@@ -368,8 +386,16 @@ public:
         CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
-        // Get the max height
+        // Get the max height and width
+        maxWidth = thrust::max_element(widths.begin(), widths.end())[0];
         maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
+
+        if (maxWidth > blockSize)
+        {
+            ostringstream oss;
+            oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
+            throw invalid_argument(oss.str());
+        }
 
         runPreprocessing(cudaOptions, results, widths, heights);
     }

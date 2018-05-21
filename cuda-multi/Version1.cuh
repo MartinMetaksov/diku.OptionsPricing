@@ -56,7 +56,7 @@ protected:
 
         KernelArgsValues values;
 
-        const int sharedMemorySize = 2 * sizeof(real) * blockSize + 2 * sizeof(int) * blockSize;
+        const int sharedMemorySize = 2 * sizeof(real) * blockSize + 2 * sizeof(int32_t) * blockSize;
         runKernel<KernelArgsNaive>(cudaOptions, results, dInds, sharedMemorySize, values);
     }
 };
