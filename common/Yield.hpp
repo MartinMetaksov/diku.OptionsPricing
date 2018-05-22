@@ -7,29 +7,27 @@
 #include "Real.hpp"
 #include "Arrays.hpp"
 
-using namespace std;
-
 namespace trinom
 {
 
 struct Yield
 {
     int N;
-    vector<real> Prices;
-    vector<int32_t> TimeSteps;
+    std::vector<real> Prices;
+    std::vector<int32_t> TimeSteps;
 
-    Yield(const string &filename)
+    Yield(const std::string &filename)
     {
         if (filename.empty())
         {
-            throw invalid_argument("File not specified.");
+            throw std::invalid_argument("File not specified.");
         }
 
-        ifstream in(filename);
+        std::ifstream in(filename);
 
         if (!in)
         {
-            throw invalid_argument("File does not exist.");
+            throw std::invalid_argument("File does not exist.");
         }
 
         Arrays::read_array(in, Prices);
@@ -39,6 +37,6 @@ struct Yield
         in.close();
     }
 };
-}
+} // namespace trinom
 
 #endif

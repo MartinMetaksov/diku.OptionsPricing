@@ -7,8 +7,6 @@
 #include <vector>
 #include <cmath>
 
-using namespace std;
-
 namespace trinom
 {
 
@@ -40,7 +38,7 @@ struct OptionConstants
     {
         termUnit = options.TermUnits.at(ind);
         const auto T = options.Maturities.at(ind);
-        const int32_t termUnitsInYearCount = ceil((real)year / termUnit);
+        const int termUnitsInYearCount = ceil((real)year / termUnit);
         const auto termStepCount = options.TermStepCounts.at(ind);
         n = termStepCount * termUnitsInYearCount * T;
         t = options.Lengths.at(ind);

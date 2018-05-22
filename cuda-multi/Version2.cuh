@@ -33,7 +33,7 @@ class KernelRunCoalesced : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
+    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
     {
         // Compute indices.
@@ -57,8 +57,7 @@ protected:
 
         KernelArgsValues values;
 
-        const int sharedMemorySize = 2 * sizeof(real) * blockSize + 2 * sizeof(int32_t) * blockSize;
-        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, sharedMemorySize, values);
+        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, values);
     }
 };
 

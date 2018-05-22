@@ -2,10 +2,10 @@
 // Define this to turn on error checking
 #define CUDA_ERROR_CHECK
 
-#include "../common/Args.hpp"
 #include "Version1.cuh"
 #include "Version2.cuh"
 #include "Version3.cuh"
+#include "../common/Args.hpp"
 
 using namespace std;
 using namespace trinom;
@@ -87,7 +87,7 @@ void computeAllOptions(const Args &args)
 int main(int argc, char *argv[])
 {
     Args args(argc, argv);
-
+    
     computeAllOptions(args);
 
     return 0;

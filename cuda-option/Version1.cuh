@@ -75,7 +75,7 @@ class KernelRunNaive : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
+    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
     {
         // Compute indices.

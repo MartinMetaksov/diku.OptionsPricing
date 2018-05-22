@@ -104,7 +104,7 @@ public:
     KernelRunCoalescedChunk(int32_t chunkSize) : ChunkSize(chunkSize) { }
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, vector<real> &results,
+    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
     {
         // Create block indices.

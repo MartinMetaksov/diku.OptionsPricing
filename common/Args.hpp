@@ -5,7 +5,6 @@
 #include "getoptpp/getopt_pp_standalone.h"
 #include "OptionConstants.hpp"
 
-using namespace std;
 using namespace GetOpt;
 
 namespace trinom
@@ -13,22 +12,25 @@ namespace trinom
 
 struct Args
 {
-    string options;
-    string yield;
+    std::string options;
+    std::string yield;
     SortType sort;
     bool test;
     int version;
     int runs;
     int blockSize;
 
+    Args() {}
+
     Args(int argc, char *argv[])
     {
         GetOpt_pp cmd(argc, argv);
-        string s;
+        std::string s;
 
         version = 1;
         runs = 0;
         sort = SortType::NONE;
+        blockSize = 1024;
 
         cmd >> GetOpt::Option('o', "options", options);
         cmd >> GetOpt::Option('y', "yield", yield);

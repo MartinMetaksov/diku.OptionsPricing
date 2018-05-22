@@ -5,8 +5,6 @@
 #include "Yield.hpp"
 #include "OptionConstants.hpp"
 
-using namespace std;
-
 namespace trinom
 {
 
@@ -153,9 +151,9 @@ DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, c
         switch (c.type)
         {
         case OptionType::PUT:
-            return max(c.X - res, zero);
+            return MAX(c.X - res, zero);
         case OptionType::CALL:
-            return max(res - c.X, zero);
+            return MAX(res - c.X, zero);
         }
     }
     return res;

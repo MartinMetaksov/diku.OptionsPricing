@@ -3,20 +3,14 @@
 
 #ifdef __CUDA_ARCH__
 #define CONSTANT __constant__
+#define DEVICE __device__
+#define HOST __host__
+#define MAX(X, Y) max((X), (Y))
 #else
 #define CONSTANT const
-#endif
-
-#ifdef __CUDA_ARCH__
-#define DEVICE __device__
-#else
 #define DEVICE
-#endif
-
-#ifdef __CUDA_ARCH__
-#define HOST __host__
-#else
 #define HOST
+#define MAX(X, Y) std::max((X), (Y))
 #endif
 
 #endif

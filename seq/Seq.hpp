@@ -59,7 +59,7 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
 
     for (auto i = 0; i < c.n; ++i)
     {
-        auto jhigh = min(i, c.jmax);
+        auto jhigh = std::min(i, c.jmax);
         auto alpha = alphas[i];
 
         // Forward iteration step, compute Qs in the next time step
@@ -94,7 +94,7 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
 
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
-        auto jhigh1 = min(i + 1, c.jmax);
+        auto jhigh1 = std::min(i + 1, c.jmax);
         real alpha_val = 0;
         for (auto j = -jhigh1; j <= jhigh1; ++j)
         {
@@ -109,18 +109,18 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
         auto QsT = Qs;
         Qs = QsCopy;
         QsCopy = QsT;
-        fill_n(QsCopy, c.width, 0);
+        std::fill_n(QsCopy, c.width, 0);
     }
 
     // Backward propagation
     auto call = Qs; // call[j]
     auto callCopy = QsCopy;
 
-    fill_n(call, c.width, 100); // initialize to 100$
+    std::fill_n(call, c.width, 100); // initialize to 100$
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
-        auto jhigh = min(i, c.jmax);
+        auto jhigh = std::min(i, c.jmax);
         auto alpha = alphas[i];
         auto isMaturity = i == ((int)(c.t / c.dt));
 
@@ -165,7 +165,7 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
         call = callCopy;
         callCopy = callT;
 
-        fill_n(callCopy, c.width, 0);
+        std::fill_n(callCopy, c.width, 0);
     }
 
     auto result = call[c.jmax];
@@ -178,7 +178,7 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
     return result;
 }
 
-void computeOptions(const Options &options, const Yield &yield, vector<real> &results)
+void computeOptions(const Options &options, const Yield &yield, std::vector<real> &results)
 {
     for (auto i = 0; i < options.N; ++i)
     {

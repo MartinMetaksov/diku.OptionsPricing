@@ -3,8 +3,9 @@
 #include "../common/Args.hpp"
 #include <chrono>
 
-using namespace trinom;
+using namespace std;
 using namespace chrono;
+using namespace trinom;
 
 void computeAllOptions(const Args &args)
 {

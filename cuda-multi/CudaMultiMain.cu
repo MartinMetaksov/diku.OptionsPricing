@@ -2,9 +2,9 @@
 // Define this to turn on error checking
 #define CUDA_ERROR_CHECK
 
-#include "../common/Args.hpp"
 #include "Version1.cuh"
 #include "Version2.cuh"
+#include "../common/Args.hpp"
 
 using namespace std;
 using namespace trinom;

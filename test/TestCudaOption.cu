@@ -8,6 +8,7 @@
 #include "../cuda-multi/Version2.cuh"
 #include "../seq/Seq.hpp"
 
+using namespace std;
 using namespace trinom;
 
 #define YIELD_CURVE_PATH "../data/yield.in" 

@@ -8,8 +8,6 @@
 #include "Real.hpp"
 #include "Arrays.hpp"
 
-using namespace std;
-
 namespace trinom
 {
 
@@ -19,20 +17,20 @@ enum class OptionType : int8_t
     CALL = 1
 };
 
-inline ostream &operator<<(ostream &os, const OptionType t)
+inline std::ostream &operator<<(std::ostream &os, const OptionType t)
 {
     os << static_cast<int>(t);
     return os;
 }
 
-inline istream &operator>>(istream &is, OptionType &t)
+inline std::istream &operator>>(std::istream &is, OptionType &t)
 {
     int c;
     is >> c;
     t = static_cast<OptionType>(c);
     if (OptionType::CALL != t && OptionType::PUT != t)
     {
-        throw out_of_range("Invalid OptionType read from stream.");
+        throw std::out_of_range("Invalid OptionType read from stream.");
     }
     return is;
 }
@@ -40,14 +38,14 @@ inline istream &operator>>(istream &is, OptionType &t)
 struct Options
 {
     int N;
-    vector<real> StrikePrices;
-    vector<real> Maturities;
-    vector<real> Lengths;
-    vector<uint16_t> TermUnits;
-    vector<uint16_t> TermStepCounts;
-    vector<real> ReversionRates;
-    vector<real> Volatilities;
-    vector<OptionType> Types;
+    std::vector<real> StrikePrices;
+    std::vector<real> Maturities;
+    std::vector<real> Lengths;
+    std::vector<uint16_t> TermUnits;
+    std::vector<uint16_t> TermStepCounts;
+    std::vector<real> ReversionRates;
+    std::vector<real> Volatilities;
+    std::vector<OptionType> Types;
 
     Options(const int count)
     {
@@ -62,18 +60,18 @@ struct Options
         Types.reserve(N);
     }
 
-    Options(const string &filename)
+    Options(const std::string &filename)
     {
         if (filename.empty())
         {
-            throw invalid_argument("File not specified.");
+            throw std::invalid_argument("File not specified.");
         }
 
-        ifstream in(filename);
+        std::ifstream in(filename);
 
         if (!in)
         {
-            throw invalid_argument("File '" + filename + "' does not exist.");
+            throw std::invalid_argument("File '" + filename + "' does not exist.");
         }
 
         Arrays::read_array(in, StrikePrices);
@@ -89,18 +87,18 @@ struct Options
         in.close();
     }
 
-    void writeToFile(const string &filename)
+    void writeToFile(const std::string &filename)
     {
         if (filename.empty())
         {
-            throw invalid_argument("File not specified.");
+            throw std::invalid_argument("File not specified.");
         }
 
-        ofstream out(filename);
+        std::ofstream out(filename);
 
         if (!out)
         {
-            throw invalid_argument("File does not exist.");
+            throw std::invalid_argument("File does not exist.");
         }
 
         Arrays::write_array(out, StrikePrices);

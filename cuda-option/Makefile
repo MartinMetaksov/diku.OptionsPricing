@@ -1,4 +1,5 @@
 CXX        = nvcc -std=c++11 #--maxrregcount=32 #--ptxas-options=-v
+DEBUG_OPTIONS = -Xcompiler -rdynamic -lineinfo
 
 SOURCES_CPP =CudaOptionMain.cu
 EXECUTABLE  =../build/CudaOption
@@ -13,6 +14,9 @@ default: compile
 compile: $(EXECUTABLE)
 $(EXECUTABLE): 
 	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
+
+compile-debug: $(EXECUTABLE)
+	@$(CXX) $(DEBUG_OPTIONS) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK)

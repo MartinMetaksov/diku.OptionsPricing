@@ -21,17 +21,17 @@ struct compute_width_height
     __host__ __device__ void operator()(Tuple t)
     {
         // Tuple(TermUnit, TermStepCount, Maturity, ReversionRate, Widths, Height)
-        auto termUnit = t.get<0>();
-        auto termStepCount = t.get<1>();
-        auto maturity = t.get<2>();
-        auto a = t.get<3>();
-        auto termUnitsInYearCount = ceil((real)year / termUnit);
-        auto dt = termUnitsInYearCount / (real)termStepCount;               // [years]
-        auto M = exp(-a * dt) - one;
-        auto jmax = (int)(minus184 / M) + 1;
+        real termUnit = thrust::get<0>(t);
+        real termStepCount = thrust::get<1>(t);
+        real maturity = thrust::get<2>(t);
+        real a = thrust::get<3>(t);
+        int termUnitsInYearCount = ceil((real)year / termUnit);
+        real dt = termUnitsInYearCount / termStepCount;               // [years]
+        real M = exp(-a * dt) - one;
+        int jmax = (int)(minus184 / M) + 1;
 
-        t.get<4>() = 2 * jmax + 1;                                          // width
-        t.get<5>() = termStepCount * termUnitsInYearCount * maturity + 1;   // height + 1
+        thrust::get<4>(t) = 2 * jmax + 1;                                          // width
+        thrust::get<5>(t) = termStepCount * termUnitsInYearCount * maturity + 1;   // height + 1
     }
 };
 
@@ -57,9 +57,9 @@ struct CudaOptions
 {
     int N;
     int YieldSize;
-    const uint16_t *StrikePrices;
-    const uint16_t *Maturities;
-    const uint16_t *Lengths;
+    const real *StrikePrices;
+    const real *Maturities;
+    const real *Lengths;
     const uint16_t *TermUnits;
     const uint16_t *TermStepCounts;
     const real *ReversionRates;
@@ -77,9 +77,9 @@ struct CudaOptions
         const int yieldSize,
         const SortType sort,
         const bool isTest,
-        thrust::device_vector<uint16_t> &strikePrices,
-        thrust::device_vector<uint16_t> &maturities,
-        thrust::device_vector<uint16_t> &lengths,
+        thrust::device_vector<real> &strikePrices,
+        thrust::device_vector<real> &maturities,
+        thrust::device_vector<real> &lengths,
         thrust::device_vector<uint16_t> &termUnits,
         thrust::device_vector<uint16_t> &termStepCounts,
         thrust::device_vector<real> &reversionRates,
@@ -107,7 +107,7 @@ struct CudaOptions
 
         // Fill in widths and heights for all options.
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(termUnits.begin(), termStepCounts.begin(), maturities.begin(), reversionRates.begin(), widths.begin(), heights.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(termUnits.end(), termStepCounts.end(), maturities.end(), reversionRates.end(), heights.end(), heights.end())),
+                     thrust::make_zip_iterator(thrust::make_tuple(termUnits.end(), termStepCounts.end(), maturities.end(), reversionRates.end(), widths.end(), heights.end())),
                      compute_width_height());
 
         if (sort != SortType::NONE)
@@ -125,15 +125,15 @@ struct CudaOptions
             switch (sort)
             {
                 case SortType::WIDTH_ASC:
-                    if (isTest) cout << "Ascending sort, width first, height second" << endl;
+                    if (isTest) std::cout << "Ascending sort, width first, height second" << std::endl;
                 case SortType::HEIGHT_ASC:
-                    if (isTest && sort == SortType::HEIGHT_ASC) cout << "Ascending sort, height first, width second" << endl;
+                    if (isTest && sort == SortType::HEIGHT_ASC) std::cout << "Ascending sort, height first, width second" << std::endl;
                     thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_asc());
                     break;
                 case SortType::WIDTH_DESC:
-                    if (isTest) cout << "Descending sort, width first, height second" << endl;
+                    if (isTest) std::cout << "Descending sort, width first, height second" << std::endl;
                 case SortType::HEIGHT_DESC:
-                    if (isTest && sort == SortType::HEIGHT_DESC) cout << "Descending sort, height first, width second" << endl;
+                    if (isTest && sort == SortType::HEIGHT_DESC) std::cout << "Descending sort, height first, width second" << std::endl;
                     thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_desc());
                     break;
             }
