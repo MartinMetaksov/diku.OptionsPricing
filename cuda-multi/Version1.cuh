@@ -17,12 +17,12 @@ public:
 
     KernelArgsNaive(KernelArgsValues &v) : KernelArgsBase(v) { }
 
-    __device__ inline void setAlphaAt(const int optionIdx, const int index, const real value) override
+    __device__ inline void setAlphaAt(const int optionIdx, const int optionCount, const int index, const real value) override
     {
         values.alphas[values.maxHeight * optionIdx + index] = value;
     }
 
-    __device__ inline real getAlphaAt(const int optionIdx, const int index) override
+    __device__ inline real getAlphaAt(const int optionIdx, const int optionCount, const int index) override
     {
         return values.alphas[values.maxHeight * optionIdx + index];
     }
