@@ -13,14 +13,6 @@ namespace cuda
 
 namespace multi
 {
-        
-struct KernelArgsValues
-{
-    real *res;
-    real *alphas;
-    int32_t *inds;
-    int32_t maxHeight;
-};
 
 /**
 Base class for kernel arguments.
@@ -36,9 +28,15 @@ public:
 
     KernelArgsBase(KernelArgsValuesT &v) : values(v) { }
 
-    __device__ virtual void setAlphaAt(const int optionIdx, const int optionCount, const int index, const real value) = 0;
+    __device__ virtual void init(const int optionIdxBlock, const int idxBlock, const int idxBlockNext, const int optionCount) = 0;
 
-    __device__ virtual real getAlphaAt(const int optionIdx, const int optionCount, const int index) = 0;
+    __device__ virtual void setAlphaAt(const int index, const real value) = 0;
+
+    __device__ virtual real getAlphaAt(const int index) const = 0;
+
+    __device__ virtual int getMaxHeight() const = 0;
+
+    __device__ virtual int getOptionIdx() const = 0;
 };
 
 template<class KernelArgsT>
@@ -52,9 +50,9 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     // Compute option indices and init Qs
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
     const auto idx = idxBlock + threadIdx.x;
-    const auto nextIdx = args.values.inds[blockIdx.x];
+    const auto idxBlockNext = args.values.inds[blockIdx.x];
     int width;
-    if (idx < nextIdx)    // Don't fetch options from next block
+    if (idx < idxBlockNext)    // Don't fetch options from next block
     {
         width = options.Widths[idx];
         optionInds[threadIdx.x] = width;
@@ -70,7 +68,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     __syncthreads();
     
     int scannedWidthIdx = -1;
-    if (idx <= nextIdx)
+    if (idx <= idxBlockNext)
     {
         scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
     }
@@ -80,12 +78,12 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     optionFlags[threadIdx.x] = 0;
     __syncthreads();
 
-    if (idx < nextIdx)
+    if (idx < idxBlockNext)
     {
         optionInds[scannedWidthIdx] = threadIdx.x;
         optionFlags[scannedWidthIdx] = width;
     }
-    else if (idx == nextIdx) // fake option to fill block
+    else if (idx == idxBlockNext) // fake option to fill block
     {
         optionInds[scannedWidthIdx] = threadIdx.x;
         optionFlags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
@@ -97,10 +95,10 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     // Get the option and compute its constants
     OptionConstants c;
-    const auto optionIdx = idxBlock + optionInds[threadIdx.x];
-    if (optionIdx < nextIdx)
+    args.init(optionInds[threadIdx.x], idxBlock, idxBlockNext, options.N);
+    if (args.getOptionIdx() < idxBlockNext)
     {
-        computeConstants(c, options, optionIdx);
+        computeConstants(c, options, args.getOptionIdx());
     }
     else
     {
@@ -109,7 +107,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     }
 
     // Let all threads know about their Q start
-    if (idx <= nextIdx)
+    if (idx <= idxBlockNext)
     {
         optionFlags[threadIdx.x] = scannedWidthIdx;
     }
@@ -122,15 +120,15 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     __syncthreads();
 
     // Set the initial alpha and Q values
-    if (threadIdx.x == scannedWidthIdx && optionIdx < nextIdx)
+    if (threadIdx.x == scannedWidthIdx && args.getOptionIdx() < idxBlockNext)
     {
-        args.setAlphaAt(optionIdx, options.N, 0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
+        args.setAlphaAt(0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
         Qs[scannedWidthIdx + c.jmax] = 1;    // Set starting Qs to 1$
     }
     __syncthreads();
 
     // Forward propagation
-    for (int i = 1; i <= args.values.maxHeight; ++i)
+    for (int i = 1; i <= args.getMaxHeight(); ++i)
     {
         int jhigh = min(i, c.jmax);
 
@@ -140,7 +138,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         real Q = 0;
         if (i <= c.n && j >= -jhigh && j <= jhigh)
         {   
-            auto alpha = args.getAlphaAt(optionIdx, options.N, i - 1);
+            auto alpha = args.getAlphaAt(i - 1);
             auto expp1 = j == jhigh ? zero : Qs[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
             auto expm = Qs[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
             auto expm1 = j == -jhigh ? zero : Qs[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
@@ -213,7 +211,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
         {
             real alpha = computeAlpha(Qexp, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
-            args.setAlphaAt(optionIdx, options.N, i, alpha);
+            args.setAlphaAt(i, alpha);
         }
         Qs[threadIdx.x] = Q;
         __syncthreads();
@@ -222,7 +220,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     // Backward propagation
     Qs[threadIdx.x] = 100; // initialize to 100$
 
-    for (auto i = args.values.maxHeight - 1; i >= 0; --i)
+    for (auto i = args.getMaxHeight() - 1; i >= 0; --i)
     {
         int jhigh = min(i, c.jmax);
 
@@ -234,7 +232,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
         if (i < c.n && j >= -jhigh && j <= jhigh)
         {
-            auto alpha = args.getAlphaAt(optionIdx, options.N, i);
+            auto alpha = args.getAlphaAt(i);
             auto isMaturity = i == ((int)(c.t / c.dt));
             auto callExp = exp(-(alpha + j * c.dr) * c.dt);
 
@@ -275,7 +273,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     if (c.n > 0 && threadIdx.x == scannedWidthIdx)
     {
-        args.values.res[optionIdx] = Qs[scannedWidthIdx + c.jmax];
+        args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + c.jmax];
     }
 }
 
@@ -288,17 +286,15 @@ private:
 protected:
     bool isTest;
     int blockSize;
-    int maxHeight;
     int maxWidth;
 
     virtual void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
 
     template<class KernelArgsT, class KernelArgsValuesT>
-    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values)
+    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values, const int totalAlphasCount)
     {
         const int sharedMemorySize = sizeof(real) * blockSize + sizeof(uint16_t) * blockSize;
-        const int totalAlphasCount = cudaOptions.N * maxHeight;
         thrust::device_vector<real> alphas(totalAlphasCount);
         thrust::device_vector<real> result(cudaOptions.N);
 
@@ -311,7 +307,6 @@ protected:
             std::cout << "Current GPU memory usage " << (memoryTotal - memoryFree) / (1024.0 * 1024.0) << " MB out of " << memoryTotal / (1024.0 * 1024.0) << " MB " << std::endl;
         }
 
-        values.maxHeight = maxHeight;
         values.res = thrust::raw_pointer_cast(result.data());
         values.alphas = thrust::raw_pointer_cast(alphas.data());
         values.inds = thrust::raw_pointer_cast(inds.data());
@@ -371,9 +366,8 @@ public:
         CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
-        // Get the max height and width
+        // Get the max width
         maxWidth = thrust::max_element(widths.begin(), widths.end())[0];
-        maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
 
         if (maxWidth > blockSize)
         {

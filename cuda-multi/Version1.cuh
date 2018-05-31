@@ -10,21 +10,50 @@ namespace cuda
 namespace multi
 {
 
-class KernelArgsNaive : public KernelArgsBase<KernelArgsValues>
+struct KernelArgsValuesNaive
 {
+    real *res;
+    real *alphas;
+    int32_t *inds;
+    int32_t maxHeight;
+};
+
+class KernelArgsNaive : public KernelArgsBase<KernelArgsValuesNaive>
+{
+
+private:
+    
+    int optionIdx;
+    int optionCount;
 
 public:
 
-    KernelArgsNaive(KernelArgsValues &v) : KernelArgsBase(v) { }
+    KernelArgsNaive(KernelArgsValuesNaive &v) : KernelArgsBase(v) { }
 
-    __device__ inline void setAlphaAt(const int optionIdx, const int optionCount, const int index, const real value) override
+    __device__ inline void init(const int optionIdxBlock, const int idxBlock, const int idxBlockNext, const int optionCount)
+    {
+        this->optionIdx = idxBlock + optionIdxBlock;
+        this->optionCount = optionCount;
+    }
+
+    __device__ inline void setAlphaAt(const int index, const real value) override
     {
         values.alphas[values.maxHeight * optionIdx + index] = value;
     }
 
-    __device__ inline real getAlphaAt(const int optionIdx, const int optionCount, const int index) override
+    __device__ inline real getAlphaAt(const int index) const override
     {
         return values.alphas[values.maxHeight * optionIdx + index];
+    }
+
+    __device__ inline int getMaxHeight() const override
+    {
+        return values.maxHeight;
+    }
+
+    __device__ inline int getOptionIdx() const override
+    {
+        return optionIdx;
     }
 };
 
@@ -54,9 +83,13 @@ protected:
 
         thrust::device_vector<int32_t> dInds = hInds;
 
-        KernelArgsValues values;
+        KernelArgsValuesNaive values;
 
-        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, values);
+        // Get the max height
+        values.maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
+        const int totalAlphasCount = cudaOptions.N * values.maxHeight;
+
+        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, values, totalAlphasCount);
     }
 };
 

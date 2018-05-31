@@ -4,6 +4,7 @@
 
 #include "Version1.cuh"
 #include "Version2.cuh"
+#include "Version3.cuh"
 #include "../common/Args.hpp"
 
 using namespace std;
@@ -22,6 +23,12 @@ cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &
         case 2:
         {
             cuda::multi::KernelRunCoalesced kernelRun;
+            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            return kernelRun.runtime;
+        }
+        case 3:
+        {
+            cuda::multi::KernelRunCoalescedBlock kernelRun;
             kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
             return kernelRun.runtime;
         }
@@ -73,7 +80,15 @@ void computeAllOptions(const Args &args)
 
 int main(int argc, char *argv[])
 {
-    Args args(argc, argv);
+    // Args args(argc, argv);
+    Args args;
+    args.options = "../data/options-60000.in";
+    args.yield = "../data/yield.in";
+    args.version = 3;
+    args.blockSize = 256;
+    args.runs = 0;
+    args.test = false;
+    args.sort = SortType::NONE;
 
     computeAllOptions(args);
 

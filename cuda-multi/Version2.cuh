@@ -10,25 +10,51 @@ namespace cuda
 namespace multi
 {
 
-class KernelArgsCoalesced : public KernelArgsBase<KernelArgsValues>
+struct KernelArgsValuesCoalesced
 {
+    real *res;
+    real *alphas;
+    int32_t *inds;
+    int32_t maxHeight;
+};
+
+class KernelArgsCoalesced : public KernelArgsBase<KernelArgsValuesCoalesced>
+{
+
+private:
+
+    int optionIdx;
+    int optionCount;
 
 public:
 
-    KernelArgsCoalesced(KernelArgsValues &v) : KernelArgsBase(v) { }
+    KernelArgsCoalesced(KernelArgsValuesCoalesced &v) : KernelArgsBase(v) { }
     
+    __device__ inline void init(const int optionIdxBlock, const int idxBlock, const int idxBlockNext, const int optionCount)
+    {
+        this->optionIdx = idxBlock + optionIdxBlock;
+        this->optionCount = optionCount;
+    }
 
-
-    __device__ inline void setAlphaAt(const int optionIdx, const int optionCount, const int index, const real value) override
+    __device__ inline void setAlphaAt(const int index, const real value) override
     {
         values.alphas[optionCount * index + optionIdx] = value;
     }
 
-    __device__ inline real getAlphaAt(const int optionIdx, const int optionCount, const int index) override
+    __device__ inline real getAlphaAt(const int index) const override
     {
         return values.alphas[optionCount * index + optionIdx];
     }
 
+    __device__ inline int getMaxHeight() const override
+    {
+        return values.maxHeight;
+    }
+
+    __device__ inline int getOptionIdx() const override
+    {
+        return optionIdx;
+    }
 };
 
 class KernelRunCoalesced : public KernelRunBase
@@ -57,9 +83,13 @@ protected:
 
         thrust::device_vector<int32_t> dInds = hInds;
 
-        KernelArgsValues values;
+        KernelArgsValuesCoalesced values;
 
-        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, values);
+        // Get the max height
+        values.maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
+        const int totalAlphasCount = cudaOptions.N * values.maxHeight;
+
+        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, values, totalAlphasCount);
     }
 };
 
