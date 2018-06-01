@@ -98,10 +98,10 @@ protected:
         hAlphaInds.push_back((hAlphaInds.empty() ? 0 : hAlphaInds.back()) + alphasBlock);
         hInds.push_back(cudaOptions.N);
 
-        for (int i = 0; i < hInds.size(); ++i)
-        {
-            std::cout << "o " << hInds[i] << " a " << hAlphaInds[i] << std::endl;
-        }
+        // for (int i = 0; i < hInds.size(); ++i)
+        // {
+        //     std::cout << "o " << hInds[i] << " a " << hAlphaInds[i] << std::endl;
+        // }
 
         thrust::device_vector<int32_t> dInds = hInds;
         thrust::device_vector<int32_t> dAlphaInds = hAlphaInds;

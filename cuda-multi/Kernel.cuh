@@ -83,7 +83,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         optionInds[scannedWidthIdx] = threadIdx.x;
         optionFlags[scannedWidthIdx] = width;
     }
-    else if (idx == idxBlockNext) // fake option to fill block
+    else if (idx == idxBlockNext && scannedWidthIdx < blockDim.x) // fake option to fill block
     {
         optionInds[scannedWidthIdx] = threadIdx.x;
         optionFlags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
@@ -301,6 +301,7 @@ protected:
         if (isTest)
         {
             std::cout << "Running pricing for " << cudaOptions.N << " options with block size " << blockSize << std::endl;
+            std::cout << "Alphas count " << totalAlphasCount << std::endl;
             cudaDeviceSynchronize();
             size_t memoryFree, memoryTotal;
             cudaMemGetInfo(&memoryFree, &memoryTotal);
@@ -367,14 +368,14 @@ public:
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
         // Get the max width
-        maxWidth = thrust::max_element(widths.begin(), widths.end())[0];
+        // maxWidth = *(thrust::max_element(widths.begin(), widths.end()));
 
-        if (maxWidth > blockSize)
-        {
-            std::ostringstream oss;
-            oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
-            throw std::invalid_argument(oss.str());
-        }
+        // if (maxWidth > blockSize)
+        // {
+        //     std::ostringstream oss;
+        //     oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
+        //     throw std::invalid_argument(oss.str());
+        // }
 
         runPreprocessing(cudaOptions, results, widths, heights);
     }
