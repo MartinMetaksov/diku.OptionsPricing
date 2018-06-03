@@ -12,9 +12,9 @@ import "/futlib/array"
 -- For unsing single-precision floats select
 --    import "header32"
 ------------------------------------------------
-import "header64"
+-- import "header64"
 
--- import "header32"
+import "header32"
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---

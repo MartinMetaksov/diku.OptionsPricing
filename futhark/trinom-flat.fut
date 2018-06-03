@@ -1,11 +1,6 @@
 -- Trinomial option pricing
 -- ==
--- compiled input @ data/small.in
--- output @ data/small.out
---
--- compiled input @ data/options-60000.in
--- output @ data/options-60000.out
-
+-- Run as e.g. $cat options.in yield.in | ./trinom-flat
 
 import "/futlib/math"
 
@@ -13,22 +8,18 @@ import "/futlib/array"
 
 ------------------------------------------------
 -- For using double-precision floats select
---    default(f64)
 --    import "header64"
 -- For unsing single-precision floats select
---    default(f32)
 --    import "header32"
 ------------------------------------------------
---default(f64)
---import "header64"
+-- import "header64"
 
-default(f32)
 import "header32"
 
 ------------------------------------------------------
 --- Pushing the compiler in a direction or another ---
 ------------------------------------------------------
-let FORCE_PER_OPTION_THREAD  = true
+let FORCE_PER_OPTION_THREAD = true
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
@@ -41,497 +32,394 @@ let three= i2r 3
 let six= i2r 6
 let seven= i2r 7
 let year = i2r 365
+let hundred = i2r 100
 
-let round (x : real) : i32 =
-    let tmp = half + (r_abs x)
-    let sgn = if x >= zero then one else (-one)
-    in  r2i (sgn*tmp)
+type YieldCurveData = {
+    P : real  -- Discount Factor function, P(t) gives the yield (interest rate) for a specific period of time t
+  , t : i32   -- Time [days]
+}
+
+type TOptionData = {
+    StrikePrice                 : real   -- X
+  , Maturity                    : real   -- T, [years]
+  , Length                      : real   -- t, [years]
+  , ReversionRateParameter      : real   -- a, parameter in HW-1F model
+  , VolatilityParameter         : real   -- sigma, volatility parameter in HW-1F model
+  , TermUnit                    : u16
+  , TermStepCount               : u16
+  , OptionType                  : i8     -- option type, [0 - Put | 1 - Call]
+}
+
+let OptionType_PUT = i8.i32 0
+let OptionType_CALL = i8.i32 1
+
+-- | As `map5`@term, but with three more arrays.
+let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =
+    map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip as bs cs ds es fs gs hs)
 
 let sgmScanPlus [n] (flags: [n]i32) (data: [n]i32) : [n]i32 =
     (unzip (scan (\(x_flag,x) (y_flag,y) ->
-                     let flag = x_flag | y_flag in
-                     if y_flag != 0
-                     then (flag, y)
-                     else (flag, x + y))
+                        let flag = x_flag | y_flag in
+                        if y_flag != 0
+                        then (flag, y)
+                        else (flag, x + y))
                     (0, 0)
                     (zip flags data))).2
 
 let sgmScanPlusReal [n] (flags: [n]i32) (data: [n]real) : [n]real =
     (unzip (scan (\(x_flag,x) (y_flag,y) ->
-                     let flag = x_flag | y_flag in
-                     if y_flag != 0
-                     then (flag, y)
-                     else (flag, x + y))
+                        let flag = x_flag | y_flag in
+                        if y_flag != 0
+                        then (flag, y)
+                        else (flag, x + y))
                     (0, 0.0)
                     (zip flags data))).2
 
------------------------
---- Data Structures ---
------------------------
+----------------------------------
+--- Yield curve interpolation ---
+----------------------------------
+let getYieldAtYear [ycCount]
+                (t : real)
+                (termUnit : real)
+                (h_YieldCurve : [ycCount]YieldCurveData) : real =
+    let tDays = r2i (r_round (t * termUnit) )
+    let (p1, t1, p2, t2, done) = loop res = (zero, -1, zero, -1, false) for yield in h_YieldCurve do
+        let pi = yield.P
+        let ti = yield.t
+        let (_, _, p2, t2, done) = res
+        in if done then res
+            else if (ti >= tDays) then (p2, t2, pi, ti, true)
+            else (p2, t2, pi, ti, false)
 
-type YieldCurveData = {
-    P : real -- Discount Factor function, P(t) gives the yield (interest rate) for a specific period of time t
-  , t : real -- Time [days]
-}
+    in if (t1 == -1 || done == false) then p2   -- result is the first or last yield curve price
+        else                                     -- linearly interpolate between two consecutive items
+            let coefficient = (i2r (tDays - t1)) / (i2r (t2 - t1))
+            in p1 + coefficient * (p2 - p1)
 
-type TOptionData = {
-    StrikePrice   : real  -- X
-  , Maturity      : real  -- T, [years]
-  , NumberOfTerms : i32   -- n
-  , ReversionRateParameter : real -- a, parameter in HW-1F model
-  , VolatilityParameter    : real -- sigma, volatility parameter in HW-1F model
-}
 
 -----------------------------
 --- Probability Equations ---
 -----------------------------
-
 -- Exhibit 1A (-jmax < j < jmax)
-let PU_A (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M + (i2r j)*M)*half
-let PM_A (j:i32, M:real) : real = two/three - ((i2r(j*j))*M*M )
-let PD_A (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
+let PU_A (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M + (i2r j)*M)*half
+let PM_A (j:i32) (M:real) : real = two/three - ((i2r(j*j))*M*M )
+let PD_A (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
 
 -- Exhibit 1B (j == -jmax)
-let PU_B (j:i32, M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
-let PM_B (j:i32, M:real) : real = -one/three - ((i2r(j*j))*M*M) + two*(i2r j)*M
-let PD_B (j:i32, M:real) : real = seven/six + ((i2r(j*j))*M*M - three*(i2r j)*M)*half
+let PU_B (j:i32) (M:real) : real = one/six + ((i2r(j*j))*M*M - (i2r j)*M)*half
+let PM_B (j:i32) (M:real) : real = -one/three - ((i2r(j*j))*M*M) + two*(i2r j)*M
+let PD_B (j:i32) (M:real) : real = seven/six + ((i2r(j*j))*M*M - three*(i2r j)*M)*half
 
 -- Exhibit 1C (j == jmax)
-let PU_C (j:i32, M:real) : real = seven/six + ((i2r(j*j))*M*M + three*(i2r j)*M)*half
-let PM_C (j:i32, M:real) : real = -one/three - ((i2r(j*j))*M*M) - two*(i2r j)*M
-let PD_C (j:i32, M:real) : real = one/six + ((i2r (j*j))*M*M + (i2r j)*M)*half
+let PU_C (j:i32) (M:real) : real = seven/six + ((i2r(j*j))*M*M + three*(i2r j)*M)*half
+let PM_C (j:i32) (M:real) : real = -one/three - ((i2r(j*j))*M*M) - two*(i2r j)*M
+let PD_C (j:i32) (M:real) : real = one/six + ((i2r (j*j))*M*M + (i2r j)*M)*half
+
+----------------------------------
+--- Wrapper for all equations  ---
+----------------------------------
+let computeJValue (j : i32) (jmax : i32) (M : real) (expout : i32) : real =
+    if (j == -jmax)
+    then 
+        if (expout == 1) then PU_B j M      -- up
+        else if (expout == 2) then PM_B j M -- mid
+        else PD_B j M                       -- down
+    else if (j == jmax)
+    then
+        if (expout == 1) then PU_C j M      -- up
+        else if (expout == 2) then PM_C j M -- mid
+        else PD_C j M                       -- down
+    else
+        if (expout == 1) then PU_A j M      -- up
+        else if (expout == 2) then PM_A j M -- mid
+        else PD_A j M                       -- down
 
 ----------------------------------
 --- forward propagation helper ---
 ----------------------------------
+let fwdHelper (M : real) (dr : real) (dt : real) (alpha : real) (Qs : []real) 
+              (i : i32) (jhigh : i32) (jmax : i32) (j : i32) (jind : i32) : real =  
 
-let fwdHelper (M : real) (dr : real) (dt : real) (alphai : real) (QCopy : []real, beg_ind: i32) 
-              (m : i32) (i : i32) (imax : i32) (jmax : i32) (j : i32) : real = unsafe
-    let eRdt_u1 = r_exp(-((i2r (j+1))*dr + alphai)*dt)
-    let eRdt    = r_exp(-((i2r j    )*dr + alphai)*dt)
-    let eRdt_d1 = r_exp(-((i2r (j-1))*dr + alphai)*dt)
-    in  if i < jmax
-        then let pu = PU_A(j-1, M)
-             let pm = PM_A(j  , M)
-             let pd = PD_A(j+1, M)
-             in  if (i == 0 && j == 0 ) then pm*QCopy[beg_ind+j+m]*eRdt
-                 else if (j == -imax+1) then pd*QCopy[beg_ind+j+m+1]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt
-                 else if (j == imax-1 ) then pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j+m-1]*eRdt_d1
-                 else if (j == 0-imax ) then pd*QCopy[beg_ind+j+m+1]*eRdt_u1
-                 else if (j == imax   ) then pu*QCopy[beg_ind+j+m-1]*eRdt_d1
-                 else pd*QCopy[beg_ind+j+m+1]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j+m-1]*eRdt_d1
-        else if (j == jmax) 
-                then let pm = PU_C(j  , M)
-                     let pu = PU_A(j-1, M)
-                     in  pm*QCopy[beg_ind+j+m]*eRdt +  pu*QCopy[beg_ind+j-1+m] * eRdt_d1
-             else if(j == jmax - 1)
-                then let pd = PM_C(j+1, M)
-                     let pm = PM_A(j  , M)
-                     let pu = PU_A(j-1, M)
-                     in  pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j-1+m]*eRdt_d1
-             else if (j == jmax - 2)
-                then let eRdt_u2 = r_exp(-( (i2r(j+2))*dr + alphai ) * dt)
-                     let pd_c = PD_C(j + 2, M)
-                     let pd   = PD_A(j + 1, M)
-                     let pm   = PM_A(j, M)
-                     let pu   = PU_A(j - 1, M)
-                     in  pd_c*QCopy[beg_ind+j+2+m]*eRdt_u2 + pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j-1+m]*eRdt_d1
-             else if (j == -jmax + 2)
-                then let eRdt_d2 = r_exp(-((i2r (j-2))*dr + alphai)*dt)
-                     let pd   = PD_A(j + 1, M)
-                     let pm   = PM_A(j, M)
-                     let pu   = PU_A(j - 1, M)
-                     let pu_b = PU_B(j - 2, M)
-                     in  pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j-1+m]*eRdt_d1 + pu_b*QCopy[beg_ind+j-2+m]*eRdt_d2
-             else if (j == -jmax + 1)
-                then let pd = PD_A(j + 1, M)
-                     let pm = PM_A(j, M)
-                     let pu = PM_B(j - 1, M)
-                     in  pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j-1+m]*eRdt_d1
-             else if (j == -jmax)
-                then let pd = PD_A(j + 1, M)
-                     let pm = PD_B(j, M)
-                     in  pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt
-             else    
-                     let pd = PD_A(j + 1, M)
-                     let pm = PM_A(j, M)
-                     let pu = PU_A(j - 1, M)
-                     in  pd*QCopy[beg_ind+j+1+m]*eRdt_u1 + pm*QCopy[beg_ind+j+m]*eRdt + pu*QCopy[beg_ind+j-1+m]*eRdt_d1
+    let expp1 = if (j == jhigh) then zero else Qs[jind + 1] * r_exp (-(alpha + (i2r (j + 1)) * dr) * dt)
+    let expm = Qs[jind] * r_exp (-(alpha + (i2r j) * dr) * dt)
+    let expm1 = if (j == -jhigh) then zero else Qs[jind - 1] * r_exp(-(alpha + (i2r (j - 1)) * dr) * dt)
+
+    in
+    if (i == 1)
+    then
+        if (j == -jhigh) then (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == jhigh) then (computeJValue (j - 1) jmax M 1) * expm1
+        else (computeJValue j jmax M 2) * expm
+    else if (i <= jmax)
+    then
+        if (j == -jhigh) then (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == -jhigh + 1)
+            then (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == jhigh) then (computeJValue (j - 1) jmax M 1) * expm1
+        else if (j == jhigh - 1)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 2) * expm
+        else
+            (computeJValue (j - 1) jmax M 1) * expm1 +
+            (computeJValue j jmax M 2) * expm +
+            (computeJValue (j + 1) jmax M 3) * expp1
+    else
+        if (j == -jhigh)
+            then (computeJValue j jmax M 3) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+        else if (j == -jhigh + 1)
+            then (computeJValue (j - 1) jmax M 2) * expm1 +
+                (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 3) * expp1
+                    
+        else if (j == jhigh)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 1) * expm
+        else if (j == jhigh - 1)
+            then (computeJValue (j - 1) jmax M 1) * expm1 +
+                (computeJValue j jmax M 2) * expm +
+                (computeJValue (j + 1) jmax M 2) * expp1
+                    
+        else
+            (if (j == -jhigh + 2) then (computeJValue (j - 2) jmax M 1) * Qs[jind - 2] * r_exp (-(alpha + (i2r (j - 2)) * dr) * dt) else zero) +
+            (computeJValue (j - 1) jmax M 1) * expm1 +
+            (computeJValue j jmax M 2) * expm +
+            (computeJValue (j + 1) jmax M 3) * expp1 +
+            (if (j == jhigh - 2) then (computeJValue (j + 2) jmax M 3) * Qs[jind + 2] * r_exp (-(alpha + (i2r (j + 2)) * dr) * dt) else zero)
+
 
 -----------------------------------
 --- backward propagation helper ---
 -----------------------------------
-let bkwdHelper (X : real) (M : real) (dr : real) (dt : real) (alphai : real) 
-               (CallCopy : []real, beg_ind: i32) (m : i32) (i : i32) (jmax : i32) (j : i32) : real = unsafe
-                let eRdt = r_exp(-((i2r j)*dr + alphai)*dt)
-                let res =
-                  if (i < jmax)
-                  then -- central node
-                     let pu = PU_A(j, M)
-                     let pm = PM_A(j, M)
-                     let pd = PD_A(j, M)
-                     in  (pu*CallCopy[beg_ind+j+m+1] + pm*CallCopy[beg_ind+j+m] + pd*CallCopy[beg_ind+j+m-1]) * eRdt
-                  else if (j == jmax)
-                        then -- top node
-                             let pu = PU_C(j, M)
-                             let pm = PM_C(j, M)
-                             let pd = PD_C(j, M)
-                             in  (pu*CallCopy[beg_ind+j+m] + pm*CallCopy[beg_ind+j+m-1] + pd*CallCopy[beg_ind+j+m-2]) * eRdt
-                       else if (j == -jmax)
-                        then -- bottom node
-                             let pu = PU_B(j, M)
-                             let pm = PM_B(j, M)
-                             let pd = PD_B(j, M)
-                             in  (pu*CallCopy[beg_ind+j+m+2] + pm*CallCopy[beg_ind+j+m+1] + pd*CallCopy[beg_ind+j+m]) * eRdt
-                       else    -- central node
-                             let pu = PU_A(j, M)
-                             let pm = PM_A(j, M)
-                             let pd = PD_A(j, M)
-                             in  (pu*CallCopy[beg_ind+j+m+1] + pm*CallCopy[beg_ind+j+m] + pd*CallCopy[beg_ind+j+m-1]) * eRdt
+let bkwdHelper (X : real) (op : i8) (M : real) (dr : real) (dt : real) (alpha : real) 
+               (call : []real) (jmax : i32) (j : i32) (jind : i32) (isMaturity : bool) : real = 
+    let callExp = r_exp(-(alpha + (i2r j) * dr) * dt)
+    let res =
+        if (j == jmax) then
+            -- Top edge branching
+            ((computeJValue j jmax M 1) * call[jind] +
+            (computeJValue j jmax M 2) * call[jind - 1] +
+            (computeJValue j jmax M 3) * call[jind - 2]) *
+                callExp
+        else if (j == -jmax) then
+            -- Bottom edge branching
+            ((computeJValue j jmax M 1) * call[jind + 2] +
+            (computeJValue j jmax M 2) * call[jind + 1] +
+            (computeJValue j jmax M 3) * call[jind]) *
+                callExp
+        else
+            -- Standard branching
+            ((computeJValue j jmax M 1) * call[jind + 1] +
+            (computeJValue j jmax M 2) * call[jind] +
+            (computeJValue j jmax M 3) * call[jind - 1]) *
+                callExp
 
-                -- TODO (WMP) This should be parametrized; length of contract, here 3 years
-                in if (i == (r2i (three / dt))) 
-                    then r_max(X - res, zero)
-                    else res
-
+    in if isMaturity
+        then
+            if (op == OptionType_PUT)
+            then r_max(X - res, zero)
+            else r_max(res - X, zero)
+        else res
 
 
 let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
-                   (h_YieldCurve : [ycCount]YieldCurveData)
-                   (options : [numAllOptions]TOptionData) 
-                   (w: i32)
-                   (n_max : i32)
-                   (optionsInChunk: i32, optionIndices: [maxOptionsInChunk]i32)
-                 : [maxOptionsInChunk]real = unsafe
-  if FORCE_PER_OPTION_THREAD && ( (options[optionIndices[0]]).StrikePrice < 0.0) 
-     then (replicate maxOptionsInChunk 0.0) else
-  -- header: get the options
-  let (Xs, ns, dts, drs, Ms, jmaxs, ms) = unzip (
-    map (\i -> if (i < 0)
-               then (1.0, 0, 1.0, 1.0, 1.0, -1, -1)
-               else
+    (h_YieldCurve : [ycCount]YieldCurveData)
+    (options : [numAllOptions]TOptionData) 
+    (w: i32)
+    (max_height : i32)
+    (optionsInChunk: i32, optionIndices: [maxOptionsInChunk]i32)
+  : [maxOptionsInChunk]real = unsafe
+        if FORCE_PER_OPTION_THREAD && ( (options[optionIndices[0]]).StrikePrice < 0.0) 
+        then (replicate maxOptionsInChunk zero) else
+        -- header: get the options
+        let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths) = unzip (
+            map (\i -> if (i < 0)
+            then (1.0, 0, 1.0, 1.0, 0, 1.0, 1.0, 1.0, -1, -1)
+            else
                 let option = unsafe options[i]
                 let X  = option.StrikePrice
                 let T  = option.Maturity
-                let n  = option.NumberOfTerms
-                let dt = T / (i2r n)
-                let a  = option.ReversionRateParameter
+                let len  = option.Length
+                let op = option.OptionType
+                let termUnit = ui2r option.TermUnit
+                let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
+                let dt = (i2r termUnitsInYearCount) / (ui2r option.TermStepCount)
+                let n = r2i ((ui2r option.TermStepCount) * (i2r termUnitsInYearCount) * T)
+                let a = option.ReversionRateParameter
                 let sigma = option.VolatilityParameter
-                let V  = sigma*sigma*( one - (r_exp (0.0 - 2.0*a*dt)) ) / (2.0*a)
-                let dr = r_sqrt( (1.0+2.0)*V )
-                let M  = (r_exp (0.0 - a*dt)) - 1.0
+                let V  = sigma*sigma*( one - (r_exp (zero - two*a*dt)) ) / (two*a)
+                let dr = r_sqrt( (one+two)*V )
+                let M  = (r_exp (zero - a*dt)) - one
                 let jmax = r2i (- 0.184 / M) + 1
-                let m  = jmax + 2
-                in  (X, n, dt, dr, M, jmax, m)
-        ) optionIndices
-    )
+                let width = 2 * jmax + 1
+                in  (X, op, len, termUnit, n, dt, dr, M, jmax, width)
+        ) optionIndices)
 
-  -- make the flag array (probably usefull for segmented scan/reduce operations)
-  let map_lens   = map2  (\m i -> if i < optionsInChunk then 2*m + 1 else 0) 
-                        ms (iota maxOptionsInChunk)
-  let scanned_lens = scan (+) 0 map_lens
-  let len_valinds= map2  (\i m -> if i == 0 then (0, m) 
-                                 else if i < optionsInChunk
-                                      then (scanned_lens[i-1], m)
-                                      else let last_ind = scanned_lens[optionsInChunk-1]
-                                           in  if last_ind < w 
-                                               then (last_ind, w - last_ind)
-                                               else (-1, 0)
-                        ) (iota maxOptionsInChunk) map_lens
-  let (len_inds, len_vals) = unzip len_valinds
-  let flags = scatter (replicate w 0) len_inds len_vals
+    -- make the flag array (probably usefull for segmented scan/reduce operations)
+    let map_lens = map2 (\w i -> if i < optionsInChunk then w else 0) widths (iota maxOptionsInChunk)
+    let scanned_lens = scan (+) 0 map_lens
+    let len_valinds = map2 (\m i -> 
+        if i == 0 then (0, m) 
+        else if i < optionsInChunk then (scanned_lens[i-1], m)
+        else 
+            let last_ind = scanned_lens[optionsInChunk-1]
+            in  if last_ind < w 
+                then (last_ind, w - last_ind)
+                else (-1, 0)
+    ) map_lens (iota maxOptionsInChunk)
 
-  -- make the flat segment-index array
-  let sgm_inds = scatter (replicate w 0)
-                         len_inds
-                         (iota maxOptionsInChunk)
-  let sgm_inds = sgmScanPlus flags sgm_inds
+    let (len_inds, len_vals) = unzip len_valinds
+    let flags = scatter (replicate w 0) len_inds len_vals
 
-  -- make the segmented (iota (2*m+1)) across all ms
-  let iota2mp1_p1 = sgmScanPlus flags (replicate w 1)
-  let iota2mp1    = map (\x->x-1) iota2mp1_p1
+    -- make the flat segment-index array
+    let sgm_inds = scatter (replicate w 0) len_inds (iota maxOptionsInChunk)
+    -- sgm_inds can be used to access the index of the current option
+    let sgm_inds = sgmScanPlus flags sgm_inds
+    
+    -- make the segmented (iota (2*m+1)) across all widths
+    let q_lens = map (\x->x-1) (sgmScanPlus flags (replicate w 1))
 
-  -- make the replicated segment lengths
-  -- let len_flat = sgmScanPlus flags flags
+    let Qs = map2 (\i k -> if i == jmaxs[sgm_inds[k]] then one else zero) q_lens (iota w)
 
-  -- Q = map (\i -> if i == m then one else zero) (iota (2 * m + 1))
-  let Qs = map2 (\i k -> if i == ms[sgm_inds[k]] then 1.0 else 0.0 
-               ) iota2mp1 (iota w)
+    let seq_len = max_height + 1
+    let total_len = maxOptionsInChunk*seq_len
+    let alphas = replicate (maxOptionsInChunk * seq_len) zero
+    let alphas = scatter alphas
+        ( map (\i -> i*seq_len) (iota maxOptionsInChunk) )
+        ( map (\i -> getYieldAtYear dts[i] tus[i] h_YieldCurve) (iota maxOptionsInChunk) )
 
-  -- alphas = replicate (n + 1) zero
-  -- alphas[0] = #P (h_YieldCurve[0])
-  -- for simplicity we pad this
-  let seq_len = n_max+1
-  let alphass = replicate (maxOptionsInChunk * seq_len) 0.0
-  let alphass = scatter alphass 
-                        ( map (\i->i*seq_len) (iota maxOptionsInChunk) )
-                        ( replicate maxOptionsInChunk  (h_YieldCurve[0]).P )
-  --let alphass = reshape ((maxOptionsInChunk,seq_len)) alphass
+    -------------------------
+    -- FORWARD PROPAGATION --
+    -------------------------
+    let (_,alphas) = loop (Qs: *[w]real, alphas: *[total_len]real) for i < max_height do
+        let jhighs = map (\jmax -> i32.min (i+1) jmax) jmaxs
+        let QsCopy = copy Qs
 
-  -- compute n_maxInChunk
-  -- let n_maxInChunk = reduce (\x y -> i32.max x y) (-1) ns
-  let n_maxInChunk = n_max
+        let Qs = map2 (\jind wind ->
+            let opt_ind = sgm_inds[wind]
+            let j = jind - jmaxs[opt_ind] in
+                if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
+                else fwdHelper Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len+i] QsCopy (i + 1) jhighs[opt_ind] jmaxs[opt_ind] j wind
+        ) (q_lens) (iota w)
 
-  -- time stepping
-  let ((Qs,alphass)) = loop ((Qs,alphass)) for i < n_maxInChunk do
-      let imaxs = map (\jmax -> i32.min (i+1) jmax) jmaxs
+        -- compute tmps
+        let tmps = map2 (\jind wind ->
+            let opt_ind = sgm_inds[wind]
+            let j = jind - jmaxs[opt_ind] in
+                if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
+                else Qs[wind] * r_exp (-(i2r j) * drs[opt_ind] * dts[opt_ind])
+        ) (q_lens) (iota w)
+                
+        -- sum up Qs
+        let alpha_vals = sgmScanPlusReal flags tmps 
+        let alpha_vals = map (\opt_ind -> 
+            if (opt_ind >= optionsInChunk || i >= (ns[opt_ind])) then zero
+            else 
+                let t = (i2r (i+2)) * dts[opt_ind]
+                let R = getYieldAtYear t tus[opt_ind] h_YieldCurve
+                let P = r_exp(-R * t)
+                in (r_log (alpha_vals[scanned_lens[opt_ind]-1] / P) ) / dts[opt_ind]
+        ) (iota maxOptionsInChunk)
 
-      -- Reset
-      -- QCopy[m - imax : m + imax + 1] = Q[m - imax : m + imax + 1]
-      let QCopys' = copy Qs
+        let alpha_indvals = map (\opt_ind->opt_ind*seq_len + i + 1) (iota maxOptionsInChunk)
+        let alphas = scatter alphas alpha_indvals alpha_vals
+    in  (Qs,alphas)
 
-      ----------------------------
-      -- forward iteration step --
-      ----------------------------
+    --------------------------
+    -- BACKWARD PROPAGATION --
+    --------------------------
+    let call = map (\wind -> if (wind < scanned_lens[maxOptionsInChunk - 1]) then hundred else zero) (iota w)
 
-      -- Q = map (\j -> if (j < (-imax)) || (j > imax)
-      --                then zero -- Q[j + m]
-      --                else fwdHelper M dr dt (alphas[i]) QCopy m i imax jmax j
-      --         ) (map (-m) (iota (2*m+1)))
-      let Qs'= map2 (\jj w_ind -> let sgm_ind = sgm_inds[w_ind] in
-                               if sgm_ind >= optionsInChunk || i >= ns[sgm_ind]
-                               then 0.0
-                               else let imax = imaxs[sgm_ind]
-                                    let m    = ms[sgm_ind] 
-                                    let j    = jj - m in
-                                    if (j < (-imax)) || (j > imax)
-                                    then 0.0
-                                    else -- unsafe
-                                         let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1] in
-                                         fwdHelper (Ms[sgm_ind]) (drs[sgm_ind]) (dts[sgm_ind]) 
-                                                   (alphass[sgm_ind*seq_len+i]) (QCopys',begind) 
-                                                   m i imax (jmaxs[sgm_ind]) j
-                   ) iota2mp1 (iota w)
-      --------------------------      
-      -- determine new alphas --
-      --------------------------
+    let call = loop (call: *[w]real) for ii < max_height do
+        let i = max_height - 1 - ii 
+        let jhighs = map (\jmax -> i32.min i jmax) jmaxs
+        
+        -- Copy array values to avoid overwriting during update
+        let callCopy = copy call
 
-      -- tmps= map (\jj -> let j = jj - imax in
-      --                   if (j < (-imax)) || (j > imax) then zero 
-      --                   else unsafe Q[j+m] * r_exp(-(i2r j)*dr*dt)
-      --           ) (iota (2*m+1))--(iota (2*imax+1))
-      -- alpha_val = reduce (+) zero tmps
-      let tmpss = map2 (\ jj w_ind ->
-                            let sgm_ind = sgm_inds[w_ind]
-                            let imax    = imaxs[sgm_ind]
-                            let j       = jj - imax in
-                            if (j < (-imax)) || (j > imax) || 
-                               (sgm_ind >= optionsInChunk) || (i >= ns[sgm_ind]) 
-                            then 0.0
-                            else -- unsafe
-                                 let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1]
-                                 in  Qs'[begind+j+ms[sgm_ind]] * r_exp(-(i2r j)*drs[sgm_ind]*dts[sgm_ind])
-                      ) iota2mp1 (iota w)
-      let tmpss_scan = sgmScanPlusReal flags tmpss
-      let (inds, vals) = unzip (           -- INCORRECT, w-1 might not be the end of a segment
-                            map (\w_ind -> if w_ind == w-1 then (sgm_inds[w_ind],tmpss_scan[w_ind])
-                                      else if sgm_inds[w_ind] != sgm_inds[w_ind+1]
-                                           then -- last element in a segment
-                                                (sgm_inds[w_ind], tmpss_scan[w_ind])
-                                           else (-1, 0.0) 
-                                ) (iota w)
-                          )
-      let alpha_vals = scatter (replicate maxOptionsInChunk 0.0) inds vals
-                                
-      ----------------------------------
-      -- interpolation of yield curve --
-      ----------------------------------
-      let Ps = map (\sgm_ind -> 
-                        if (sgm_ind >= optionsInChunk) || (i >= ns[sgm_ind]) 
-                        then 1.0
-                        else --  t = (i2r (i+1))*dt + one -- plus one year
-                             let t = (i2r (i+1))*dts[sgm_ind] + 1.0
-                             let t2 = round t
-                             let t1 = t2 - 1
-                             let (t2, t1) = 
-                                    if (t2 >= ycCount)
-                                    then (ycCount - 1, ycCount - 2)
-                                    else (t2         , t1         )
-                             let R = -- unsafe
-                                ( (h_YieldCurve[t2]).P - (h_YieldCurve[t1]).P ) / 
-                                ( (h_YieldCurve[t2]).t - (h_YieldCurve[t1]).t ) *
-                                ( t*year - (h_YieldCurve[t1]).t ) + (h_YieldCurve[t1]).P
-                             let P = r_exp(-R*t)
-                             in  P
-                   ) (iota maxOptionsInChunk)      
-      
-      let alpha_vals = map2 (\alpha_val P -> r_log (alpha_val / P)) alpha_vals Ps
+        let call =
+            map2 (\jind wind -> 
+                let opt_ind = sgm_inds[wind] in
+                if (i >= ns[opt_ind]) then callCopy[wind]
+                else
+                    let j = jind - jmaxs[opt_ind] in
+                    if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
+                    else bkwdHelper Xs[opt_ind] ops[opt_ind] Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len+i] callCopy jmaxs[opt_ind] j wind (i == (r2i (lens[opt_ind] / dts[opt_ind])))
+            ) (q_lens) (iota w)
+    in call
 
-      -------------------------------  
-      -- alphas[i + 1] = alpha_val --
-      -------------------------------
-      let alpha_inds = map (\k -> if (k < optionsInChunk) && (i < ns[k])
-                                  then k*seq_len+(i+1)  -- ok, it is in range
-                                  else -1 -- either not a valid option or 
-                                          -- out of the convergence-loop range
-                           ) (iota maxOptionsInChunk)
-
-      let alphass' = scatter alphass alpha_inds alpha_vals
-
-      in  (Qs', alphass')
-
-  ------------------------------------------------------------
-  --- Compute values at expiration date:
-  --- call option value at period end is V(T) = S(T) - X
-  --- if S(T) is greater than X, or zero otherwise.
-  --- The computation is similar for put options.
-  ------------------------------------------------------------
-  -- Call = map (\j -> if (j >= -jmax+m) && (j <= jmax + m)
-  --                   then one else zero
-  --            ) (iota (2*m+1))
-  -- CallCopy = replicate (2 * m + 1) zero
-
-  let Calls = map2 (\ j w_ind -> let sgm_ind = sgm_inds[w_ind]
-                                let (jmax,m) = (jmaxs[sgm_ind],ms[sgm_ind]) in
-                                if (j >= -jmax+m) && (j <= jmax + m)
-                                then 1.0 else 0.0
-                  ) iota2mp1 (iota w)
-
-  ----------------------
-  -- back propagation --
-  ----------------------
-  let (Calls) = loop (Calls) for ii < n_maxInChunk do  -- condition is ii < ns[sgm_ind]
-      -- i = n - 1 - ii
-      let is = map (\sgm_ind -> if sgm_ind >= optionsInChunk then 0
-                                else ns[sgm_ind] - 1 - ii 
-                   ) (iota maxOptionsInChunk)
-      let imaxs = map2 (\jmax i -> i32.min (i+1) jmax) jmaxs is
-      
-      ----------------------------------------------------------
-      -- Copy array values to avoid overwriting during update --
-      ----------------------------------------------------------
-      -- CallCopy[m - imax : m + imax + 1] = Call[m - imax : m + imax + 1]
-      let CallCopys' = copy Calls
-
-      -----------------------------
-      -- backward iteration step --
-      -----------------------------
-      -- Calls' = -- 1. result of size independent of i (hoistable)
-      --          map (\j -> if (j < (-imax)) || (j > imax)
-      --                     then zero -- Call[j + m]
-      --                     else bkwdHelper X M dr dt (alphas[i]) CallCopy m i jmax j
-      --              ) (map (-m) (iota (2*m+1)))
-      let Calls' = map2  (\jj w_ind -> 
-                            let sgm_ind = sgm_inds[w_ind] in
-                            let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1] in
-                            if  sgm_ind >= optionsInChunk || ii >= ns[sgm_ind]
-                            then Calls[begind+jj]
-                            else let imax = imaxs[sgm_ind]
-                                 let i    = is[sgm_ind]
-                                 let m    = ms[sgm_ind] 
-                                 let j    = jj - m in
-                                 if (j < (-imax)) || (j > imax)
-                                    then Calls[begind+jj] -- 0.0
-                                    else -- unsafe
-                                         bkwdHelper (Xs[sgm_ind]) (Ms[sgm_ind]) (drs[sgm_ind]) 
-                                                    (dts[sgm_ind]) (alphass[sgm_ind*seq_len+i]) 
-                                                    (CallCopys', begind) (ms[sgm_ind]) 
-                                                    i (jmaxs[sgm_ind]) j
-                        )
-                        iota2mp1 (iota w)
-
-      in  (Calls')
-
-------------------
---  in Calls[m] --
-------------------
-  let (inds, vals) = unzip (
+    -- reshape result
+    let (inds, vals) = unzip (
         map (\sgm_ind -> if (sgm_ind >= optionsInChunk)
-                   then (-1, 0.0) -- out of range
-                   else let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1]
-                        let m_ind  = begind+ms[sgm_ind]
-                        in  (sgm_ind, Calls[m_ind])
+                then (-1, 0.0)
+                else let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1]
+                    let m_ind  = begind+jmaxs[sgm_ind]
+                    in  (sgm_ind, call[m_ind])
             ) (iota maxOptionsInChunk)
     )
-  let res = scatter (replicate maxOptionsInChunk 0.0) inds vals
-  in  res
+    let res = scatter (replicate maxOptionsInChunk 0.0) inds vals
+in res
 
--------------------------
--- Static Yield Curve
--------------------------
-
-let h_YieldCurve = [ { P = 0.0501772, t = 3.0    }
-                   , { P = 0.0509389, t = 367.0  }
-                   , { P = 0.0579733, t = 731.0  }
-                   , { P = 0.0630595, t = 1096.0 }
-                   , { P = 0.0673464, t = 1461.0 }
-                   , { P = 0.0694816, t = 1826.0 }
-                   , { P = 0.0708807, t = 2194.0 }
-                   , { P = 0.0727527, t = 2558.0 }
-                   , { P = 0.0730852, t = 2922.0 }
-                   , { P = 0.0739790, t = 3287.0 }
-                   , { P = 0.0749015, t = 3653.0 }
-                   ]
-
--- trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
---                   (h_YieldCurve : [ycCount]YieldCurveData)
---                   (w: i32)
---                   (n_max : i32)
---                   (optionIndices: [maxOptionsInChunk]i32)
---                   (optionsInChunk: i32)
---                   (options : [numAllOptions]TOptionData) 
---                 : [maxOptionsInChunk]real
 let formatOptions [numOptions]
-                  (w: i32)
-                  (options : [numOptions]TOptionData)
-                -- (n_max, maxOptionsInChunk, optionsInChunk, optionIndices) 
-                : (i32, i32, [](i32, []i32)) = -- unsafe
-  let (ns, ms) = unzip (
-    map (\option -> 
+    (w: i32)
+    (options : [numOptions]TOptionData)
+    : (i32, [](i32, []i32)) = 
+        let (heights, widths) = unzip (
+            map (\option ->
                 let T  = option.Maturity
-                let n  = option.NumberOfTerms
-                let dt = T / (i2r n)
-                let a  = option.ReversionRateParameter
-                -- let sigma = option.VolatilityParameter
-                let M  = (r_exp (0.0 - a*dt)) - 1.0
+                let termUnit = ui2r option.TermUnit
+                let termStepCount = ui2r option.TermStepCount                        
+                let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
+                let n = r2i (termStepCount * (i2r termUnitsInYearCount) * T)
+                let dt = (i2r termUnitsInYearCount) / termStepCount                        
+                let a = option.ReversionRateParameter
+                let M = (r_exp (zero - a*dt)) - one
                 let jmax = r2i (- 0.184 / M) + 1
-                let m  = jmax + 2
-                in  (n+1, 2*m+1)
-        ) options
-    )
-  let n_max = reduce (\x y -> i32.max x y) 0 ns
-  let m_max = reduce (\x y -> i32.max x y) 0 ms
+                in  (n, 2*jmax+1)
+            ) options )
+        
+        let max_height = reduce (\x y -> i32.max x y) 0 heights
+        let max_width = reduce (\x y -> i32.max x y) 0 widths
 
-  let maxOptionsInChunk = w / m_max
-  let num_chunks = (numOptions + maxOptionsInChunk - 1) / maxOptionsInChunk
-  let chunks = map (\ c_ind ->
-                              let num = if c_ind == num_chunks - 1 
-                                        then numOptions - c_ind*maxOptionsInChunk
-                                        else maxOptionsInChunk
-                              let arr = 
-                                map (\ i -> let opt_ind = c_ind*maxOptionsInChunk + i in  
-                                            if opt_ind < numOptions then opt_ind else (-1)
-                                    ) (iota maxOptionsInChunk)
-                              in (num, arr)
-                          )
-                          (iota num_chunks)
-  in  (n_max, maxOptionsInChunk, chunks)
-   
+        let maxOptionsInChunk = w / max_width
+        let num_chunks = (numOptions + maxOptionsInChunk - 1) / maxOptionsInChunk
+        let chunks = map (\ c_ind ->
+                            let num = if c_ind == num_chunks - 1 
+                                then numOptions - c_ind*maxOptionsInChunk
+                                else maxOptionsInChunk
+                            let arr = 
+                            map (\ i -> 
+                                    let opt_ind = c_ind*maxOptionsInChunk + i in  
+                                    if opt_ind < numOptions then opt_ind else (-1)
+                                ) (iota maxOptionsInChunk)
+                            in (num, arr)) (iota num_chunks)
+        in  (max_height, chunks)
 
 -----------------
--- Entry point
+-- Entry point --
 -----------------
-let main [q] (strikes    : [q]real)
-             (maturities : [q]real) 
-             (numofterms : [q]i32 ) 
-             (rrps       : [q]real) 
-             (vols       : [q]real) 
-           : [q]real =
+let main [q] [y] (strikes           : [q]real)
+                 (maturities        : [q]real) 
+                 (lenghts           : [q]real)
+                 (termunits         : [q]u16) 
+                 (termstepcounts    : [q]u16) 
+                 (rrps              : [q]real) 
+                 (vols              : [q]real) 
+                 (types             : [q]i8)
+                 (yield_p           : [y]real)
+                 (yield_t           : [y]i32) : 
+                 []real =
 
-  let options = map5 (\s m n r v -> { StrikePrice=s, Maturity=m, NumberOfTerms=n,
-                                       ReversionRateParameter=r, VolatilityParameter=v }
-                    ) strikes maturities numofterms rrps vols
+  let yield = map2 (\p d -> {P = p, t = d}) yield_p yield_t
 
-  let w = 256
-  let (n_max, maxOptionsInChunk, chunks) = formatOptions w options
-  let chunkRes = -- : [maxOptionsInChunk]real
-        map (trinomialChunk h_YieldCurve options w n_max) chunks
+  let options = map8 (\s m l u c r v t -> 
+    {StrikePrice=s, Maturity=m, Length=l, TermUnit=u, TermStepCount=c, 
+    ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }) 
+      strikes maturities lenghts termunits termstepcounts rrps vols types
+  
+  let w = 64
+  let (max_height, chunks) = formatOptions w options
+  let chunkRes = unsafe (map (trinomialChunk yield options w max_height) chunks)
       
-  let num_chunks = length chunkRes
-  let res_flat = reshape (num_chunks*maxOptionsInChunk) chunkRes
-  let (res,_) = split (q) res_flat
-  in  res
-
-
-
-
+  in flatten chunkRes
