@@ -78,11 +78,12 @@ void genOneLargeOption(vector<RandOption> &options, int &totalHeight, int &total
     }
 }
 
-void genMultLargeOptions(vector<RandOption> &options, int &totalHeight, int &totalWidth, int &currentTotalHeight, int &currentTotalWidth)
+void genMultLargeOptions(vector<RandOption> &options, int &totalHeight, int &totalWidth, int &currentTotalHeight, int &currentTotalWidth, int &skewPercent)
 {
     int loHeight = 0;
 
-    while (loHeight < totalHeight / 2)
+    // while (loHeight < totalHeight / 2)
+    while (loHeight < totalHeight * (skewPercent/100))
     {
         RandOption o(4 * 9, 277, 0.1);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
@@ -144,7 +145,8 @@ int main(int argc, char *argv[])
     }
     else if (type == 2)
     {
-        genMultLargeOptions(randOptions, totalHeight, totalWidth, currentTotalHeight, currentTotalWidth);
+        int skewPercent = 10;
+        genMultLargeOptions(randOptions, totalHeight, totalWidth, currentTotalHeight, currentTotalWidth, skewPercent);
     }
 
     while (true)
