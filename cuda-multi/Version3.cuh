@@ -24,7 +24,7 @@ class KernelArgsCoalescedBlock : public KernelArgsBase<KernelArgsValuesCoalesced
 private:
 
     int optionIdx;
-    int alphaIdx;
+    int alphaIdxBlock;
     int maxHeight;
     int optionCountBlock;
 
@@ -36,19 +36,20 @@ public:
     {
         this->optionIdx = idxBlock + optionIdxBlock;
         optionCountBlock = idxBlockNext - idxBlock;
-        const auto alphaIdxBlock = blockIdx.x == 0 ? 0 : values.alphaInds[blockIdx.x - 1];
+        alphaIdxBlock = blockIdx.x == 0 ? 0 : values.alphaInds[blockIdx.x - 1];
         maxHeight = (values.alphaInds[blockIdx.x] - alphaIdxBlock) / optionCountBlock;
-        alphaIdx = alphaIdxBlock + optionIdx;
     }
 
     __device__ inline void setAlphaAt(const int index, const real value) override
     {
-        values.alphas[alphaIdx + optionCountBlock * index] = value;
+        auto globalIndex = alphaIdxBlock + optionCountBlock * index;
+        values.alphas[globalIndex] = value;
     }
 
     __device__ inline real getAlphaAt(const int index) const override
     {
-        return values.alphas[alphaIdx + optionCountBlock * index];
+        auto globalIndex = alphaIdxBlock + optionCountBlock * index;
+        return values.alphas[globalIndex];
     }
 
     __device__ inline int getMaxHeight() const override
@@ -98,18 +99,14 @@ protected:
         hAlphaInds.push_back((hAlphaInds.empty() ? 0 : hAlphaInds.back()) + alphasBlock);
         hInds.push_back(cudaOptions.N);
 
-        // for (int i = 0; i < hInds.size(); ++i)
-        // {
-        //     std::cout << "o " << hInds[i] << " a " << hAlphaInds[i] << std::endl;
-        // }
-
         thrust::device_vector<int32_t> dInds = hInds;
         thrust::device_vector<int32_t> dAlphaInds = hAlphaInds;
+        auto totalAlphasCount = hAlphaInds.back();
 
         KernelArgsValuesCoalescedBlock values;
         values.alphaInds = thrust::raw_pointer_cast(dAlphaInds.data());
 
-        runKernel<KernelArgsCoalescedBlock>(cudaOptions, results, dInds, values, hAlphaInds.back());
+        runKernel<KernelArgsCoalescedBlock>(cudaOptions, results, dInds, values, totalAlphasCount);
     }
 };
 

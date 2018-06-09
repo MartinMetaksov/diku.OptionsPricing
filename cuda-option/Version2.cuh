@@ -3,7 +3,6 @@
 
 #include "Kernel.cuh"
 #include "../cuda/CudaDomain.cuh"
-#include <thrust/extrema.h>
 
 namespace cuda
 {

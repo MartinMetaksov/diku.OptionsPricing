@@ -81,14 +81,6 @@ void computeAllOptions(const Args &args)
 int main(int argc, char *argv[])
 {
     Args args(argc, argv);
-    // Args args;
-    // args.options = "../data/options-60000.in";
-    // args.yield = "../data/yield.in";
-    // args.version = 3;
-    // args.blockSize = 1024;
-    // args.runs = 0;
-    // args.test = true;
-    // args.sort = SortType::NONE;
 
     computeAllOptions(args);
 

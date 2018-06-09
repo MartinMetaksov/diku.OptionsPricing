@@ -196,7 +196,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         }
         __syncthreads();
 
-        Qs[threadIdx.x] = Q > 0 ? Q * exp(-j * c.dr * c.dt) : 0;
+        Qs[threadIdx.x] = Q > zero ? Q * exp(-j * c.dr * c.dt) : zero;
         __syncthreads();
 
         // Repopulate flags
@@ -319,12 +319,12 @@ protected:
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
+        CudaCheckError();
+
         if (isTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
-
-        CudaCheckError();
 
         // Copy result
         thrust::copy(result.begin(), result.end(), results.begin());
@@ -368,14 +368,14 @@ public:
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
 
         // Get the max width
-        // maxWidth = *(thrust::max_element(widths.begin(), widths.end()));
+        maxWidth = *(thrust::max_element(widths.begin(), widths.end()));
 
-        // if (maxWidth > blockSize)
-        // {
-        //     std::ostringstream oss;
-        //     oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
-        //     throw std::invalid_argument(oss.str());
-        // }
+        if (maxWidth > blockSize)
+        {
+            std::ostringstream oss;
+            oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
+            throw std::invalid_argument(oss.str());
+        }
 
         runPreprocessing(cudaOptions, results, widths, heights);
     }

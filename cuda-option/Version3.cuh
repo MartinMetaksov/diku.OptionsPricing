@@ -3,7 +3,6 @@
 
 #include "Kernel.cuh"
 #include "../cuda/CudaDomain.cuh"
-#include <thrust/transform_scan.h>
 
 namespace cuda
 {
