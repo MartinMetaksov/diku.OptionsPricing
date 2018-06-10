@@ -582,3 +582,7 @@ __pycache__/
 
 
 # End of https://www.gitignore.io/api/cuda,latex,macos,windows,visualstudio
+
+.vscode
+*/*.dSYM
+build

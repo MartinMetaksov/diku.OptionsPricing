@@ -14,7 +14,7 @@ $(EXECUTABLE):
 	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) -t $(TYPE) -f $(FILENAME) -h $(TOTAL_HEIGHT)
+	@./$(EXECUTABLE) -t $(TYPE) -h $(TOTAL_HEIGHT) -w $(TOTAL_WIDTH) -s $(SKEW_PERCENT)
 
 clean:
 	@rm -f $(EXECUTABLE)
