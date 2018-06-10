@@ -1,10 +1,11 @@
 #ifndef CUDA_KERNEL_MULTI_CUH
 #define CUDA_KERNEL_MULTI_CUH
 
+#include <stdexcept>
+#include <sstream>
+
 #include "../cuda/CudaDomain.cuh"
 #include "../cuda/ScanKernels.cuh"
-#include <sstream>
-#include <stdexcept>
 
 using namespace trinom;
 

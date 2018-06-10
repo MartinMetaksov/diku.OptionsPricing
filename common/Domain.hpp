@@ -2,8 +2,8 @@
 #define DOMAIN_HPP
 
 #include "CudaInterop.h"
-#include "Yield.hpp"
 #include "OptionConstants.hpp"
+#include "Yield.hpp"
 
 namespace trinom
 {

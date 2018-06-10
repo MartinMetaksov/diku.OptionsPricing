@@ -1,12 +1,13 @@
 #ifndef OPTIONS_HPP
 #define OPTIONS_HPP
 
-#include <stdexcept>
-#include <fstream>
-#include <vector>
 #include <cinttypes>
-#include "Real.hpp"
+#include <fstream>
+#include <stdexcept>
+#include <vector>
+
 #include "Arrays.hpp"
+#include "Real.hpp"
 
 namespace trinom
 {

@@ -1,10 +1,10 @@
 #ifndef ARRAYS_HPP
 #define ARRAYS_HPP
 
-#include <type_traits>
-#include <vector>
 #include <iostream>
 #include <limits>
+#include <type_traits>
+#include <vector>
 
 namespace trinom
 {

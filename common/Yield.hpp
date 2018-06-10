@@ -1,11 +1,12 @@
 #ifndef YIELD_HPP
 #define YIELD_HPP
 
-#include <stdexcept>
 #include <fstream>
+#include <stdexcept>
 #include <vector>
-#include "Real.hpp"
+
 #include "Arrays.hpp"
+#include "Real.hpp"
 
 namespace trinom
 {

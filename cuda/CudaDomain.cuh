@@ -1,16 +1,18 @@
 #ifndef CUDA_DOMAIN_CUH
 #define CUDA_DOMAIN_CUH
 
-#include "../common/Options.hpp"
-#include "../common/OptionConstants.hpp"
-#include "../common/Domain.hpp"
-#include "../cuda/CudaErrors.cuh"
+#include <chrono>
+
 #include <cuda_runtime.h>
 #include <thrust/extrema.h>
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <thrust/transform_scan.h>
-#include <chrono>
+
+#include "../common/Options.hpp"
+#include "../common/OptionConstants.hpp"
+#include "../common/Domain.hpp"
+#include "../cuda/CudaErrors.cuh"
 
 using namespace trinom;
 

@@ -1,7 +1,8 @@
-#include "Seq.hpp"
-#include "../common/Arrays.hpp"
-#include "../common/Args.hpp"
 #include <chrono>
+
+#include "../common/Args.hpp"
+#include "../common/Arrays.hpp"
+#include "Seq.hpp"
 
 using namespace std;
 using namespace chrono;

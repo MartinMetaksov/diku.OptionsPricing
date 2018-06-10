@@ -2,7 +2,9 @@
 #define ARGS_HPP
 
 #include <string.h>
+
 #include "getoptpp/getopt_pp_standalone.h"
+
 #include "OptionConstants.hpp"
 
 using namespace GetOpt;

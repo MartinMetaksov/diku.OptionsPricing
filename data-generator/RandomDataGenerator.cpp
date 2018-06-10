@@ -3,8 +3,9 @@
 #include <fstream>
 
 // math
-#include <math.h>
+#include <cmath>
 #include <algorithm>
+#include <numeric>
 #include <random>
 
 #include "../common/getoptpp/getopt_pp_standalone.h"

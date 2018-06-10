@@ -1,11 +1,12 @@
 #ifndef OPTION_CONSTANTS_HPP
 #define OPTION_CONSTANTS_HPP
 
-#include "CudaInterop.h"
-#include "Options.hpp"
 #include <algorithm>
 #include <vector>
 #include <cmath>
+
+#include "CudaInterop.h"
+#include "Options.hpp"
 
 namespace trinom
 {
