@@ -6,6 +6,7 @@
 #include "../cuda-option/Version3.cuh"
 #include "../cuda-multi/Version1.cuh"
 #include "../cuda-multi/Version2.cuh"
+#include "../cuda-multi/Version3.cuh"
 #include "../seq/Seq.hpp"
 
 using namespace std;
@@ -85,7 +86,7 @@ TEST_CASE("Book options")
         vector<real> results;
         results.resize(options.N);
         cuda::multi::KernelRunNaive kernelRun;
-        kernelRun.run(options, yield, results, 1024);
+        kernelRun.run(options, yield, results, 512);
         compareVectors(results, seqResults);
     }
 
@@ -94,7 +95,16 @@ TEST_CASE("Book options")
         vector<real> results;
         results.resize(options.N);
         cuda::multi::KernelRunCoalesced kernelRun;
-        kernelRun.run(options, yield, results, 1024);
+        kernelRun.run(options, yield, results, 512);
+        compareVectors(results, seqResults);
+    }
+
+    SECTION("CUDA multi version 3")
+    {
+        vector<real> results;
+        results.resize(options.N);
+        cuda::multi::KernelRunCoalescedBlock kernelRun;
+        kernelRun.run(options, yield, results, 512);
         compareVectors(results, seqResults);
     }
 }

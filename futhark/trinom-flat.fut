@@ -16,21 +16,16 @@ import "/futlib/array"
 
 import "header32"
 
-------------------------------------------------------
---- Pushing the compiler in a direction or another ---
-------------------------------------------------------
-let FORCE_PER_OPTION_THREAD = true
-
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
 -------------------------------------------------------------
-let zero=i2r 0
-let one= i2r 1
-let two= i2r 2
-let half= one / two
-let three= i2r 3
-let six= i2r 6
-let seven= i2r 7
+let zero = i2r 0
+let one = i2r 1
+let two = i2r 2
+let half = one / two
+let three = i2r 3
+let six = i2r 6
+let seven = i2r 7
 let year = i2r 365
 let hundred = i2r 100
 
@@ -223,57 +218,40 @@ let bkwdHelper (X : real) (op : i8) (M : real) (dr : real) (dt : real) (alpha : 
         else res
 
 
-let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
+let trinomialFlat [ycCount] [numAllOptions]
     (h_YieldCurve : [ycCount]YieldCurveData)
     (options : [numAllOptions]TOptionData) 
-    (w: i32)
-    (max_height : i32)
-    (optionsInChunk: i32, optionIndices: [maxOptionsInChunk]i32)
-  : [maxOptionsInChunk]real = unsafe
-        if FORCE_PER_OPTION_THREAD && ( (options[optionIndices[0]]).StrikePrice < 0.0) 
-        then (replicate maxOptionsInChunk zero) else
-        -- header: get the options
-        let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths) = unzip (
-            map (\i -> if (i < 0)
-            then (1.0, 0, 1.0, 1.0, 0, 1.0, 1.0, 1.0, -1, -1)
-            else
-                let option = unsafe options[i]
-                let X  = option.StrikePrice
-                let T  = option.Maturity
-                let len  = option.Length
-                let op = option.OptionType
-                let termUnit = ui2r option.TermUnit
-                let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
-                let dt = (i2r termUnitsInYearCount) / (ui2r option.TermStepCount)
-                let n = r2i ((ui2r option.TermStepCount) * (i2r termUnitsInYearCount) * T)
-                let a = option.ReversionRateParameter
-                let sigma = option.VolatilityParameter
-                let V  = sigma*sigma*( one - (r_exp (zero - two*a*dt)) ) / (two*a)
-                let dr = r_sqrt( (one+two)*V )
-                let M  = (r_exp (zero - a*dt)) - one
-                let jmax = r2i (- 0.184 / M) + 1
-                let width = 2 * jmax + 1
-                in  (X, op, len, termUnit, n, dt, dr, M, jmax, width)
-        ) optionIndices)
+  : [numAllOptions]real = unsafe
+    -- header: get the options
+    let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths, heights) = unzip (
+        map (\{StrikePrice, Maturity, Length, ReversionRateParameter, VolatilityParameter, TermUnit, TermStepCount, OptionType} ->
+            let termUnit = ui2r TermUnit
+            let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
+            let dt = (i2r termUnitsInYearCount) / (ui2r TermStepCount)
+            let n = r2i ((ui2r TermStepCount) * (i2r termUnitsInYearCount) * Maturity)
+            let a = ReversionRateParameter
+            let sigma = VolatilityParameter
+            let V  = sigma * sigma * ( one - (r_exp (zero - two * a * dt)) ) / (two * a)
+            let dr = r_sqrt( (one + two) * V )
+            let M  = (r_exp (zero - a * dt)) - one
+            let jmax = r2i (- 0.184 / M) + 1
+            let width = 2 * jmax + 1
+            in  (StrikePrice, OptionType, Length, termUnit, n, dt, dr, M, jmax, width, n)
+    ) options)
 
-    -- make the flag array (probably usefull for segmented scan/reduce operations)
-    let map_lens = map2 (\w i -> if i < optionsInChunk then w else 0) widths (iota maxOptionsInChunk)
-    let scanned_lens = scan (+) 0 map_lens
+    -- make the flag array (probably useful for segmented scan/reduce operations)
+    let scanned_lens = scan (+) 0 widths
     let len_valinds = map2 (\m i -> 
         if i == 0 then (0, m) 
-        else if i < optionsInChunk then (scanned_lens[i-1], m)
-        else 
-            let last_ind = scanned_lens[optionsInChunk-1]
-            in  if last_ind < w 
-                then (last_ind, w - last_ind)
-                else (-1, 0)
-    ) map_lens (iota maxOptionsInChunk)
+        else (scanned_lens[i-1], m)
+    ) widths (iota numAllOptions)
 
+    let w = last scanned_lens
     let (len_inds, len_vals) = unzip len_valinds
     let flags = scatter (replicate w 0) len_inds len_vals
 
     -- make the flat segment-index array
-    let sgm_inds = scatter (replicate w 0) len_inds (iota maxOptionsInChunk)
+    let sgm_inds = scatter (replicate w 0) len_inds (iota numAllOptions)
     -- sgm_inds can be used to access the index of the current option
     let sgm_inds = sgmScanPlus flags sgm_inds
     
@@ -282,12 +260,13 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
 
     let Qs = map2 (\i k -> if i == jmaxs[sgm_inds[k]] then one else zero) q_lens (iota w)
 
+    let max_height = reduce (\x y -> i32.max x y) 0 heights
     let seq_len = max_height + 1
-    let total_len = maxOptionsInChunk*seq_len
-    let alphas = replicate (maxOptionsInChunk * seq_len) zero
+    let total_len = numAllOptions * seq_len
+    let alphas = replicate total_len zero
     let alphas = scatter alphas
-        ( map (\i -> i*seq_len) (iota maxOptionsInChunk) )
-        ( map (\i -> getYieldAtYear dts[i] tus[i] h_YieldCurve) (iota maxOptionsInChunk) )
+        ( map (\i -> i*seq_len) (iota numAllOptions) )
+        ( map (\i -> getYieldAtYear dts[i] tus[i] h_YieldCurve) (iota numAllOptions) )
 
     -------------------------
     -- FORWARD PROPAGATION --
@@ -314,22 +293,22 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
         -- sum up Qs
         let alpha_vals = sgmScanPlusReal flags tmps 
         let alpha_vals = map (\opt_ind -> 
-            if (opt_ind >= optionsInChunk || i >= (ns[opt_ind])) then zero
+            if (i >= (ns[opt_ind])) then zero
             else 
                 let t = (i2r (i+2)) * dts[opt_ind]
                 let R = getYieldAtYear t tus[opt_ind] h_YieldCurve
                 let P = r_exp(-R * t)
                 in (r_log (alpha_vals[scanned_lens[opt_ind]-1] / P) ) / dts[opt_ind]
-        ) (iota maxOptionsInChunk)
+        ) (iota numAllOptions)
 
-        let alpha_indvals = map (\opt_ind->opt_ind*seq_len + i + 1) (iota maxOptionsInChunk)
+        let alpha_indvals = map (\opt_ind->opt_ind*seq_len + i + 1) (iota numAllOptions)
         let alphas = scatter alphas alpha_indvals alpha_vals
     in  (Qs,alphas)
 
     --------------------------
     -- BACKWARD PROPAGATION --
     --------------------------
-    let call = map (\wind -> if (wind < scanned_lens[maxOptionsInChunk - 1]) then hundred else zero) (iota w)
+    let call = map (\wind -> if (wind < scanned_lens[numAllOptions - 1]) then hundred else zero) (iota w)
 
     let call = loop (call: *[w]real) for ii < max_height do
         let i = max_height - 1 - ii 
@@ -351,50 +330,14 @@ let trinomialChunk [ycCount] [numAllOptions] [maxOptionsInChunk]
 
     -- reshape result
     let (inds, vals) = unzip (
-        map (\sgm_ind -> if (sgm_ind >= optionsInChunk)
-                then (-1, 0.0)
-                else let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1]
-                    let m_ind  = begind+jmaxs[sgm_ind]
-                    in  (sgm_ind, call[m_ind])
-            ) (iota maxOptionsInChunk)
+        map (\sgm_ind ->
+                let begind = if sgm_ind == 0 then 0 else scanned_lens[sgm_ind-1]
+                let m_ind  = begind + jmaxs[sgm_ind]
+                in  (sgm_ind, call[m_ind])
+            ) (iota numAllOptions)
     )
-    let res = scatter (replicate maxOptionsInChunk 0.0) inds vals
+    let res = scatter (replicate numAllOptions 0.0) inds vals
 in res
-
-let formatOptions [numOptions]
-    (w: i32)
-    (options : [numOptions]TOptionData)
-    : (i32, [](i32, []i32)) = 
-        let (heights, widths) = unzip (
-            map (\option ->
-                let T  = option.Maturity
-                let termUnit = ui2r option.TermUnit
-                let termStepCount = ui2r option.TermStepCount                        
-                let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
-                let n = r2i (termStepCount * (i2r termUnitsInYearCount) * T)
-                let dt = (i2r termUnitsInYearCount) / termStepCount                        
-                let a = option.ReversionRateParameter
-                let M = (r_exp (zero - a*dt)) - one
-                let jmax = r2i (- 0.184 / M) + 1
-                in  (n, 2*jmax+1)
-            ) options )
-        
-        let max_height = reduce (\x y -> i32.max x y) 0 heights
-        let max_width = reduce (\x y -> i32.max x y) 0 widths
-
-        let maxOptionsInChunk = w / max_width
-        let num_chunks = (numOptions + maxOptionsInChunk - 1) / maxOptionsInChunk
-        let chunks = map (\ c_ind ->
-                            let num = if c_ind == num_chunks - 1 
-                                then numOptions - c_ind*maxOptionsInChunk
-                                else maxOptionsInChunk
-                            let arr = 
-                            map (\ i -> 
-                                    let opt_ind = c_ind*maxOptionsInChunk + i in  
-                                    if opt_ind < numOptions then opt_ind else (-1)
-                                ) (iota maxOptionsInChunk)
-                            in (num, arr)) (iota num_chunks)
-        in  (max_height, chunks)
 
 -----------------
 -- Entry point --
@@ -417,9 +360,5 @@ let main [q] [y] (strikes           : [q]real)
     {StrikePrice=s, Maturity=m, Length=l, TermUnit=u, TermStepCount=c, 
     ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }) 
       strikes maturities lenghts termunits termstepcounts rrps vols types
-  
-  let w = 64
-  let (max_height, chunks) = formatOptions w options
-  let chunkRes = unsafe (map (trinomialChunk yield options w max_height) chunks)
       
-  in flatten chunkRes
+  in trinomialFlat yield options

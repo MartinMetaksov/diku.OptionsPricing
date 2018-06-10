@@ -24,7 +24,7 @@ class KernelArgsCoalescedBlock : public KernelArgsBase<KernelArgsValuesCoalesced
 private:
 
     int optionIdx;
-    int alphaIdxBlock;
+    int alphaIdx;
     int maxHeight;
     int optionCountBlock;
 
@@ -34,22 +34,21 @@ public:
     
     __device__ inline void init(const int optionIdxBlock, const int idxBlock, const int idxBlockNext, const int optionCount)
     {
-        this->optionIdx = idxBlock + optionIdxBlock;
+        optionIdx = idxBlock + optionIdxBlock;
         optionCountBlock = idxBlockNext - idxBlock;
-        alphaIdxBlock = blockIdx.x == 0 ? 0 : values.alphaInds[blockIdx.x - 1];
+        auto alphaIdxBlock = (blockIdx.x == 0 ? 0 : values.alphaInds[blockIdx.x - 1]);
         maxHeight = (values.alphaInds[blockIdx.x] - alphaIdxBlock) / optionCountBlock;
+        alphaIdx = alphaIdxBlock + optionIdxBlock;
     }
 
     __device__ inline void setAlphaAt(const int index, const real value) override
     {
-        auto globalIndex = alphaIdxBlock + optionCountBlock * index;
-        values.alphas[globalIndex] = value;
+        values.alphas[alphaIdx + optionCountBlock * index] = value;
     }
 
     __device__ inline real getAlphaAt(const int index) const override
     {
-        auto globalIndex = alphaIdxBlock + optionCountBlock * index;
-        return values.alphas[globalIndex];
+        return values.alphas[alphaIdx + optionCountBlock * index];
     }
 
     __device__ inline int getMaxHeight() const override
