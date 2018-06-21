@@ -42,7 +42,7 @@ TEST_CASE("Book options")
     }
     
     vector<real> seqResults, cudaResults;
-    seqResults.reserve(options.N);
+    seqResults.resize(options.N);
     seq::computeOptions(options, yield, seqResults);
 
     SECTION("CUDA option version 1")

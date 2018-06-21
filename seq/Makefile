@@ -1,5 +1,4 @@
-CXX        = g++ -g -std=c++11
-
+CXX        = g++ -std=c++11 -fopenmp -O3
 
 SOURCES_CPP =SeqMain.cpp
 EXECUTABLE  =../build/SeqMain

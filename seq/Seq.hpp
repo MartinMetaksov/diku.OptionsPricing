@@ -180,11 +180,12 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
 
 void computeOptions(const Options &options, const Yield &yield, std::vector<real> &results)
 {
+#pragma omp parallel for
     for (auto i = 0; i < options.N; ++i)
     {
         OptionConstants c(options, i);
         auto result = computeSingleOption(c, yield);
-        results.push_back(result);
+        results[i] = result;
     }
 }
 

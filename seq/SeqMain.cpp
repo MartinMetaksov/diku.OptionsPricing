@@ -17,7 +17,7 @@ void computeAllOptions(const Args &args)
     auto time_begin = steady_clock::now();
 
     vector<real> results;
-    results.reserve(options.N);
+    results.resize(options.N);
 
     seq::computeOptions(options, yield, results);
 
@@ -29,7 +29,7 @@ void computeAllOptions(const Args &args)
     }
     else
     {
-        cout << "Total execution time " << duration_cast<milliseconds>(time_end - time_begin).count() << " ms" << endl;
+        cout << "Total execution time " << duration_cast<microseconds>(time_end - time_begin).count() << " microsec" << endl;
     }
 }
 
