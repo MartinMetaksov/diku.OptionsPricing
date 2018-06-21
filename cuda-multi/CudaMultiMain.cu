@@ -61,7 +61,7 @@ void computeAllOptions(const Args &args)
             }
         }
         cout << "Best times: kernel " << best.KernelRuntime << " microsec, total " << best.TotalRuntime << " microsec." << endl;
-        cout << best.KernelRuntime << ";" << best.TotalRuntime << endl;
+        cout << best.KernelRuntime << "," << best.TotalRuntime << endl;
     }
     else
     {
