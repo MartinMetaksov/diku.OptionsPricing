@@ -21,6 +21,7 @@ struct Args
     int version;
     int runs;
     int blockSize;
+    int device;
 
     Args() {}
 
@@ -33,6 +34,7 @@ struct Args
         runs = 0;
         sort = SortType::NONE;
         blockSize = 1024;
+        device = 0;
 
         cmd >> GetOpt::Option('o', "options", options);
         cmd >> GetOpt::Option('y', "yield", yield);
@@ -40,6 +42,7 @@ struct Args
         cmd >> GetOpt::Option('v', "version", version);
         cmd >> GetOpt::Option('r', "runs", runs);
         cmd >> GetOpt::Option('b', "block", blockSize);
+        cmd >> GetOpt::Option('d', "device", device);
         cmd >> GetOpt::OptionPresent('t', "test", test);
 
         if (s.length() == 1)

@@ -50,6 +50,7 @@ void computeAllOptions(const Args &args)
     Options options(args.options);
     Yield yield(args.yield);
 
+    cudaSetDevice(args.device);
     cudaFree(0);
 
     if (args.runs > 0)
