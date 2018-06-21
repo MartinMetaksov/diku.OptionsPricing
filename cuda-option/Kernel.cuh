@@ -214,6 +214,7 @@ private:
 protected:
     bool isTest;
     int blockSize;
+    size_t deviceMemory = 0;
 
     virtual void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
@@ -230,7 +231,21 @@ protected:
 
         if (isTest)
         {
-            std::cout << "Running pricing for " << cudaOptions.N << " options with block size " << blockSize << std::endl;
+            deviceMemory += vectorsizeof(Qs);
+            deviceMemory += vectorsizeof(QsCopy);
+            deviceMemory += vectorsizeof(alphas);
+            deviceMemory += vectorsizeof(result);
+
+            std::cout << "Running pricing for " << cudaOptions.N << 
+            #ifdef USE_DOUBLE
+            " double"
+            #else
+            " float"
+            #endif
+            << " options with block size " << blockSize << std::endl;
+            std::cout << "Qs count " << totalQsCount << ", alphas count " << totalAlphasCount << std::endl;
+            std::cout << "Global memory size " << deviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
+
             cudaDeviceSynchronize();
             size_t memoryFree, memoryTotal;
             cudaMemGetInfo(&memoryFree, &memoryTotal);
@@ -293,6 +308,22 @@ public:
 
         thrust::device_vector<int32_t> widths(options.N);
         thrust::device_vector<int32_t> heights(options.N);
+
+        if (isTest)
+        {
+            deviceMemory += vectorsizeof(strikePrices);
+            deviceMemory += vectorsizeof(maturities);
+            deviceMemory += vectorsizeof(lengths);
+            deviceMemory += vectorsizeof(termUnits);
+            deviceMemory += vectorsizeof(termStepCounts);
+            deviceMemory += vectorsizeof(reversionRates);
+            deviceMemory += vectorsizeof(volatilities);
+            deviceMemory += vectorsizeof(types);
+            deviceMemory += vectorsizeof(yieldPrices);
+            deviceMemory += vectorsizeof(yieldTimeSteps);
+            deviceMemory += vectorsizeof(widths);
+            deviceMemory += vectorsizeof(heights);
+        }
 
         CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
             termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);

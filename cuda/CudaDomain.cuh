@@ -145,6 +145,12 @@ struct CudaOptions
     }
 };
 
+template<typename T>
+size_t vectorsizeof(const typename thrust::device_vector<T>& vec)
+{
+    return sizeof(T) * vec.size();
+}
+
 struct CudaRuntime
 {
     long KernelRuntime;

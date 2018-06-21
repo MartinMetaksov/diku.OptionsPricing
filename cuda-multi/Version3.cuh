@@ -105,6 +105,11 @@ protected:
         KernelArgsValuesCoalescedBlock values;
         values.alphaInds = thrust::raw_pointer_cast(dAlphaInds.data());
 
+        if (isTest)
+        {
+            deviceMemory += vectorsizeof(dAlphaInds);
+        }
+
         runKernel<KernelArgsCoalescedBlock>(cudaOptions, results, dInds, values, totalAlphasCount);
     }
 };

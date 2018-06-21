@@ -129,6 +129,14 @@ protected:
         values.QsInds  = thrust::raw_pointer_cast(QsInds.data());
         values.alphasInds = thrust::raw_pointer_cast(alphasInds.data());
 
+        if (isTest)
+        {
+            deviceMemory += vectorsizeof(keys);
+            deviceMemory += vectorsizeof(QsInds);
+            deviceMemory += vectorsizeof(alphasInds);
+            deviceMemory += vectorsizeof(keysOut);
+        }
+
         runKernel<KernelArgsCoalescedChunk>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
     }
 };

@@ -5,7 +5,7 @@ namespace trinom
 {
 
 // Define this to use doubles
-#define USE_DOUBLE
+// #define USE_DOUBLE
 #ifdef USE_DOUBLE
 typedef double real;
 #define ROUND(X) round((X))
@@ -22,7 +22,7 @@ typedef float real;
 #define six (real)6.0
 #define seven (real)7.0
 #define year (real)365.0
-#define minus184 (real)-0.184
+#define minus184 (real) - 0.184
 
 } // namespace trinom
 

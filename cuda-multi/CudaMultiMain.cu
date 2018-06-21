@@ -1,7 +1,4 @@
 
-// Define this to turn on error checking
-#define CUDA_ERROR_CHECK
-
 #include "Version1.cuh"
 #include "Version2.cuh"
 #include "Version3.cuh"
@@ -64,6 +61,7 @@ void computeAllOptions(const Args &args)
             }
         }
         cout << "Best times: kernel " << best.KernelRuntime << " microsec, total " << best.TotalRuntime << " microsec." << endl;
+        cout << best.KernelRuntime << ";" << best.TotalRuntime << endl;
     }
     else
     {

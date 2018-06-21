@@ -1,10 +1,22 @@
-CXX        = nvcc -std=c++11 #--maxrregcount=32 #--ptxas-options=-v
-DEBUG_OPTIONS = -Xcompiler -rdynamic -lineinfo
+CXX        = nvcc -std=c++11
+DEBUG_OPTIONS = --ptxas-options=-v -DCUDA_ERROR_CHECK -Xcompiler -rdynamic -lineinfo
 
-SOURCES_CPP =CudaOptionMain.cu
-EXECUTABLE  =../build/CudaOption
-DATA		=../data
-COMPARE		=compare
+SOURCES_CPP = CudaOptionMain.cu
+EXECUTABLE  = ../build/CudaOption
+DATA		= ../data
+COMPARE		= compare
+
+ifeq ($(REAL),64)
+  DEFINE_DOUBLE = -DUSE_DOUBLE
+else
+  DEFINE_DOUBLE =
+endif
+
+ifeq ($(REG),32)
+  REG_COUNT = --maxrregcount=32
+else
+  REG_COUNT =
+endif
 
 default: compile
 
@@ -13,10 +25,10 @@ default: compile
 
 compile: $(EXECUTABLE)
 $(EXECUTABLE): 
-	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
+	@$(CXX) $(REG_COUNT) $(DEFINE_DOUBLE) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 compile-debug: $(EXECUTABLE)
-	@$(CXX) $(DEBUG_OPTIONS) -o $(EXECUTABLE) $(SOURCES_CPP)
+	@$(CXX) $(REG_COUNT) $(DEBUG_OPTIONS) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK)
@@ -25,7 +37,7 @@ test: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -t
 
 repeat: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -r 10
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -r $(REP)
 
 validate: $(EXECUTABLE) $(COMPARE)
 	@echo "Is valid:"
