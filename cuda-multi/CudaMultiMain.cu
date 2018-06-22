@@ -7,70 +7,74 @@
 using namespace std;
 using namespace trinom;
 
-cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &results, const Args &args)
+cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &results, 
+    const int version, const int blockSize, const SortType sortType, const bool isTest)
 {
-    switch (args.version)
+    switch (version)
     {
         case 1:
         {
             cuda::multi::KernelRunNaive kernelRun;
-            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            kernelRun.run(options, yield, results, blockSize, sortType, isTest);
             return kernelRun.runtime;
         }
         case 2:
         {
             cuda::multi::KernelRunCoalesced kernelRun;
-            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            kernelRun.run(options, yield, results, blockSize, sortType, isTest);
             return kernelRun.runtime;
         }
         case 3:
         {
             cuda::multi::KernelRunCoalescedBlock kernelRun;
-            kernelRun.run(options, yield, results, args.blockSize, args.sort, args.test);
+            kernelRun.run(options, yield, results, blockSize, sortType, isTest);
             return kernelRun.runtime;
         }
     }
     return cuda::CudaRuntime();
 }
 
-void computeAllOptions(const Args &args)
+void computeOptions(const Options &options, const Yield &yield, const int version, 
+const int blockSize, const SortType sortType, const int runs, const bool isTest)
 {
-    if (args.test)
+    if (isTest)
     {
-        cout << "Cuda multiple options per thread block version " << args.version << endl;
+        cout << "Cuda one option per thread version " << version << endl;
     }
-    
-    // Read options and yield curve.
-    Options options(args.options);
-    Yield yield(args.yield);
 
-    cudaSetDevice(args.device);
-    cudaFree(0);
-
-    if (args.runs > 0)
+    if (runs > 0)
     {
-        cout << "Performing " << args.runs << " runs..." << endl;
+        if (isTest)
+        {
+            cout << "Performing " << runs << " runs..." << endl;
+        }
         cuda::CudaRuntime best;
-        for (auto i = 0; i < args.runs; ++i)
+        for (auto i = 0; i < runs; ++i)
         {
             vector<real> results;
             results.resize(options.N);
-            auto runtime = run(options, yield, results, args);
+            auto runtime = run(options, yield, results, version, blockSize, sortType, isTest);
             if (runtime < best)
             {
                 best = runtime;
             }
         }
-        cout << "Best times: kernel " << best.KernelRuntime << " microsec, total " << best.TotalRuntime << " microsec." << endl;
-        cout << best.KernelRuntime << "," << best.TotalRuntime << endl;
+        if (isTest)
+        {
+            cout << "Best times: kernel " << best.KernelRuntime << " microsec, total " << best.TotalRuntime << " microsec." << endl;
+        }
+        else
+        {
+            cout << version << ',' << blockSize << ',' << (char)sortType << ',' << best.KernelRuntime << ',' << best.TotalRuntime << endl;
+        }
     }
     else
     {
         vector<real> results;
         results.resize(options.N);
-        run(options, yield, results, args);
+        run(options, yield, results, version, blockSize, sortType, isTest);
         
-        if (!args.test)
+        if (!isTest)
         {
             Arrays::write_array(cout, results);
         }
@@ -81,7 +85,29 @@ int main(int argc, char *argv[])
 {
     Args args(argc, argv);
 
-    computeAllOptions(args);
+    if (args.test)
+    {
+        cout << "Loading options " << args.options << ", yield " << args.yield << endl;
+    }
+
+    // Read options and yield curve.
+    Options options(args.options);
+    Yield yield(args.yield);
+
+    // Initialize cuda device.
+    cudaSetDevice(args.device);
+    cudaFree(0);
+
+    for (auto &version : args.versions)
+    {
+        for (auto &blockSize : args.blockSizes)
+        {
+            for (auto &sortType : args.sorts)
+            {
+                computeOptions(options, yield, version, blockSize, sortType, args.runs, args.test);
+            }
+        }
+    }
 
     return 0;
 }

@@ -287,7 +287,7 @@ public:
     CudaRuntime runtime;
     
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
-        const int blockSize = 64, const SortType sortType = SortType::NONE, bool isTest = false)
+        const int blockSize = 64, const SortType sortType = SortType::NONE, const bool isTest = false)
     {
         time_begin = std::chrono::steady_clock::now();
 

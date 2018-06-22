@@ -1,12 +1,22 @@
 #!/bin/bash
 
+# Usage:
+# $ sh test.sh compile - to compile all 4 executables once
+# $ sh test.sh - to run benchmarking with the sepcified parameters
+
+# program options
 rep=5
-sorts=("-" "h" "H" "w" "W")
-block_sizes=(256 512 1024)
-versions=(1 2 3 4)
-data="../data"
-files=("options-60000" "options-1000")
+device=1
+sorts="- h H w W"
+block_sizes="256 512 1024"
+versions="4"
+
+# data
+data_path="../data"
+files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
 yield="yield"
+
+# executables
 exe="../build/CudaOption"
 exefloat=$exe"-float"
 exefloatreg=$exefloat"-reg32"
@@ -30,26 +40,14 @@ compile() {
     mv $exe $exedoublereg
 }
 
-test_files() {
+test() {
+    echo "file,precision,registers,version,block,sort,kernel time,total time"
     for file in ${files[*]}
     do
-        for version in ${versions[*]}
-        do
-            for block in ${block_sizes[*]}
-            do
-                for sort in ${sorts[*]}
-                do
-                    echo -e "$2,$file,$version,$block,$sort,"`./$1 -o $data/$file.in -y $data/$yield.in -s $sort -v $version -b $block -r $rep | tail -n 1`
-                done
-            done
+        for index in ${!exes[*]}
+        do 
+            ./${exes[$index]} -o $data_path/$file.in -y $data_path/$yield.in -s $sorts -v $versions -b $block_sizes -r $rep -d $device | awk -v prefix="$file,${exes_names[$index]}," '{print prefix $0}'
         done
-    done
-}
-
-test() {
-    echo "precision,registers,file,version,block,sort,kernel time,total time"
-    for index in ${!exes[*]}; do 
-        test_files ${exes[$index]} ${exes_names[$index]}
     done
 }
 
