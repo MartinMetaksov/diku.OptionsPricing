@@ -39,7 +39,7 @@ const int blockSize, const SortType sortType, const int runs, const bool isTest)
 {
     if (isTest)
     {
-        cout << "Cuda one option per thread version " << version << endl;
+        cout << "Cuda multiple options per thread block version " << version << endl;
     }
 
     if (runs > 0)
