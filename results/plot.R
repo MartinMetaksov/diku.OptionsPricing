@@ -26,6 +26,7 @@ files <- split(data, data$file)
 
 # create dropdown buttons per file
 buttons <- lapply(seq_along(files), function(i) {
+  # ther are as many traces in a box plot as colors, make the ones for this file visible
   types.count = length(levels(data$type))
   visibility <- as.list(rep(F, types.count  * length(files)))
   e <- i * types.count
@@ -37,15 +38,20 @@ buttons <- lapply(seq_along(files), function(i) {
        label = names(files)[i])
 })
 
+# create an empty plot
 p <- plot_ly()
 
+# add add a box plot for each file
 for (i in seq_along(files)) {
-  p <- p %>% add_boxplot(data = files[[i]], y = ~exe, x = ~kernel.time, color = ~type, orientation = "h", visible = i == 1)
+  p <- p %>% add_boxplot(data = files[[i]], y = ~exe, x = ~kernel.time, color = ~type,
+                         orientation = "h", visible = i == 1)
 }
 
+# add the layout
 p <- p %>%
   layout(
     boxmode = "group",
+    hovermode = "closest",
     margin = list(l = 100),
     xaxis = list(title = "Kernel time (sec)"), 
     yaxis = list(title = "Version"),
@@ -59,4 +65,3 @@ p <- p %>%
       buttons = buttons)))
 
 print(p)
-
