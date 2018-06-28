@@ -1,14 +1,21 @@
+#!/usr/bin/env Rscript
 require(plotly)
+require(htmlwidgets)
 
-cuda_multi_gpu01_1 <- read.csv("cuda-multi-gpu01.1.csv")
-cuda_option_gpu01_1 <- read.csv("cuda-option-gpu01.1.csv")
+args = commandArgs(trailingOnly = TRUE)
 
-# add type column
-cuda_multi_gpu01_1$type <- "multi"
-cuda_option_gpu01_1$type <- "option"
+# load and join data
+title = args[2]
+i <- 3
+data = data.frame()
+while (i < length(args)) {
+  a <- read.csv(args[i + 1])
+  a$type <- args[i]
+  data = rbind(data, a)
+  i <- i + 2
+}
 
-# join tables
-data <- rbind(cuda_multi_gpu01_1, cuda_option_gpu01_1)
+# convert type to factor
 data$type <- as.factor(data$type)
 
 # add description column
@@ -64,4 +71,4 @@ p <- p %>%
       y = 1.1,
       buttons = buttons)))
 
-print(p)
+saveWidget(p, file = paste(title, "html", sep = "."))
