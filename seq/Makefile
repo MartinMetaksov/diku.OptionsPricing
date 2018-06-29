@@ -1,18 +1,24 @@
 CXX        = g++ -std=c++11 -fopenmp -O3
 
 SOURCES_CPP =SeqMain.cpp
-EXECUTABLE  =../build/SeqMain
+EXECUTABLE  =../build/Seq
 DATA		=../data
 COMPARE		=compare
 
-default: compile
+ifeq ($(REAL),64)
+  DEFINE_DOUBLE = -DUSE_DOUBLE
+else
+  DEFINE_DOUBLE =
+endif
+
+default: run
 
 .o: $(SOURCES_CPP)
 	@$(CXX) -c $@ $<
 
 compile: $(EXECUTABLE)
 $(EXECUTABLE): 
-	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
+	@$(CXX) -o $(EXECUTABLE) $(DEFINE_DOUBLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in

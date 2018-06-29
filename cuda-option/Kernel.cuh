@@ -3,6 +3,8 @@
 
 #include "../cuda/CudaDomain.cuh"
 
+#define DEFAULT_BLOCK_SIZE 256
+
 using namespace trinom;
 
 namespace cuda
@@ -272,7 +274,9 @@ protected:
         CudaCheckError();
 
         // Copy result
-        thrust::copy(result.begin(), result.end(), results.begin());
+        cudaOptions.copySortedResult(result, results);
+
+        cudaDeviceSynchronize();
 
         auto time_end = std::chrono::steady_clock::now();
         runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();
@@ -287,12 +291,12 @@ public:
     CudaRuntime runtime;
     
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
-        const int blockSize = 64, const SortType sortType = SortType::NONE, const bool isTest = false)
+        const int blockSize = -1, const SortType sortType = SortType::NONE, const bool isTest = false)
     {
         time_begin = std::chrono::steady_clock::now();
 
         this->isTest = isTest;
-        this->blockSize = blockSize;
+        this->blockSize = blockSize > 0 ? blockSize : DEFAULT_BLOCK_SIZE;
 
         thrust::device_vector<real> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
         thrust::device_vector<real> maturities(options.Maturities.begin(), options.Maturities.end());
@@ -308,6 +312,7 @@ public:
 
         thrust::device_vector<int32_t> widths(options.N);
         thrust::device_vector<int32_t> heights(options.N);
+        thrust::device_vector<int32_t> indices(sortType == SortType::NONE ? 0 : options.N);
 
         if (isTest)
         {
@@ -323,10 +328,11 @@ public:
             deviceMemory += vectorsizeof(yieldTimeSteps);
             deviceMemory += vectorsizeof(widths);
             deviceMemory += vectorsizeof(heights);
+            deviceMemory += vectorsizeof(indices);
         }
 
         CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
-            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights);
+            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights, indices);
 
         runPreprocessing(cudaOptions, results, widths, heights);
     }

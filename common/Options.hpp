@@ -14,8 +14,8 @@ namespace trinom
 
 enum class OptionType : int8_t
 {
-    PUT = 0,
-    CALL = 1
+    CALL = 0,
+    PUT = 1
 };
 
 inline std::ostream &operator<<(std::ostream &os, const OptionType t)

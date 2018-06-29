@@ -1,6 +1,3 @@
-#include "catch.hpp"
-
-#define USE_DOUBLE
 #include "../cuda-option/Version1.cuh"
 #include "../cuda-option/Version2.cuh"
 #include "../cuda-option/Version3.cuh"
@@ -9,20 +6,12 @@
 #include "../cuda-multi/Version3.cuh"
 #include "../seq/Seq.hpp"
 
+#include "Compare.hpp"
+
 using namespace std;
 using namespace trinom;
 
 #define YIELD_CURVE_PATH "../data/yield.in" 
-
-void compareVectors(vector<real> test, vector<real> gold)
-{
-    REQUIRE(test.size() == gold.size());
-
-    for (auto i = 0; i < test.size(); i++)
-    {
-        CHECK(test[i] == Approx(gold[i]));
-    }
-}
 
 TEST_CASE("Book options")
 {

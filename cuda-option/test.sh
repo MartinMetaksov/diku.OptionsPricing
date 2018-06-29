@@ -2,18 +2,23 @@
 
 # Usage:
 # $ sh test.sh compile - to compile all 4 executables once
-# $ sh test.sh - to run benchmarking with the sepcified parameters
+# $ sh test.sh - to run benchmarking with the specified parameters
 
 # program options
 rep=5
-device=1
-sorts="- h H w W"
+device=0
+sorts="h H w W"
 block_sizes="256 512 1024"
 versions="4"
 
 # data
 data_path="../data"
-files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+files=("book")
+# files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+# data_path="../data/100000"
+# out_path="../data/100000/out"
+# files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
+#        "skew_hw_1_100000" "skew_hw_10_100000" "skew_w_1_rand_h_100000" "skew_w_10_rand_h_100000" "unif_book_hw_100000" "unif_hw_100000")
 yield="yield"
 
 # executables
@@ -27,16 +32,16 @@ exes_names=("float,-" "float,32" "double,-" "double,32")
 
 compile() {
     echo "Compiling float version..."
-    make -B REAL=32
+    make -B compile REAL=32
     mv $exe $exefloat
     echo "Compiling float version with 32 registers..."
-    make -B REAL=32 REG=32
+    make -B compile REAL=32 REG=32
     mv $exe $exefloatreg
     echo "Compiling double version..."
-    make -B REAL=64
+    make -B compile REAL=64
     mv $exe $exedouble
     echo "Compiling double version with 32 registers..."
-    make -B REAL=64 REG=32
+    make -B compile REAL=64 REG=32
     mv $exe $exedoublereg
 }
 

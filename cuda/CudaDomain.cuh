@@ -61,6 +61,8 @@ struct CudaOptions
 {
     int N;
     int YieldSize;
+    SortType Sort;
+
     const real *StrikePrices;
     const real *Maturities;
     const real *Lengths;
@@ -75,6 +77,8 @@ struct CudaOptions
 
     const int32_t *Widths;
     const int32_t *Heights;
+    thrust::device_vector<int32_t>::iterator IndicesBegin;
+    thrust::device_vector<int32_t>::iterator IndicesEnd;
 
     CudaOptions(
         const Options &options,
@@ -92,10 +96,12 @@ struct CudaOptions
         thrust::device_vector<real> &yieldPrices,
         thrust::device_vector<int32_t> &yieldTimeSteps,
         thrust::device_vector<int32_t> &widths,
-        thrust::device_vector<int32_t> &heights)
+        thrust::device_vector<int32_t> &heights,
+        thrust::device_vector<int32_t> &indices)
     {
         N = options.N;
         YieldSize = yieldSize;
+        Sort = sort;
         StrikePrices = thrust::raw_pointer_cast(strikePrices.data());
         Maturities = thrust::raw_pointer_cast(maturities.data());
         Lengths = thrust::raw_pointer_cast(lengths.data());
@@ -108,6 +114,8 @@ struct CudaOptions
         YieldTimeSteps = thrust::raw_pointer_cast(yieldTimeSteps.data());
         Widths = thrust::raw_pointer_cast(widths.data());
         Heights = thrust::raw_pointer_cast(heights.data());
+        IndicesBegin = indices.begin();
+        IndicesEnd = indices.end();
 
         // Fill in widths and heights for all options.
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(termUnits.begin(), termStepCounts.begin(), maturities.begin(), reversionRates.begin(), widths.begin(), heights.begin())),
@@ -116,8 +124,10 @@ struct CudaOptions
 
         if (sort != SortType::NONE)
         {
+            thrust::sequence(indices.begin(), indices.end());
+
             auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(strikePrices.begin(), maturities.begin(), lengths.begin(), termUnits.begin(), 
-                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin()));
+                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin(), indices.begin()));
     
             auto keysBegin = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
                 ? thrust::make_zip_iterator(thrust::make_tuple(widths.begin(), heights.begin()))
@@ -142,6 +152,18 @@ struct CudaOptions
                     break;
             }
         }
+    }
+
+    void copySortedResult(thrust::device_vector<real> &deviceResults, std::vector<real> &hostResults)
+    {
+        // Sort result
+        if (Sort != SortType::NONE)
+        {
+            thrust::sort_by_key(IndicesBegin, IndicesEnd, deviceResults.begin());
+        }
+
+        // Copy result
+        thrust::copy(deviceResults.begin(), deviceResults.end(), hostResults.begin());
     }
 };
 

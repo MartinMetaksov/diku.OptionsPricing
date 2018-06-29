@@ -10686,10 +10686,10 @@ std::string StringMaker<std::nullptr_t>::convert(std::nullptr_t) {
 }
 
 std::string StringMaker<float>::convert(float value) {
-    return fpToString(value, 5) + 'f';
+    return fpToString(value, std::numeric_limits<float>::max_digits10) + 'f';
 }
 std::string StringMaker<double>::convert(double value) {
-    return fpToString(value, 10);
+    return fpToString(value, std::numeric_limits<double>::max_digits10);
 }
 
 std::string ratio_string<std::atto>::symbol() { return "a"; }

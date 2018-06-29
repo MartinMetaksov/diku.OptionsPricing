@@ -61,7 +61,7 @@ struct Args
         if (sorts.empty())
             sorts.push_back(SortType::NONE);
         if (blockSizes.empty())
-            blockSizes.push_back(1024);
+            blockSizes.push_back(-1);
         if (versions.empty())
             versions.push_back(1);
     }

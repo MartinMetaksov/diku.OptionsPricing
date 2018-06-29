@@ -18,7 +18,7 @@ else
   REG_COUNT =
 endif
 
-default: compile
+default: run
 
 .cu.o: $(SOURCES_CPP)
 	@$(CXX) -c $@ $<
@@ -37,12 +37,7 @@ test: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -d $(DEVICE) -t
 
 repeat: $(EXECUTABLE)
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -d $(DEVICE) -r $(REP)
-
-validate: $(EXECUTABLE) $(COMPARE)
-	@echo "Is valid:"
-	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in > $(FILE).test.out
-	@cat $(DATA)/$(FILE).out $(FILE).test.out | ./compare 
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -s $(SORT) -v $(VERSION) -b $(BLOCK) -d $(DEVICE) -t -r $(REP)
 
 clean:
 	@rm -f $(EXECUTABLE)
