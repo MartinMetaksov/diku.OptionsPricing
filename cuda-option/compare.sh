@@ -17,8 +17,11 @@ block_size="256"
 # data
 data_path="../data"
 out_path="../data/out"
-# files=("book")
-files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+files=("book")
+# files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+# data_path="../data/1000"
+# out_path="../data/1000/out"
+# files=("rand_hw_1000" "unif_book_hw_1000")
 # data_path="../data/100000"
 # out_path="../data/100000/out"
 # files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
@@ -32,7 +35,7 @@ test_dir="../test"
 
 compile() {
     echo "Compiling cuda option..."
-    make -B compile REAL=$real REG=$REG
+    make -B compile REAL=$real REG=$reg
     echo "Compiling compare..."
     make --no-print-directory -C $test_dir -B compile-compare REAL=$real
 }

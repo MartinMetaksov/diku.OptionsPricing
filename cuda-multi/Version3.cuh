@@ -81,6 +81,7 @@ protected:
         {
             auto w = hostWidths[i];
             auto h = hostHeights[i];
+
             counter += w;
             if (counter > blockSize)
             {

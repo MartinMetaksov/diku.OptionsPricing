@@ -45,8 +45,8 @@ type TOptionData = {
   , OptionType                  : i8     -- option type, [0 - Put | 1 - Call]
 }
 
-let OptionType_PUT = i8.i32 0
-let OptionType_CALL = i8.i32 1
+let OptionType_CALL = i8.i32 0
+let OptionType_PUT = i8.i32 1
 
 -- | As `map5`@term, but with three more arrays.
 let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =

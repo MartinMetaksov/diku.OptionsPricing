@@ -262,21 +262,19 @@ protected:
 
         auto time_begin_kernel = std::chrono::steady_clock::now();
         kernelOneOptionPerThread<<<blockCount, blockSize>>>(cudaOptions, kernelArgs);
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
+        CudaCheckError();
+        
         if (isTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
 
-        CudaCheckError();
-
         // Copy result
         cudaOptions.copySortedResult(result, results);
-
-        cudaDeviceSynchronize();
 
         auto time_end = std::chrono::steady_clock::now();
         runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();

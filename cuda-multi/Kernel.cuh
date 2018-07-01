@@ -40,19 +40,67 @@ public:
     __device__ virtual int getOptionIdx() const = 0;
 };
 
+// Sequential scan implementation, useful for debugging.
+// template<class T, class F>
+// __device__ void sgmScanIncBlockSeq(T *values, F *flags)
+// {
+//     if (threadIdx.x == 0)
+//     {
+//         F counter = 0;
+//         T scan = 0;
+//         for (int i = 0; i < blockDim.x; ++i)
+//         {
+//             F flg = flags[i];
+//             if (flg != 0)
+//             {   
+//                 if (counter > 0)
+//                 {
+//                     printf("sgmScanIncBlock: wrong flag at %d!\n", i);
+//                 }
+//                 counter = flg;
+//                 scan = 0;
+//             }
+
+//             --counter;
+//             scan += values[i];
+//             values[i] = scan;
+//         }
+//         if (counter > 0)
+//         {
+//             printf("sgmScanIncBlock: wrong flag at the end!\n");
+//         }
+//     }
+//     __syncthreads();
+// }
+
+template<class T>
+__device__ void scanIncBlockSeq(T *values)
+{
+    if (threadIdx.x == 0)
+    {
+        T scan = 0;
+        for (int i = 0; i < blockDim.x; ++i)
+        {
+            scan += values[i];
+            values[i] = scan;
+        }
+    }
+    __syncthreads();
+}
+
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
 {
-    extern __shared__ real sh_mem[];
+    volatile extern __shared__ char sh_mem[];
     volatile real *Qs = (real *)&sh_mem;
     volatile int32_t *optionInds = (int32_t *) &sh_mem;     // Sharing the same array with Qs!
     volatile uint16_t *optionFlags = (uint16_t *) &Qs[blockDim.x];
 
     // Compute option indices and init Qs
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
-    const auto idx = idxBlock + threadIdx.x;
     const auto idxBlockNext = args.values.inds[blockIdx.x];
-    int width;
+    const auto idx = idxBlock + threadIdx.x;
+    int32_t width; 
     if (idx < idxBlockNext)    // Don't fetch options from next block
     {
         width = options.Widths[idx];
@@ -65,16 +113,17 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     __syncthreads();
 
     // Scan widths
-    optionInds[threadIdx.x] = scanIncBlock<Add<int>>(optionInds, threadIdx.x);
-    __syncthreads();
+    // TODO: use scanIncBlock<Add<int32_t>>(optionInds);
+    scanIncBlockSeq(optionInds);
     
     int scannedWidthIdx = -1;
     if (idx <= idxBlockNext)
     {
         scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
     }
+    __syncthreads();
 
-    // Compute option indices
+    // Send option indices to all threads
     optionInds[threadIdx.x] = 0;
     optionFlags[threadIdx.x] = 0;
     __syncthreads();
@@ -91,7 +140,15 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     }
     __syncthreads();
 
-    optionInds[threadIdx.x] = sgmScanIncBlock<Add<int>>(optionInds, optionFlags, threadIdx.x);
+    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
+
+    // Let all threads know about their Q start
+    if (idx <= idxBlockNext)
+    {
+        optionFlags[threadIdx.x] = scannedWidthIdx;
+    }
+    __syncthreads();
+    scannedWidthIdx = optionFlags[optionInds[threadIdx.x]];
     __syncthreads();
 
     // Get the option and compute its constants
@@ -106,15 +163,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         c.n = 0;
         c.width = blockDim.x - scannedWidthIdx;
     }
-
-    // Let all threads know about their Q start
-    if (idx <= idxBlockNext)
-    {
-        optionFlags[threadIdx.x] = scannedWidthIdx;
-    }
-    __syncthreads();
-    scannedWidthIdx = optionFlags[optionInds[threadIdx.x]];
-    __syncthreads();
 
     // Zero out Qs
     Qs[threadIdx.x] = 0;
@@ -206,8 +254,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
-        real Qexp = sgmScanIncBlock<Add<real>>(Qs, optionFlags, threadIdx.x);
-        __syncthreads();
+        real Qexp = sgmScanIncBlock<Add<real>>(Qs, optionFlags);
         
         if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
         {
@@ -229,7 +276,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         int j = threadIdx.x - c.jmax - scannedWidthIdx;
 
         real call = Qs[threadIdx.x];
-        __syncthreads();
 
         if (i < c.n && j >= -jhigh && j <= jhigh)
         {
@@ -271,8 +317,8 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         Qs[threadIdx.x] = call;
         __syncthreads();
     }
-
-    if (c.n > 0 && threadIdx.x == scannedWidthIdx)
+    
+    if (args.getOptionIdx() < idxBlockNext && threadIdx.x == scannedWidthIdx)
     {
         args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + c.jmax];
     }
@@ -329,7 +375,7 @@ protected:
 
         auto time_begin_kernel = std::chrono::steady_clock::now();
         kernelMultipleOptionsPerThreadBlock<<<inds.size(), blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
@@ -342,8 +388,6 @@ protected:
 
         // Copy result
         cudaOptions.copySortedResult(result, results);
-
-        cudaDeviceSynchronize();
 
         auto time_end = std::chrono::steady_clock::now();
         runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();

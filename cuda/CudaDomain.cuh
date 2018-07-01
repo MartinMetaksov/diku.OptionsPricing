@@ -114,8 +114,6 @@ struct CudaOptions
         YieldTimeSteps = thrust::raw_pointer_cast(yieldTimeSteps.data());
         Widths = thrust::raw_pointer_cast(widths.data());
         Heights = thrust::raw_pointer_cast(heights.data());
-        IndicesBegin = indices.begin();
-        IndicesEnd = indices.end();
 
         // Fill in widths and heights for all options.
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(termUnits.begin(), termStepCounts.begin(), maturities.begin(), reversionRates.begin(), widths.begin(), heights.begin())),
@@ -124,7 +122,10 @@ struct CudaOptions
 
         if (sort != SortType::NONE)
         {
-            thrust::sequence(indices.begin(), indices.end());
+            // Create indices
+            IndicesBegin = indices.begin();
+            IndicesEnd = indices.end();
+            thrust::sequence(IndicesBegin, IndicesEnd);
 
             auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(strikePrices.begin(), maturities.begin(), lengths.begin(), termUnits.begin(), 
                 termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin(), indices.begin()));
@@ -136,6 +137,7 @@ struct CudaOptions
                 ? thrust::make_zip_iterator(thrust::make_tuple(widths.end(), heights.end()))
                 : thrust::make_zip_iterator(thrust::make_tuple(heights.end(), widths.end()));
 
+            // Sort options
             switch (sort)
             {
                 case SortType::WIDTH_ASC:
@@ -152,6 +154,7 @@ struct CudaOptions
                     break;
             }
         }
+        cudaDeviceSynchronize();
     }
 
     void copySortedResult(thrust::device_vector<real> &deviceResults, std::vector<real> &hostResults)
@@ -160,10 +163,12 @@ struct CudaOptions
         if (Sort != SortType::NONE)
         {
             thrust::sort_by_key(IndicesBegin, IndicesEnd, deviceResults.begin());
+            cudaDeviceSynchronize();
         }
 
         // Copy result
         thrust::copy(deviceResults.begin(), deviceResults.end(), hostResults.begin());
+        cudaDeviceSynchronize();
     }
 };
 

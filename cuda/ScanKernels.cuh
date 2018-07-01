@@ -37,7 +37,7 @@ __device__ inline T scanIncWarp(volatile T *ptr, const unsigned int idx)
 }
 
 template <class OP, class T>
-__device__ inline T scanIncBlock(volatile T *ptr, const unsigned int idx)
+__device__ inline T scanIncBlock(volatile T *ptr, const unsigned int idx = threadIdx.x)
 {
     const unsigned int lane = idx & 31;
     const unsigned int warpid = idx >> 5;
@@ -64,8 +64,11 @@ __device__ inline T scanIncBlock(volatile T *ptr, const unsigned int idx)
     {
         val = OP::apply(ptr[warpid - 1], val);
     }
-
     __syncthreads();
+
+    ptr[idx] = val;
+    __syncthreads();
+    
     return val;
 }
 
@@ -126,9 +129,9 @@ __device__ inline T sgmScanIncWarp(volatile T *ptr, volatile F *flg, const unsig
 }
 
 template <class OP, class T, class F>
-__device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsigned int idx)
+__device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsigned int idx = threadIdx.x)
 {
-    const unsigned int lane = idx & 31;
+    // const unsigned int lane = idx & 31;
     const unsigned int warpid = idx >> 5;
     const unsigned int warplst = (warpid << 5) + 31;
 
@@ -145,7 +148,7 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
     // 2b: warp_flag is the OR-reduction of the flags
     //     in a warp, and is computed indirectly from
     //     the mindex in hd[]
-    bool warp_flag = flg[warplst] != 0 || !warp_is_open;
+    F warp_flag = flg[warplst] != 0 || !warp_is_open;
     bool will_accum = warp_is_open && (flg[idx] == 0);
 
     __syncthreads();
@@ -153,7 +156,7 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
     // 2c: the last thread in a warp writes partial results
     //     in the first warp. Note that all fit in the first
     //     warp because warp = 32 and max block size is 32^2
-    if (lane == 31)
+    if (idx == warplst)
     {
         ptr[warpid] = warp_total; //ptr[idx];
         flg[warpid] = warp_flag;
@@ -170,6 +173,10 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
         val = OP::apply(ptr[warpid - 1], val);
     }
     __syncthreads();
+
+    ptr[idx] = val;
+    __syncthreads();
+
     return val;
 }
 

@@ -1,4 +1,4 @@
-CXX        = nvcc -std=c++11 -O3
+CXX        	  = nvcc -std=c++11 -O3
 DEBUG_OPTIONS = -G -DCUDA_ERROR_CHECK #--ptxas-options=-v
 
 SOURCES_CPP = CudaOptionMain.cu

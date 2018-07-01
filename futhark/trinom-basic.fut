@@ -49,8 +49,8 @@ type TOptionData = {
   , OptionType                  : i8     -- option type, [0 - Put | 1 - Call]
 }
 
-let OptionType_PUT = i8.i32 0
-let OptionType_CALL = i8.i32 1
+let OptionType_CALL = i8.i32 0
+let OptionType_PUT = i8.i32 1
 
 ----------------------------------
 --- yield curve interpolation ---
