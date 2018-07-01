@@ -8,7 +8,7 @@
 rep=5
 
 # compiled options (change in futhark code first)
-real=32
+real="double"
 
 # data
 data_path="../data"

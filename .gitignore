@@ -588,3 +588,4 @@ __pycache__/
 build
 data/dataInfo
 data/[0-9]*
+.Rproj.user
