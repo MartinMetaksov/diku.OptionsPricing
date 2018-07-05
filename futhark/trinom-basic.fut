@@ -12,9 +12,9 @@ import "/futlib/array"
 -- For unsing single-precision floats select
 --    import "header32"
 ------------------------------------------------
--- import "header64"
+import "header64"
 
-import "header32"
+-- import "header32"
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
@@ -297,10 +297,9 @@ let trinomialOptionsHW1FCPU_single [ycCount]
 
     in Call[jmax]
 
-
 -- | As `map5`@term, but with three more arrays.
 let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =
-        map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip as bs cs ds es fs gs hs)
+        map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip8 as bs cs ds es fs gs hs)
 
 -----------------
 -- Entry point

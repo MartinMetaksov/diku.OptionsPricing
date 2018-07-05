@@ -12,9 +12,9 @@ import "/futlib/array"
 -- For unsing single-precision floats select
 --    import "header32"
 ------------------------------------------------
--- import "header64"
+import "header64"
 
-import "header32"
+-- import "header32"
 
 -------------------------------------------------------------
 --- Follows code independent of the instantiation of real ---
@@ -50,7 +50,25 @@ let OptionType_PUT = i8.i32 1
 
 -- | As `map5`@term, but with three more arrays.
 let map8 'a 'b 'c 'd 'e 'f 'g 'h [n] 'x (i: a -> b -> c -> d -> e -> f -> g -> h -> x) (as: [n]a) (bs: [n]b) (cs: [n]c) (ds: [n]d) (es: [n]e) (fs: [n]f) (gs: [n]g) (hs: [n]h): *[n]x =
-    map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip as bs cs ds es fs gs hs)
+    map (\(a, b, c, d, e, f, g, h) -> i a b c d e f g h) (zip8 as bs cs ds es fs gs hs)
+
+-- | As `unzip8`@term, but with one more array.
+let unzip9 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i (xs: [n](a,b,c,d,e,f,g,h,i)): ([n]a, [n]b, [n]c, [n]d, [n]e, [n]f, [n]g, [n]h, [n]i) =
+    let (as, bs, cs, ds, es, fs, gs, his) = unzip8 (map (\(a,b,c,d,e,f,g,h,i) -> (a,b,c,d,e,f,g,(h,i))) xs)
+    let (hs, is) = unzip his
+    in (as, bs, cs, ds, es, fs, gs, hs, is)
+
+-- | As `unzip9`@term, but with one more array.
+let unzip10 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j (xs: [n](a,b,c,d,e,f,g,h,i,j)): ([n]a, [n]b, [n]c, [n]d, [n]e, [n]f, [n]g, [n]h, [n]i, [n]j) =
+    let (as, bs, cs, ds, es, fs, gs, hs, ijs) = unzip9 (map (\(a,b,c,d,e,f,g,h,i,j) -> (a,b,c,d,e,f,g,h,(i,j))) xs)
+    let (is, js) = unzip ijs
+    in (as, bs, cs, ds, es, fs, gs, hs, is, js)
+
+-- | As `unzip10`@term, but with one more array.
+let unzip11 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k (xs: [n](a,b,c,d,e,f,g,h,i,j,k)): ([n]a, [n]b, [n]c, [n]d, [n]e, [n]f, [n]g, [n]h, [n]i, [n]j, [n]k) =
+    let (as, bs, cs, ds, es, fs, gs, hs, is, jks) = unzip10 (map (\(a,b,c,d,e,f,g,h,i,j,k) -> (a,b,c,d,e,f,g,h,i,(j,k))) xs)
+    let (js, ks) = unzip jks
+    in (as, bs, cs, ds, es, fs, gs, hs, is, js, ks)
 
 let sgmScanPlus [n] (flags: [n]i32) (data: [n]i32) : [n]i32 =
     (unzip (scan (\(x_flag,x) (y_flag,y) ->
@@ -223,7 +241,7 @@ let trinomialFlat [ycCount] [numAllOptions]
     (options : [numAllOptions]TOptionData) 
   : [numAllOptions]real = unsafe
     -- header: get the options
-    let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths, heights) = unzip (
+    let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths, heights) = unzip11 (
         map (\{StrikePrice, Maturity, Length, ReversionRateParameter, VolatilityParameter, TermUnit, TermStepCount, OptionType} ->
             let termUnit = ui2r TermUnit
             let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
