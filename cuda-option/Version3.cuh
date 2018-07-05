@@ -107,7 +107,6 @@ protected:
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
     {
         // Create block indices.
-        const auto blockCount = ceil(cudaOptions.N / ((float)blockSize));
         thrust::device_vector<int32_t> keys(cudaOptions.N);
         thrust::sequence(keys.begin(), keys.end());
 

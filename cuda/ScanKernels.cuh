@@ -183,7 +183,7 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
     return val;
 }
 
-// Sequential segmented scan implementation, useful for debugging.
+// // Sequential segmented scan implementation, useful for debugging.
 // template<class T, class F>
 // __device__ void sgmScanIncBlockSeq(T *values, F *flags)
 // {
@@ -216,7 +216,7 @@ __device__ inline T sgmScanIncBlock(volatile T *ptr, volatile F *flg, const unsi
 //     __syncthreads();
 // }
 
-// Sequential scan implementation, useful for debugging.
+// // Sequential scan implementation, useful for debugging.
 // template<class T>
 // __device__ void scanIncBlockSeq(T *values)
 // {

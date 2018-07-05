@@ -102,7 +102,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     }
     __syncthreads();
     scannedWidthIdx = optionFlags[optionInds[threadIdx.x]];
-    __syncthreads();
 
     // Get the option and compute its constants
     OptionConstants c;
@@ -116,6 +115,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         c.n = 0;
         c.width = blockDim.x - scannedWidthIdx;
     }
+    __syncthreads();
 
     // Zero out Qs
     Qs[threadIdx.x] = 0;

@@ -6,26 +6,25 @@
 
 # compile options
 real=64
-reg=""
+reg=32
 
 # program options
 device=0
-sort="H"
-version="4"
-block_size="256"
+sorts=("-" "h" "H" "w" "W")
+versions=("1" "2" "3" "4")
+block_sizes=("256")
 
 # data
-data_path="../data"
-out_path="../data/out"
-files=("book")
-# files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+# data_path="../data"
+# files=("book")
+files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
 # data_path="../data/1000"
-# out_path="../data/1000/out"
 # files=("rand_hw_1000" "unif_book_hw_1000")
 # data_path="../data/100000"
-# out_path="../data/100000/out"
 # files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
 #        "skew_hw_1_100000" "skew_hw_10_100000" "skew_w_1_rand_h_100000" "skew_w_10_rand_h_100000" "unif_book_hw_100000" "unif_hw_100000")
+data_path="../data/new_sets"
+out_path="$data_path/out"
 yield="yield"
 
 # executables
@@ -43,11 +42,20 @@ compile() {
 compare() {
     for file in ${files[*]}
     do
-        echo "Comparing" $file
-        {
-            ./$exe -o $data_path/$file.in -y $data_path/$yield.in -s $sort -v $version -b $block_size -d $device
-            cat $out_path/$file.out
-        } | ./$compare
+        for version in ${versions[*]}
+        do
+            for block_size in ${block_sizes[*]}
+            do
+                for sort in ${sorts[*]}
+                do
+                    echo "Comparing $file (version $version, block size $block_size, sort $sort)"
+                    {
+                        ./$exe -o $data_path/$file.in -y $data_path/$yield.in -s $sort -v $version -b $block_size -d $device
+                        cat $out_path/$file.out
+                    } | ./$compare
+                done
+            done
+        done
     done
 }
 
