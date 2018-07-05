@@ -6,14 +6,14 @@
 #include <vector>
 
 #ifdef USE_DOUBLE
-#define EPSILON std::numeric_limits<double>::epsilon()
+#define EPSILON std::numeric_limits<double>::epsilon() * 1000
 #else
-#define EPSILON std::numeric_limits<float>::epsilon()
+#define EPSILON std::numeric_limits<float>::epsilon() * 1000
 #endif
 
 void compareVectors(std::vector<trinom::real> test, std::vector<trinom::real> gold)
 {
-    Approx approx = Approx::custom().epsilon(EPSILON).scale(1000);
+    Approx approx = Approx::custom().margin(EPSILON);
 
     REQUIRE(test.size() == gold.size());
 

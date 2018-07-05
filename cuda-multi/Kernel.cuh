@@ -40,54 +40,6 @@ public:
     __device__ virtual int getOptionIdx() const = 0;
 };
 
-// Sequential scan implementation, useful for debugging.
-// template<class T, class F>
-// __device__ void sgmScanIncBlockSeq(T *values, F *flags)
-// {
-//     if (threadIdx.x == 0)
-//     {
-//         F counter = 0;
-//         T scan = 0;
-//         for (int i = 0; i < blockDim.x; ++i)
-//         {
-//             F flg = flags[i];
-//             if (flg != 0)
-//             {   
-//                 if (counter > 0)
-//                 {
-//                     printf("sgmScanIncBlock: wrong flag at %d!\n", i);
-//                 }
-//                 counter = flg;
-//                 scan = 0;
-//             }
-
-//             --counter;
-//             scan += values[i];
-//             values[i] = scan;
-//         }
-//         if (counter > 0)
-//         {
-//             printf("sgmScanIncBlock: wrong flag at the end!\n");
-//         }
-//     }
-//     __syncthreads();
-// }
-
-template<class T>
-__device__ void scanIncBlockSeq(T *values)
-{
-    if (threadIdx.x == 0)
-    {
-        T scan = 0;
-        for (int i = 0; i < blockDim.x; ++i)
-        {
-            scan += values[i];
-            values[i] = scan;
-        }
-    }
-    __syncthreads();
-}
-
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
 {
@@ -110,11 +62,12 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     {
         optionInds[threadIdx.x] = 0;
     }
+    optionFlags[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
     __syncthreads();
 
     // Scan widths
-    // TODO: use scanIncBlock<Add<int32_t>>(optionInds);
-    scanIncBlockSeq(optionInds);
+    // TODO: maybe use scanIncBlock<Add<int32_t>>(optionInds);
+    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
     
     int scannedWidthIdx = -1;
     if (idx <= idxBlockNext)
