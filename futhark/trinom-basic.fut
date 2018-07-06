@@ -1,5 +1,10 @@
 -- Trinomial option pricing
 -- ==
+-- compiled input @ data/small.in
+-- output @ data/small.out
+-- compiled input @ data/options-60000.in
+-- output @ data/options-60000.out
+
 -- Run as e.g. $cat options.in yield.in | ./trinom-basic
 
 import "/futlib/math"
