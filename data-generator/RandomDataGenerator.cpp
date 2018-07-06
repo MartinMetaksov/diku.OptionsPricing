@@ -45,17 +45,45 @@ struct RandOption
     }
 };
 
+long getApproxNumOfOperations(long width, long height)
+{
+    return width * height;
+}
+
 real randRealInRange(real a, real b)
 {
-    real random = ((real)rand()) / (real)RAND_MAX;
-    real diff = b - a;
-    real r = random * diff;
-    return a + r;
+    random_device rand_dev;
+    mt19937 gen(rand_dev());
+    uniform_real_distribution<> dis(a, b);
+    return dis(gen);
 }
 
 int randIntInRange(int a, int b)
 {
     return rand() % (b - a + 1) + a;
+}
+
+int getWidthByRRandTsc(int termStepCount, real rr)
+{
+    return 2 * ((int)(minus184 / (exp(-rr * ((ceil((real)year / 365)) / (real)termStepCount)) - one)) + 1) + 1;
+}
+
+real getRandRRByWidthRangeTscAndRRRange(int termStepCount, real a, real b)
+{
+    real rr = zero;
+    int targetWidth = -1;
+    int widthMin = getWidthByRRandTsc(termStepCount, b);
+    int widthMax = getWidthByRRandTsc(termStepCount, a);
+    int randWidth = randIntInRange(widthMin, widthMax);
+
+    // set an offset, as can't always get the exact width
+    while (targetWidth == -1 ||
+           (targetWidth != randWidth && (targetWidth < randWidth - 20 || targetWidth > randWidth + 20)))
+    {
+        rr = randRealInRange(a, b);
+        targetWidth = getWidthByRRandTsc(termStepCount, rr);
+    }
+    return rr;
 }
 
 void addOption(vector<RandOption> &options, const RandOption o, long &currentTotalHeight, long &currentTotalWidth)
@@ -112,8 +140,9 @@ void writeOptionsToFile(vector<RandOption> &randOptions,
     mdFile << "Current total width: " << finalWidth << endl;
     mdFile << "Current total height: " << finalHeight << endl;
     mdFile << "Constant max product: " << constProduct << endl;
-    mdFile << "Current product: " << finalWidth * finalHeight << endl;
-    mdFile << "Deviation: " << abs(constProduct - (finalWidth * finalHeight)) * 100 / (real)constProduct << "%" << endl;
+    long finalNumOperations = getApproxNumOfOperations(finalWidth, finalHeight);
+    mdFile << "Current product: " << finalNumOperations << endl;
+    mdFile << "Deviation: " << abs(constProduct - finalNumOperations) * 100 / (real)constProduct << "%" << endl;
     if (dataType == 4 || dataType == 5 || dataType == 6)
     {
         mdFile << "Skew: " << skewPercent << "%" << endl;
@@ -147,12 +176,16 @@ void distribute_0(vector<RandOption> &options, const long constProduct)
 {
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         RandOption o(9, 12, 0.1, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
-    writeOptionsToFile(options, "0_UNIFORM", 0, constProduct, 0);
+
+    string filename = "0_UNIFORM";
+    writeOptionsToFile(options, filename, 0, constProduct, 0);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_1(vector<RandOption> &options, const long constProduct)
@@ -160,15 +193,17 @@ void distribute_1(vector<RandOption> &options, const long constProduct)
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         int maturity = randIntInRange(1, 729);
-        real reversionRate = randRealInRange(0.00433, 0.99);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.00433, 0.99);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    writeOptionsToFile(options, "1_RAND", 1, constProduct, 0);
+    string filename = "1_RAND";
+    writeOptionsToFile(options, filename, 1, constProduct, 0);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_2(vector<RandOption> &options, const long constProduct)
@@ -176,14 +211,16 @@ void distribute_2(vector<RandOption> &options, const long constProduct)
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
-        real reversionRate = randRealInRange(0.00433, 0.99);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.00433, 0.99);
         RandOption o(9, 12, reversionRate, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    writeOptionsToFile(options, "2_RANDCONSTHEIGHT", 2, constProduct, 0);
+    string filename = "2_RANDCONSTHEIGHT";
+    writeOptionsToFile(options, filename, 2, constProduct, 0);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_3(vector<RandOption> &options, const long constProduct)
@@ -191,14 +228,15 @@ void distribute_3(vector<RandOption> &options, const long constProduct)
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         int maturity = randIntInRange(1, 729);
         RandOption o(maturity, 12, 0.1, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
-
-    writeOptionsToFile(options, "3_RANDCONSTWIDTH", 3, constProduct, 0);
+    string filename = "3_RANDCONSTWIDTH";
+    writeOptionsToFile(options, filename, 3, constProduct, 0);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_4(vector<RandOption> &options, const long constProduct, const int skewPerc)
@@ -206,23 +244,25 @@ void distribute_4(vector<RandOption> &options, const long constProduct, const in
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < (skewPerc / (real)100) * constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < (skewPerc / (real)100) * constProduct)
     {
         int maturity = randIntInRange(648, 729);
-        real reversionRate = randRealInRange(0.00433, 0.0045);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.00433, 0.0045);
         RandOption o(maturity, 12, reversionRate, true);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         int maturity = randIntInRange(1, 81);
-        real reversionRate = randRealInRange(0.01, 0.99);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.01, 0.99);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    writeOptionsToFile(options, "4_SKEWED", 4, constProduct, skewPerc);
+    string filename = "4_SKEWED";
+    writeOptionsToFile(options, filename, 4, constProduct, skewPerc);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_5(vector<RandOption> &options, const long constProduct, const int skewPerc)
@@ -230,22 +270,24 @@ void distribute_5(vector<RandOption> &options, const long constProduct, const in
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < (skewPerc / (real)100) * constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < (skewPerc / (real)100) * constProduct)
     {
-        real reversionRate = randRealInRange(0.00433, 0.0045);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.00433, 0.0045);
         RandOption o(9, 12, reversionRate, true);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         int maturity = randIntInRange(1, 81);
-        real reversionRate = randRealInRange(0.01, 0.99);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.01, 0.99);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    writeOptionsToFile(options, "5_SKEWEDCONSTHEIGHT", 5, constProduct, skewPerc);
+    string filename = "5_SKEWEDCONSTHEIGHT";
+    writeOptionsToFile(options, filename, 5, constProduct, skewPerc);
+    cout << "finished writing to " << filename << endl;
 }
 
 void distribute_6(vector<RandOption> &options, const long constProduct, const int skewPerc)
@@ -253,22 +295,24 @@ void distribute_6(vector<RandOption> &options, const long constProduct, const in
     long currentTotalWidth = 0;
     long currentTotalHeight = 0;
 
-    while ((currentTotalHeight * currentTotalWidth) < (skewPerc / (real)100) * constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < (skewPerc / (real)100) * constProduct)
     {
         int maturity = randIntInRange(648, 729);
         RandOption o(maturity, 12, 0.1, true);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    while ((currentTotalHeight * currentTotalWidth) < constProduct)
+    while (getApproxNumOfOperations(currentTotalWidth, currentTotalHeight) < constProduct)
     {
         int maturity = randIntInRange(1, 81);
-        real reversionRate = randRealInRange(0.01, 0.99);
+        real reversionRate = getRandRRByWidthRangeTscAndRRRange(12, 0.01, 0.99);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentTotalHeight, currentTotalWidth);
     }
 
-    writeOptionsToFile(options, "6_SKEWEDCONSTWIDTH", 6, constProduct, skewPerc);
+    string filename = "6_SKEWEDCONSTWIDTH";
+    writeOptionsToFile(options, filename, 6, constProduct, skewPerc);
+    cout << "finished writing to " << filename << endl;
 }
 
 int main(int argc, char *argv[])
@@ -292,7 +336,8 @@ int main(int argc, char *argv[])
     cmd >> GetOpt::Option('s', "skewPerc", skewPercent);
 
     // ofstream myfile;
-    long constProduct = totalWidth * totalHeight;
+    long constProduct = getApproxNumOfOperations(totalWidth, totalHeight);
+
     vector<RandOption> randOptions;
 
     switch (dataType)

@@ -586,6 +586,4 @@ __pycache__/
 .vscode
 */*.dSYM
 build
-data/dataInfo
-data/[0-9]*
 .Rproj.user
