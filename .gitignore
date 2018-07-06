@@ -588,3 +588,4 @@ __pycache__/
 build
 .Rproj.user
 !data/**/*.out
+data/wmp
