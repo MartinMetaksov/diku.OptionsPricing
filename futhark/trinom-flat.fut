@@ -1,11 +1,21 @@
--- Trinomial option pricing
+-- Trinomial option pricing - flat version
+-- Run as e.g. $cat options.in yield.in | ./trinom-basic
+-- Join datasets with yield by running $sh test.sh create
 -- ==
--- compiled input @ data/small.in
--- output @ data/small.out
--- compiled input @ data/options-60000.in
--- output @ data/options-60000.out
-
--- Run as e.g. $cat options.in yield.in | ./trinom-flat
+-- compiled input @ ../data/fut/0_UNIFORM.in
+-- output @ ../data/out/0_UNIFORM.out
+-- compiled input @ ../data/fut/1_RAND.in
+-- output @ ../data/out/1_RAND.out
+-- compiled input @ ../data/fut/2_RANDCONSTHEIGHT.in
+-- output @ ../data/out/2_RANDCONSTHEIGHT.out
+-- compiled input @ ../data/fut/3_RANDCONSTWIDTH.in
+-- output @ ../data/out/3_RANDCONSTWIDTH.out
+-- compiled input @ ../data/fut/4_SKEWED.in
+-- output @ ../data/out/4_SKEWED.out
+-- compiled input @ ../data/fut/5_SKEWEDCONSTHEIGHT.in
+-- output @ ../data/out/5_SKEWEDCONSTHEIGHT.out
+-- compiled input @ ../data/fut/6_SKEWEDCONSTWIDTH.in
+-- output @ ../data/out/6_SKEWEDCONSTWIDTH.out
 
 import "/futlib/math"
 

@@ -587,3 +587,4 @@ __pycache__/
 */*.dSYM
 build
 .Rproj.user
+!data/**/*.out
