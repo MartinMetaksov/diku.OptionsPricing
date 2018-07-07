@@ -589,3 +589,4 @@ build
 .Rproj.user
 !data/**/*.out
 data/wmp
+.Rhistory

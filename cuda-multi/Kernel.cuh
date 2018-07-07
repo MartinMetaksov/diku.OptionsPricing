@@ -263,7 +263,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            call = computeCallValue(isMaturity, c, res);
+            call = computeCallValue(isMaturity, c.X, c.type, res);
         }
         __syncthreads();
 

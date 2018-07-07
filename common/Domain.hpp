@@ -144,16 +144,16 @@ DEVICE real computeJValue(const int j, const int jmax, const real M, const int e
     return 0;
 }
 
-DEVICE inline real computeCallValue(bool isMaturity, const OptionConstants &c, const real res)
+DEVICE inline real computeCallValue(bool isMaturity, const real X, const OptionType type, const real res)
 {
     if (isMaturity)
     {
-        switch (c.type)
+        switch (type)
         {
         case OptionType::PUT:
-            return MAX(c.X - res, zero);
+            return MAX(X - res, zero);
         case OptionType::CALL:
-            return MAX(res - c.X, zero);
+            return MAX(res - X, zero);
         }
     }
     return res;

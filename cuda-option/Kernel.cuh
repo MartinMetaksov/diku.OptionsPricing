@@ -197,7 +197,7 @@ __global__ void kernelOneOptionPerThread(const CudaOptions options, KernelArgsT 
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            args.setQCopyAt(jind, computeCallValue(isMaturity, c, res));
+            args.setQCopyAt(jind, computeCallValue(isMaturity, c.X, c.type, res));
         }
 
         // Switch Qs
