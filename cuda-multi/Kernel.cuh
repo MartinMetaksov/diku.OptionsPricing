@@ -43,77 +43,83 @@ public:
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
 {
-    volatile extern __shared__ char sh_mem[];
+    extern __shared__ char sh_mem[];
     volatile real *Qs = (real *)&sh_mem;
-    volatile int32_t *optionInds = (int32_t *) &sh_mem;     // Sharing the same array with Qs!
-    volatile uint16_t *optionFlags = (uint16_t *) &Qs[blockDim.x];
+    volatile int32_t *values = (int32_t *) &sh_mem;     // Sharing the same array with Qs!
+    volatile uint16_t *flags = (uint16_t *) &Qs[blockDim.x];
+    volatile OptionConstants *constants = (OptionConstants *) &flags[blockDim.x];
 
     // Compute option indices and init Qs
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
     const auto idxBlockNext = args.values.inds[blockIdx.x];
     const auto idx = idxBlock + threadIdx.x;
-    int32_t width; 
     if (idx < idxBlockNext)    // Don't fetch options from next block
     {
-        width = options.Widths[idx];
-        optionInds[threadIdx.x] = width;
+        OptionConstants c;
+        computeConstants(c, options, idx);
+        values[threadIdx.x] = c.width;
+        constants[threadIdx.x].t = c.t;
+        constants[threadIdx.x].dt = c.dt;
+        constants[threadIdx.x].dr = c.dr;
+        constants[threadIdx.x].X = c.X;
+        constants[threadIdx.x].M = c.M;
+        constants[threadIdx.x].jmax = c.jmax;
+        constants[threadIdx.x].n = c.n;
+        constants[threadIdx.x].width = c.width;
+        constants[threadIdx.x].termUnit = c.termUnit;
+        constants[threadIdx.x].type = c.type;
     }
     else
     {
-        optionInds[threadIdx.x] = 0;
+        values[threadIdx.x] = 0;
     }
-    optionFlags[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
+    flags[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
     __syncthreads();
 
     // Scan widths
-    // TODO: maybe use scanIncBlock<Add<int32_t>>(optionInds);
-    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
+    // TODO: maybe use scanIncBlock<Add<int32_t>>(values);
+    sgmScanIncBlock<Add<int32_t>>(values, flags);
     
     int scannedWidthIdx = -1;
     if (idx <= idxBlockNext)
     {
-        scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
+        scannedWidthIdx = threadIdx.x == 0 ? 0 : values[threadIdx.x - 1];
     }
     __syncthreads();
 
     // Send option indices to all threads
-    optionInds[threadIdx.x] = 0;
-    optionFlags[threadIdx.x] = 0;
+    values[threadIdx.x] = 0;
+    flags[threadIdx.x] = 0;
     __syncthreads();
 
     if (idx < idxBlockNext)
     {
-        optionInds[scannedWidthIdx] = threadIdx.x;
-        optionFlags[scannedWidthIdx] = width;
+        values[scannedWidthIdx] = threadIdx.x;
+        flags[scannedWidthIdx] = constants[threadIdx.x].width;
     }
     else if (idx == idxBlockNext && scannedWidthIdx < blockDim.x) // fake option to fill block
     {
-        optionInds[scannedWidthIdx] = threadIdx.x;
-        optionFlags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
+        values[scannedWidthIdx] = threadIdx.x;
+        flags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
     }
     __syncthreads();
 
-    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
+    sgmScanIncBlock<Add<int32_t>>(values, flags);
 
     // Let all threads know about their Q start
     if (idx <= idxBlockNext)
     {
-        optionFlags[threadIdx.x] = scannedWidthIdx;
+        flags[threadIdx.x] = scannedWidthIdx;
     }
     __syncthreads();
-    scannedWidthIdx = optionFlags[optionInds[threadIdx.x]];
+    scannedWidthIdx = flags[values[threadIdx.x]];
 
-    // Get the option and compute its constants
-    OptionConstants c;
-    args.init(optionInds[threadIdx.x], idxBlock, idxBlockNext, options.N);
-    if (args.getOptionIdx() < idxBlockNext)
+    // Let all threads know about their option index
+    auto optIdx = values[threadIdx.x];
+    args.init(optIdx, idxBlock, idxBlockNext, options.N);
+    if (args.getOptionIdx() >= idxBlockNext)
     {
-        computeConstants(c, options, args.getOptionIdx());
-    }
-    else
-    {
-        c.n = 0;
-        c.width = blockDim.x - scannedWidthIdx;
+        optIdx = -1;
     }
     __syncthreads();
 
@@ -122,96 +128,103 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     __syncthreads();
 
     // Set the initial alpha and Q values
-    if (threadIdx.x == scannedWidthIdx && args.getOptionIdx() < idxBlockNext)
+    if (threadIdx.x == scannedWidthIdx && optIdx != -1)
     {
-        args.setAlphaAt(0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
-        Qs[scannedWidthIdx + c.jmax] = 1;    // Set starting Qs to 1$
+        args.setAlphaAt(0, getYieldAtYear(constants[optIdx].dt, constants[optIdx].termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
+        Qs[scannedWidthIdx + constants[optIdx].jmax] = 1;    // Set starting Qs to 1$
     }
     __syncthreads();
 
     // Forward propagation
     for (int i = 1; i <= args.getMaxHeight(); ++i)
     {
-        int jhigh = min(i, c.jmax);
-
-        // Forward iteration step, compute Qs in the next time step
-        int j = threadIdx.x - c.jmax - scannedWidthIdx;
-
         real Q = 0;
-        if (i <= c.n && j >= -jhigh && j <= jhigh)
-        {   
-            auto alpha = args.getAlphaAt(i - 1);
-            auto expp1 = j == jhigh ? zero : Qs[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
-            auto expm = Qs[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
-            auto expm1 = j == -jhigh ? zero : Qs[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
+        int j = 0;
+        if (optIdx != -1)
+        {
+            int jhigh = min(i, constants[optIdx].jmax);
 
-            if (i == 1) {
-                if (j == -jhigh) {
-                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
-                } else {
-                    Q = computeJValue(j, c.jmax, c.M, 2) * expm;
+            // Forward iteration step, compute Qs in the next time step
+            j = threadIdx.x - constants[optIdx].jmax - scannedWidthIdx;
+
+            if (i <= constants[optIdx].n && j >= -jhigh && j <= jhigh)
+            {   
+                auto alpha = args.getAlphaAt(i - 1);
+                auto expp1 = j == jhigh ? zero : Qs[threadIdx.x + 1] * exp(-(alpha + (j + 1) * constants[optIdx].dr) * constants[optIdx].dt);
+                auto expm = Qs[threadIdx.x] * exp(-(alpha + j * constants[optIdx].dr) * constants[optIdx].dt);
+                auto expm1 = j == -jhigh ? zero : Qs[threadIdx.x - 1] * exp(-(alpha + (j - 1) * constants[optIdx].dr) * constants[optIdx].dt);
+
+                if (i == 1) {
+                    if (j == -jhigh) {
+                        Q = computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                    } else if (j == jhigh) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1;
+                    } else {
+                        Q = computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm;
+                    }
                 }
-            }
-            else if (i <= c.jmax) {
-                if (j == -jhigh) {
-                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    Q = computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
-                } else if (j == jhigh - 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm;
+                else if (i <= constants[optIdx].jmax) {
+                    if (j == -jhigh) {
+                        Q = computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                    } else if (j == -jhigh + 1) {
+                        Q = computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                    } else if (j == jhigh) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1;
+                    } else if (j == jhigh - 1) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm;
+                    } else {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                    }
                 } else {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                }
-            } else {
-                if (j == -jhigh) {
-                    Q = computeJValue(j, c.jmax, c.M, 3) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                } else if (j == -jhigh + 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 2) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
-                            
-                } else if (j == jhigh) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 1) * expm;
-                } else if (j == jhigh - 1) {
-                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
-                            
-                } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * Qs[threadIdx.x - 2] * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
-                        computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
-                        computeJValue(j, c.jmax, c.M, 2) * expm +
-                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * Qs[threadIdx.x + 2] * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
+                    if (j == -jhigh) {
+                        Q = computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                    } else if (j == -jhigh + 1) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 2) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
+                                
+                    } else if (j == jhigh) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 1) * expm;
+                    } else if (j == jhigh - 1) {
+                        Q = computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 2) * expp1;
+                                
+                    } else {
+                        Q = ((j == -jhigh + 2) ? computeJValue(j - 2, constants[optIdx].jmax, constants[optIdx].M, 1) * Qs[threadIdx.x - 2] * exp(-(alpha + (j - 2) * constants[optIdx].dr) * constants[optIdx].dt) : zero) +
+                            computeJValue(j - 1, constants[optIdx].jmax, constants[optIdx].M, 1) * expm1 +
+                            computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm +
+                            computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1 +
+                            ((j == jhigh - 2) ? computeJValue(j + 2, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x + 2] * exp(-(alpha + (j + 2) * constants[optIdx].dr) * constants[optIdx].dt) : zero);
+                    }
                 }
             }
         }
         __syncthreads();
 
-        Qs[threadIdx.x] = Q > zero ? Q * exp(-j * c.dr * c.dt) : zero;
+        if (optIdx != -1)
+        {
+            Qs[threadIdx.x] = Q > zero ? Q * exp(-j * constants[optIdx].dr * constants[optIdx].dt) : zero;
+        }
         __syncthreads();
 
         // Repopulate flags
-        optionFlags[threadIdx.x] = threadIdx.x == scannedWidthIdx ? c.width : 0;
+        flags[threadIdx.x] = threadIdx.x == scannedWidthIdx ? (optIdx == -1 ? blockDim.x - scannedWidthIdx : constants[optIdx].width) : 0;
         __syncthreads();
         
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
-        real Qexp = sgmScanIncBlock<Add<real>>(Qs, optionFlags);
+        real Qexp = sgmScanIncBlock<Add<real>>(Qs, flags);
         
-        if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
+        if (optIdx != -1 && i <= constants[optIdx].n && threadIdx.x == scannedWidthIdx + constants[optIdx].width - 1)
         {
-            real alpha = computeAlpha(Qexp, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
+            real alpha = computeAlpha(Qexp, i-1, constants[optIdx].dt, constants[optIdx].termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
             args.setAlphaAt(i, alpha);
         }
         Qs[threadIdx.x] = Q;
@@ -223,47 +236,51 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
     for (auto i = args.getMaxHeight() - 1; i >= 0; --i)
     {
-        int jhigh = min(i, c.jmax);
-
-        // Forward iteration step, compute Qs in the next time step
-        int j = threadIdx.x - c.jmax - scannedWidthIdx;
-
-        real call = Qs[threadIdx.x];
-
-        if (i < c.n && j >= -jhigh && j <= jhigh)
+        real call = 0;
+        if (optIdx != -1)
         {
-            auto alpha = args.getAlphaAt(i);
-            auto isMaturity = i == ((int)(c.t / c.dt));
-            auto callExp = exp(-(alpha + j * c.dr) * c.dt);
+            int jhigh = min(i, constants[optIdx].jmax);
 
-            real res;
-            if (j == c.jmax)
-            {
-                // Top edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x - 1] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x - 2]) *
-                        callExp;
-            }
-            else if (j == -c.jmax)
-            {
-                // Bottom edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x + 2] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x + 1] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x]) *
-                        callExp;
-            }
-            else
-            {
-                // Standard branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x + 1] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x - 1]) *
-                        callExp;
-            }
+            // Forward iteration step, compute Qs in the next time step
+            int j = threadIdx.x - constants[optIdx].jmax - scannedWidthIdx;
 
-            // after obtaining the result from (i+1) nodes, set the call for ith node
-            call = computeCallValue(isMaturity, c.X, c.type, res);
+            call = Qs[threadIdx.x];
+
+            if (i < constants[optIdx].n && j >= -jhigh && j <= jhigh)
+            {
+                auto alpha = args.getAlphaAt(i);
+                auto isMaturity = i == ((int)(constants[optIdx].t / constants[optIdx].dt));
+                auto callExp = exp(-(alpha + j * constants[optIdx].dr) * constants[optIdx].dt);
+
+                real res;
+                if (j == constants[optIdx].jmax)
+                {
+                    // Top edge branching
+                    res = (computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 1) * Qs[threadIdx.x] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * Qs[threadIdx.x - 1] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x - 2]) *
+                            callExp;
+                }
+                else if (j == -constants[optIdx].jmax)
+                {
+                    // Bottom edge branching
+                    res = (computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 1) * Qs[threadIdx.x + 2] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * Qs[threadIdx.x + 1] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x]) *
+                            callExp;
+                }
+                else
+                {
+                    // Standard branching
+                    res = (computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 1) * Qs[threadIdx.x + 1] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * Qs[threadIdx.x] +
+                        computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x - 1]) *
+                            callExp;
+                }
+
+                // after obtaining the result from (i+1) nodes, set the call for ith node
+                call = computeCallValue(isMaturity, constants[optIdx].X, constants[optIdx].type, res);
+            }
         }
         __syncthreads();
 
@@ -271,9 +288,9 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         __syncthreads();
     }
     
-    if (args.getOptionIdx() < idxBlockNext && threadIdx.x == scannedWidthIdx)
+    if (threadIdx.x == scannedWidthIdx && optIdx != -1)
     {
-        args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + c.jmax];
+        args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + constants[optIdx].jmax];
     }
 }
 
@@ -293,9 +310,10 @@ protected:
         thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
 
     template<class KernelArgsT, class KernelArgsValuesT>
-    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values, const int totalAlphasCount)
+    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, 
+        KernelArgsValuesT &values, const int totalAlphasCount, const int maxOptionsBlock)
     {
-        const int sharedMemorySize = sizeof(real) * blockSize + sizeof(uint16_t) * blockSize;
+        const int sharedMemorySize = sizeof(real) * blockSize + sizeof(uint16_t) * blockSize + sizeof(OptionConstants) * maxOptionsBlock;
         thrust::device_vector<real> alphas(totalAlphasCount);
         thrust::device_vector<real> result(cudaOptions.N);
 

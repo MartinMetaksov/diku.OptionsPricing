@@ -69,6 +69,8 @@ protected:
         thrust::host_vector<int32_t> hInds;
 
         auto counter = 0;
+        auto prevInd = 0;
+        auto maxOptionsBlock = 0;
         for (auto i = 0; i < cudaOptions.N; ++i)
         {
             auto w = hostWidths[i];
@@ -77,9 +79,20 @@ protected:
             {
                 hInds.push_back(i);
                 counter = w;
+
+                auto optionsBlock = i - prevInd;
+                if (optionsBlock > maxOptionsBlock) {
+                    maxOptionsBlock = optionsBlock;
+                }
+                prevInd = i;
             }
         }
         hInds.push_back(cudaOptions.N);
+
+        auto optionsBlock = cudaOptions.N - prevInd;
+        if (optionsBlock > maxOptionsBlock) {
+            maxOptionsBlock = optionsBlock;
+        }
 
         thrust::device_vector<int32_t> dInds = hInds;
 
@@ -89,7 +102,7 @@ protected:
         values.maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
         const int totalAlphasCount = cudaOptions.N * values.maxHeight;
 
-        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, values, totalAlphasCount);
+        runKernel<KernelArgsNaive>(cudaOptions, results, dInds, values, totalAlphasCount, maxOptionsBlock);
     }
 };
 
