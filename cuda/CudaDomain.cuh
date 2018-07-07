@@ -8,6 +8,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <thrust/transform_scan.h>
+#include <climits>
 
 #include "../common/Options.hpp"
 #include "../common/OptionConstants.hpp"
@@ -176,8 +177,8 @@ size_t vectorsizeof(const typename thrust::device_vector<T>& vec)
 
 struct CudaRuntime
 {
-    long KernelRuntime;
-    long TotalRuntime;
+    long KernelRuntime = LONG_MAX;
+    long TotalRuntime = LONG_MAX;
 };
 
 bool operator <(const CudaRuntime& x, const CudaRuntime& y) {
