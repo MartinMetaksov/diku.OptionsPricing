@@ -267,15 +267,16 @@ protected:
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
         CudaCheckError();
-        
+
         if (isTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
 
-        // Copy result
-        cudaOptions.copySortedResult(result, results);
+        // Sort result
+        cudaOptions.sortResult(result);
 
+        // Stop timing
         auto time_end = std::chrono::steady_clock::now();
         runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();
 
@@ -283,6 +284,10 @@ protected:
         {
             std::cout << "Total execution time " << runtime.TotalRuntime << " microsec" << std::endl;
         }
+
+        // Copy result to host
+        thrust::copy(result.begin(), result.end(), results.begin());
+        cudaDeviceSynchronize();
     }
 
 public:
@@ -291,8 +296,6 @@ public:
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
         const int blockSize = -1, const SortType sortType = SortType::NONE, const bool isTest = false)
     {
-        time_begin = std::chrono::steady_clock::now();
-
         this->isTest = isTest;
         this->blockSize = blockSize > 0 ? blockSize : DEFAULT_BLOCK_SIZE;
 
@@ -307,6 +310,10 @@ public:
 
         thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
         thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+
+        // Start timing when input is copied to device
+        cudaDeviceSynchronize();
+        time_begin = std::chrono::steady_clock::now();
 
         thrust::device_vector<int32_t> widths(options.N);
         thrust::device_vector<int32_t> heights(options.N);

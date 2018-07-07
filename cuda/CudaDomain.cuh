@@ -157,7 +157,7 @@ struct CudaOptions
         cudaDeviceSynchronize();
     }
 
-    void copySortedResult(thrust::device_vector<real> &deviceResults, std::vector<real> &hostResults)
+    void sortResult(thrust::device_vector<real> &deviceResults)
     {
         // Sort result
         if (Sort != SortType::NONE)
@@ -165,10 +165,6 @@ struct CudaOptions
             thrust::sort_by_key(IndicesBegin, IndicesEnd, deviceResults.begin());
             cudaDeviceSynchronize();
         }
-
-        // Copy result
-        thrust::copy(deviceResults.begin(), deviceResults.end(), hostResults.begin());
-        cudaDeviceSynchronize();
     }
 };
 

@@ -1,5 +1,5 @@
-CXX        	  = nvcc -std=c++11 -O3
-DEBUG_OPTIONS = -G -DCUDA_ERROR_CHECK #--ptxas-options=-v
+CXX        	  = nvcc -std=c++11 -O3 #--ptxas-options=-v
+DEBUG_OPTIONS = -G -DCUDA_ERROR_CHECK
 
 SOURCES_CPP = CudaMultiMain.cu
 EXECUTABLE  = ../build/CudaMulti

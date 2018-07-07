@@ -2,7 +2,7 @@ CXX	= nvcc -std=c++11 -O3 -Xcompiler -fopenmp
 CPP	= g++ -std=c++11 -O3	 
 
 SOURCES_CPP = TestMain.cpp TestCuda.cu
-EXECUTABLE  = ../build/TestMain
+EXECUTABLE  = ../build/Test
 
 SOURCES_COMPARE		= Compare.cpp
 EXECUTABLE_COMPARE  = ../build/Compare
