@@ -1,7 +1,5 @@
 Filename: ../data/3_RANDCONSTWIDTH.in
-Total size: 15499
-Current total width: 728453
-Current total height: 68642851
-Constant max product: 300000020000000
-Current product: 300018614536775
-Deviation: 0.00619818%
+Total size: 4922
+Constant max product: 1000000000
+Current product: 1000226458
+Deviation: 0.0226458%

@@ -14,7 +14,7 @@ $(EXECUTABLE):
 	@$(CXX) -o $(EXECUTABLE) $(SOURCES_CPP)
 
 run: $(EXECUTABLE)
-	@./$(EXECUTABLE) -t $(TYPE) -h $(TOTAL_HEIGHT) -w $(TOTAL_WIDTH) -s $(SKEW_PERCENT)
+	@./$(EXECUTABLE) -t $(TYPE) -p $(TOTAL_PROD) -s $(SKEW_PERCENT)
 
 clean:
 	@rm -f $(EXECUTABLE)
