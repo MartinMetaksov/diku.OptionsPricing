@@ -230,12 +230,13 @@ let bkwdHelper (X : real) (op : i8) (M : real) (dr : real) (dt : real) (alpha : 
             (computeJValue j jmax M 3) * call[jind - 1]) *
                 callExp
 
-    in if isMaturity
+    let value = if isMaturity
         then
             if (op == OptionType_PUT)
             then r_max(X - res, zero)
             else r_max(res - X, zero)
         else res
+    in r_convert_inf value
 
 
 
