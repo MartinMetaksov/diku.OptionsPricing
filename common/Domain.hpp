@@ -156,8 +156,15 @@ DEVICE inline real computeCallValue(bool isMaturity, const real X, const OptionT
             return MAX(res - X, zero);
         }
     }
-    return res;
+
+    if (res == infinity)
+        return REAL_MAX;
+    else if (res == -infinity)
+        return REAL_MIN;
+    else
+        return res;
 }
+
 } // namespace trinom
 
 #endif

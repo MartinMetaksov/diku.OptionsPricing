@@ -12,6 +12,15 @@
 namespace trinom
 {
 
+enum class SortType : char
+{
+    WIDTH_DESC = 'W',
+    WIDTH_ASC = 'w',
+    HEIGHT_DESC = 'H',
+    HEIGHT_ASC = 'h',
+    NONE = '-'
+};
+
 enum class OptionType : int8_t
 {
     CALL = 0,
