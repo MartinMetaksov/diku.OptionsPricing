@@ -1,33 +1,74 @@
 #!/usr/bin/env Rscript
 require(plotly)
 require(htmlwidgets)
+require(jsonlite)
+require(dplyr)
 
-args = commandArgs(trailingOnly = TRUE)
+readFuthark <- function(file, real) {
+  json <- fromJSON(file)
+  datasets <- json[[1]][["datasets"]]
+  
+  df <- data.frame()
+  for (i in 1:length(datasets)) {
+    set <- datasets[[i]]
+    name <- tools::file_path_sans_ext(basename(names(datasets)[i]))
+    time <- min(set[["runtimes"]])
+    df <- rbind(df, list(file=name, precision=real, total.time=time), stringsAsFactors=F)
+  }
+  df
+}
 
-# args = c("args", "results-wmp", "Futhark basic", "wmp-basic.csv", "Futhark flat", "wmp-flat.csv", "Cuda option", "wmp-option.csv", "Cuda multi", "wmp-multi.csv")
+title = "results"
+datasets.names = c("Cuda option", "Cuda multi", "Futhark basic", "Futhark flat")
+datasets.files = c("option.csv", "multi.csv", "basic32.json", "basic64.json", "flat32.json", "flat64.json")
 
 # load and join data
-title = args[2]
-i <- 3
-data = data.frame()
-while (i < length(args)) {
-  a <- read.csv(args[i + 1], na.strings = "-")
-  a$type <- args[i]
-  data = rbind(data, a)
-  i <- i + 2
+n <- 1
+f <- 1
+data <- data.frame()
+while (n <= length(datasets.names)) {
+  file <- datasets.files[f]
+  name <- datasets.names[n]
+  
+  if (endsWith(file, "csv")) {
+    set <- read.csv(file, na.strings = "-")
+    set$type <- name
+    data <- bind_rows(data, set)
+    
+  } else if (endsWith(file, "json")) {
+    set <- readFuthark(file, "float")
+    set$type <- name
+    data <- bind_rows(data, set)
+    
+    f <- f + 1
+    set <- readFuthark(datasets.files[f], "double")
+    set$type <- name
+    data <- bind_rows(data, set)
+  }
+  
+  f <- f + 1
+  n <- n + 1
 }
 
 # sort precision
 data <- data[order(data$precision),] 
 
-# convert type to factor
+# convert columns to factors
 data$type <- as.factor(data$type)
+data$version <- as.factor(data$version)
+data$block <- as.factor(data$block)
+data$sort <- as.factor(data$sort)
+data$precision <- as.factor(data$precision)
 
 # add exe column
 noreg <- is.na(data$registers)
 data$exe[noreg] <- as.character(data$type[noreg])
 data$exe[!noreg] <- paste(data$type[!noreg], " reg", data$registers[!noreg], sep = "")
 data$exe <- as.factor(data$exe)
+
+# add details column
+nodetails <- is.na(data$version)
+data$details[!nodetails] <- paste("version ", data$version[!nodetails], ", block ", data$block[!nodetails], ", sort ", data$sort[!nodetails], sep = "")
 
 # convert time to seconds
 data$kernel.time <- data$kernel.time / 1000000
@@ -55,7 +96,8 @@ p <- plot_ly()
 
 # add add a box plot for each file
 for (i in seq_along(files)) {
-  p <- p %>% add_boxplot(data = files[[i]], x = ~exe, y = ~total.time, color = ~precision, visible = i == 1)
+  p <- add_trace(p, type = "scatter", data = files[[i]], x = ~exe, y = ~total.time, color = ~precision, visible = i == 1,
+                 hoverinfo = "all", text = ~details)
 }
 
 # add the layout
@@ -75,6 +117,7 @@ p <- p %>%
       y = 1.1,
       buttons = buttons)))
 
-# print(p)
+print(p)
 
 saveWidget(p, file = paste(title, "html", sep = "."))
+

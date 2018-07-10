@@ -1,0 +1,76 @@
+{
+    "trinom-basic.fut": {
+        "datasets": {
+            "../data/fut/0_UNIFORM.in": {
+                "runtimes": [
+                    325933,
+                    325932,
+                    325966,
+                    325884,
+                    325919
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND.in": {
+                "runtimes": [
+                    27439023,
+                    27388223,
+                    27355954,
+                    27330812,
+                    27314046
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT.in": {
+                "runtimes": [
+                    561384,
+                    560814,
+                    563231,
+                    561404,
+                    563245
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH.in": {
+                "runtimes": [
+                    1372848,
+                    1372925,
+                    1372816,
+                    1372853,
+                    1372864
+                ],
+                "stderr": ""
+            },
+            "../data/fut/4_SKEWED.in": {
+                "runtimes": [
+                    24777750,
+                    24775149,
+                    24775673,
+                    24768075,
+                    24765957
+                ],
+                "stderr": ""
+            },
+            "../data/fut/5_SKEWEDCONSTHEIGHT.in": {
+                "runtimes": [
+                    1591706,
+                    1591667,
+                    1591872,
+                    1591891,
+                    1591591
+                ],
+                "stderr": ""
+            },
+            "../data/fut/6_SKEWEDCONSTWIDTH.in": {
+                "runtimes": [
+                    2619521,
+                    2619351,
+                    2619208,
+                    2618730,
+                    2618682
+                ],
+                "stderr": ""
+            }
+        }
+    }
+}

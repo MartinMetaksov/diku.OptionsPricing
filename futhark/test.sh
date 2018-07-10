@@ -14,13 +14,6 @@ yield="yield"
 data_fut_path="$data_path/fut"
 
 create() {
-    echo "Compiling basic version..."
-    make -B compile-basic
-    echo "Compiling flat version..."
-    make -B compile-flat
-}
-
-create() {
     for file in ${files[*]}
     do
         echo "Joining $file with $yield"

@@ -1,0 +1,76 @@
+{
+    "trinom-flat.fut": {
+        "datasets": {
+            "../data/fut/0_UNIFORM.in": {
+                "runtimes": [
+                    2480718,
+                    2480482,
+                    2480810,
+                    2481478,
+                    2481216
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND.in": {
+                "runtimes": [
+                    3516160,
+                    3516072,
+                    3514780,
+                    3513972,
+                    3513814
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT.in": {
+                "runtimes": [
+                    837770,
+                    837195,
+                    837716,
+                    837747,
+                    838388
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH.in": {
+                "runtimes": [
+                    5222415,
+                    5221779,
+                    5220513,
+                    5220190,
+                    5218331
+                ],
+                "stderr": ""
+            },
+            "../data/fut/4_SKEWED.in": {
+                "runtimes": [
+                    24968044,
+                    24921977,
+                    24909316,
+                    24901979,
+                    24895478
+                ],
+                "stderr": ""
+            },
+            "../data/fut/5_SKEWEDCONSTHEIGHT.in": {
+                "runtimes": [
+                    3480412,
+                    3480344,
+                    3481074,
+                    3479015,
+                    3480497
+                ],
+                "stderr": ""
+            },
+            "../data/fut/6_SKEWEDCONSTWIDTH.in": {
+                "runtimes": [
+                    25187291,
+                    25183558,
+                    25178898,
+                    25181906,
+                    25180377
+                ],
+                "stderr": ""
+            }
+        }
+    }
+}
