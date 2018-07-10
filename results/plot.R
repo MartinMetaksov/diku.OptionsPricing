@@ -54,10 +54,12 @@ while (n <= length(datasets.names)) {
 data <- data[order(data$precision),] 
 
 # convert columns to factors
+data$sort <- as.character(data$sort)
+data$sort[is.na(data$sort)] <- "-"
+data$sort <- as.factor(data$sort)
 data$type <- as.factor(data$type)
 data$version <- as.factor(data$version)
 data$block <- as.factor(data$block)
-data$sort <- as.factor(data$sort)
 data$precision <- as.factor(data$precision)
 
 # add exe column
