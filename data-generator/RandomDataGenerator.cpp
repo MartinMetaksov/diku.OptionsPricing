@@ -282,6 +282,108 @@ void distribute_6(vector<RandOption> &options, const long constProduct, const in
     cout << "finished writing to " << filename << endl;
 }
 
+void distribute_7(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(1, 300);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "7_RAND_HEIGHT_IN_0-3500";
+    writeOptionsToFile(options, filename, 7, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
+void distribute_8(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(1, 100);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "8_RAND_HEIGHT_IN_0-1200";
+    writeOptionsToFile(options, filename, 8, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
+void distribute_9(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(4, 20);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "9_RAND_HEIGHT_IN_50-250";
+    writeOptionsToFile(options, filename, 9, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
+void distribute_10(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(4, 45);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "10_RAND_HEIGHT_IN_50-500";
+    writeOptionsToFile(options, filename, 10, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
+void distribute_11(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(8, 25);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "11_RAND_HEIGHT_IN_100-300";
+    writeOptionsToFile(options, filename, 10, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
+void distribute_12(vector<RandOption> &options, const long constProduct)
+{
+    long currentTotalProd = 0;
+
+    while (currentTotalProd < constProduct)
+    {
+        int maturity = randIntInRange(8, 60);
+        real reversionRate = getRandRRByTscAndRRRange(12, 0.018, 0.99);
+        RandOption o(maturity, 12, reversionRate, false);
+        addOption(options, o, currentTotalProd);
+    }
+
+    string filename = "12_RAND_HEIGHT_IN_100-700";
+    writeOptionsToFile(options, filename, 11, constProduct, 0, currentTotalProd, 0);
+    cout << "finished writing to " << filename << endl;
+}
+
 int main(int argc, char *argv[])
 {
     int dataType;
@@ -324,6 +426,24 @@ int main(int argc, char *argv[])
         break;
     case 6:
         distribute_6(randOptions, totalProd, skewPercent);
+        break;
+    case 7:
+        distribute_7(randOptions, totalProd);
+        break;
+    case 8:
+        distribute_8(randOptions, totalProd);
+        break;
+    case 9:
+        distribute_9(randOptions, totalProd);
+        break;
+    case 10:
+        distribute_10(randOptions, totalProd);
+        break;
+    case 11:
+        distribute_11(randOptions, totalProd);
+        break;
+    case 12:
+        distribute_12(randOptions, totalProd);
         break;
     default:
         // if out of range - just print them all
