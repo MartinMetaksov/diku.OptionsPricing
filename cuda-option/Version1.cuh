@@ -21,7 +21,7 @@ public:
 
     KernelArgsNaive(KernelArgsValues &v) : KernelArgsBase(v) { }
 
-    __device__ inline void init(const CudaOptions &options) override
+    __device__ inline void init(const KernelOptions &options) override
     {
         auto idx = getIdx();
         auto QsInd = idx == 0 ? 0 : options.Widths[idx - 1];
@@ -75,19 +75,18 @@ class KernelRunNaive : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
+    void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
     {
         // Compute indices.
-        thrust::inclusive_scan(widths.begin(), widths.end(), widths.begin());
-        thrust::inclusive_scan(heights.begin(), heights.end(), heights.begin());
+        thrust::inclusive_scan(options.Widths.begin(), options.Widths.end(), options.Widths.begin());
+        thrust::inclusive_scan(options.Heights.begin(), options.Heights.end(), options.Heights.begin());
 
         // Allocate temporary vectors.
-        const int totalQsCount = widths[cudaOptions.N - 1];
-        const int totalAlphasCount = heights[cudaOptions.N - 1];
+        const int totalQsCount = options.Widths[options.N - 1];
+        const int totalAlphasCount = options.Heights[options.N - 1];
         KernelArgsValues values;
 
-        runKernel<KernelArgsNaive>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
+        runKernel<KernelArgsNaive>(options, results, totalQsCount, totalAlphasCount, values);
     }
 };
 

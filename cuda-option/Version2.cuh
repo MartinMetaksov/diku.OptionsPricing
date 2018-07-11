@@ -19,7 +19,7 @@ public:
 
     KernelArgsCoalesced(KernelArgsValues &v) : KernelArgsBase(v) { }
 
-    __device__ inline void init(const CudaOptions &options) override
+    __device__ inline void init(const KernelOptions &options) override
     {
         N = options.N;
     }
@@ -64,17 +64,16 @@ class KernelRunCoalesced : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
+    void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
     {
         // Compute padding
-        int maxWidth = thrust::max_element(widths.begin(), widths.end())[0];
-        int maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
-        int totalQsCount = cudaOptions.N * maxWidth;
-        int totalAlphasCount = cudaOptions.N * maxHeight;
+        int maxWidth = thrust::max_element(options.Widths.begin(), options.Widths.end())[0];
+        int maxHeight = thrust::max_element(options.Heights.begin(), options.Heights.end())[0];
+        int totalQsCount = options.N * maxWidth;
+        int totalAlphasCount = options.N * maxHeight;
         KernelArgsValues values;
 
-        runKernel<KernelArgsCoalesced>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
+        runKernel<KernelArgsCoalesced>(options, results, totalQsCount, totalAlphasCount, values);
     }
 };
 

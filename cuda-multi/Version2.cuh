@@ -61,35 +61,34 @@ class KernelRunCoalesced : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
+    void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
     {
         // Compute indices.
-        thrust::host_vector<int32_t> hostWidths = widths;
+        thrust::host_vector<int32_t> hostWidths = options.Widths;
         thrust::host_vector<int32_t> hInds;
 
         auto counter = 0;
-        for (auto i = 0; i < cudaOptions.N; ++i)
+        for (auto i = 0; i < options.N; ++i)
         {
             auto w = hostWidths[i];
             counter += w;
-            if (counter > blockSize)
+            if (counter > BlockSize)
             {
                 hInds.push_back(i);
                 counter = w;
             }
         }
-        hInds.push_back(cudaOptions.N);
+        hInds.push_back(options.N);
 
         thrust::device_vector<int32_t> dInds = hInds;
 
         KernelArgsValuesCoalesced values;
 
         // Get the max height
-        values.maxHeight = thrust::max_element(heights.begin(), heights.end())[0];
-        const int totalAlphasCount = cudaOptions.N * values.maxHeight;
+        values.maxHeight = thrust::max_element(options.Heights.begin(), options.Heights.end())[0];
+        const int totalAlphasCount = options.N * values.maxHeight;
 
-        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, values, totalAlphasCount);
+        runKernel<KernelArgsCoalesced>(options, results, dInds, values, totalAlphasCount);
     }
 };
 
