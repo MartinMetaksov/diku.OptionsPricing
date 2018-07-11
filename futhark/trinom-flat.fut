@@ -2,6 +2,8 @@
 -- Run as e.g. $cat options.in yield.in | ./trinom-basic
 -- Join datasets with yield by running $sh test.sh create
 -- ==
+-- compiled input @ ../data/fut/options-60000.in
+-- output @ ../data/out/options-60000.out
 -- compiled input @ ../data/fut/0_UNIFORM.in
 -- output @ ../data/out/0_UNIFORM.out
 -- compiled input @ ../data/fut/1_RAND.in
