@@ -45,6 +45,8 @@ import "/futlib/math"
 
 import "/futlib/array"
 
+import "/futlib/merge_sort"
+
 ------------------------------------------------
 -- For using double-precision floats select
 --    import "header64"
@@ -239,10 +241,23 @@ let bkwdHelper (X : real) (op : i8) (M : real) (dr : real) (dt : real) (alpha : 
     in r_convert_inf value
 
 
+let computeWH (optionData : TOptionData) : (i32,i32) =
+    let T  = optionData.Maturity
+    let termUnit = ui2r optionData.TermUnit
+    let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
+    let dt = (i2r termUnitsInYearCount) / (ui2r optionData.TermStepCount)
+    let n = r2i ((ui2r optionData.TermStepCount) * (i2r termUnitsInYearCount) * T)
+    let a = optionData.ReversionRateParameter
+    let M  = (r_exp (zero - a*dt)) - one
+    let jmax = r2i (- 0.184 / M) + 1
+    let Qlen = 2 * jmax + 1
+    in  (Qlen, n)
 
-let trinomialOptionsHW1FCPU_single [ycCount]
+let trinomialOptionsHW1FCPU_single [ycCount][optCount]
                                    (h_YieldCurve : [ycCount]YieldCurveData)
-                                   (optionData : TOptionData) : real = unsafe
+                                   (options : [optCount]TOptionData)
+                                   (sorted_index  : i32)  : real = unsafe
+    let optionData = options[sorted_index]
     let X  = optionData.StrikePrice
     let T  = optionData.Maturity
     let len  = optionData.Length
@@ -274,8 +289,6 @@ let trinomialOptionsHW1FCPU_single [ycCount]
     loop (Q: *[Qlen]real, alphas: *[]real) for i < n do
         let jhigh = i32.min (i+1) jmax
         let alphai = alphas[i]
-        -- Reset
-        let QCopy = copy Q
 
         ----------------------------
         -- forward iteration step --
@@ -284,7 +297,7 @@ let trinomialOptionsHW1FCPU_single [ycCount]
                 map (\jind -> 
                         let j = jind - jmax in
                         if (j < (-jhigh)) || (j > jhigh) then zero
-                        else fwdHelper M dr dt alphai QCopy (i + 1) jhigh jmax j jind
+                        else fwdHelper M dr dt alphai Q (i + 1) jhigh jmax j jind
                     ) (iota Qlen)
             
         -- sum up Qs
@@ -320,9 +333,6 @@ let trinomialOptionsHW1FCPU_single [ycCount]
         let alphai = alphas[i]
         let isMaturity = i == (r2i (len / dt))
         
-        -- Copy array values to avoid overwriting during update
-        let CallCopy = copy Call
-
         -----------------------------
         -- backward iteration step --
         -----------------------------
@@ -330,7 +340,7 @@ let trinomialOptionsHW1FCPU_single [ycCount]
                 map (\jind -> 
                         let j = jind - jmax in
                         if (j < (-jhigh)) || (j > jhigh) then zero
-                        else bkwdHelper X op M dr dt alphai CallCopy jmax j jind isMaturity
+                        else bkwdHelper X op M dr dt alphai Call jmax j jind isMaturity
                     ) (iota Qlen)
 
         in  Call
@@ -361,4 +371,9 @@ let main [q] [y] (strikes           : [q]real)
                                         ReversionRateParameter=r, VolatilityParameter=v, OptionType=t }
                 ) strikes maturities lenghts termunits termstepcounts rrps vols types
 
-  in map (trinomialOptionsHW1FCPU_single yield) options
+  let (ws, _) = map computeWH options |> unzip
+  let (_, sorted_inds) = zip ws (iota q) |> merge_sort (\(w1,_) (w2, _) -> w2 <= w1 ) |> unzip
+
+  let res = map (trinomialOptionsHW1FCPU_single yield options) sorted_inds
+  in  scatter (replicate q zero) sorted_inds res
+
