@@ -33,7 +33,7 @@ public:
 
     KernelArgsCoalescedChunk(KernelArgsValuesChunk &v) : KernelArgsBase(v) { }
 
-    __device__ inline void init(const CudaOptions &options) override
+    __device__ inline void init(const KernelOptions &options) override
     {
         const int chunkIndex = getIdx() / values.chunkSize;
         widthStartIndex = chunkIndex == 0 ? 0 : values.QsInds[chunkIndex - 1];
@@ -97,25 +97,25 @@ struct times_chunk_size
 class KernelRunCoalescedChunk : public KernelRunBase
 {
 private:
-    const int32_t ChunkSize;
+    int32_t ChunkSize;
 
 public:
     KernelRunCoalescedChunk(int32_t chunkSize) : ChunkSize(chunkSize) { }
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
+    void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
     {
         // Create block indices.
-        thrust::device_vector<int32_t> keys(cudaOptions.N);
+        thrust::device_vector<int32_t> keys(options.N);
         thrust::sequence(keys.begin(), keys.end());
 
-        const auto chunkCount = ceil(cudaOptions.N / ((float)ChunkSize));
+        if (ChunkSize < BlockSize) ChunkSize = BlockSize;
+        const auto chunkCount = ceil(options.N / ((float)ChunkSize));
         thrust::device_vector<int32_t> QsInds(chunkCount);
         thrust::device_vector<int32_t> alphasInds(chunkCount);
         thrust::device_vector<int32_t> keysOut(chunkCount);
-        thrust::reduce_by_key(keys.begin(), keys.end(), widths.begin(), keysOut.begin(), QsInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
-        thrust::reduce_by_key(keys.begin(), keys.end(), heights.begin(), keysOut.begin(), alphasInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
+        thrust::reduce_by_key(keys.begin(), keys.end(), options.Widths.begin(), keysOut.begin(), QsInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
+        thrust::reduce_by_key(keys.begin(), keys.end(), options.Heights.begin(), keysOut.begin(), alphasInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
     
         thrust::transform_inclusive_scan(QsInds.begin(), QsInds.end(), QsInds.begin(), times_chunk_size(ChunkSize), thrust::plus<int32_t>());
         thrust::transform_inclusive_scan(alphasInds.begin(), alphasInds.end(), alphasInds.begin(), times_chunk_size(ChunkSize), thrust::plus<int32_t>());
@@ -128,15 +128,12 @@ protected:
         values.QsInds  = thrust::raw_pointer_cast(QsInds.data());
         values.alphasInds = thrust::raw_pointer_cast(alphasInds.data());
 
-        if (isTest)
-        {
-            deviceMemory += vectorsizeof(keys);
-            deviceMemory += vectorsizeof(QsInds);
-            deviceMemory += vectorsizeof(alphasInds);
-            deviceMemory += vectorsizeof(keysOut);
-        }
+        options.DeviceMemory += vectorsizeof(keys);
+        options.DeviceMemory += vectorsizeof(QsInds);
+        options.DeviceMemory += vectorsizeof(alphasInds);
+        options.DeviceMemory += vectorsizeof(keysOut);
 
-        runKernel<KernelArgsCoalescedChunk>(cudaOptions, results, totalQsCount, totalAlphasCount, values);
+        runKernel<KernelArgsCoalescedChunk>(options, results, totalQsCount, totalAlphasCount, values);
     }
 };
 

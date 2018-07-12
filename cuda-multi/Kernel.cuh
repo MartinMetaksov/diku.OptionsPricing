@@ -41,7 +41,7 @@ public:
 };
 
 template<class KernelArgsT>
-__global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
+__global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options, KernelArgsT args)
 {
     volatile extern __shared__ char sh_mem[];
     volatile real *Qs = (real *)&sh_mem;
@@ -281,39 +281,36 @@ class KernelRunBase
 {
 
 private:
-    std::chrono::time_point<std::chrono::steady_clock> time_begin;
+    std::chrono::time_point<std::chrono::steady_clock> TimeBegin;
+    bool IsTest;
 
 protected:
-    bool isTest;
-    int blockSize;
-    int maxWidth;
-    size_t deviceMemory = 0;
+    int BlockSize;
 
-    virtual void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
+    virtual void runPreprocessing(CudaOptions &options, std::vector<real> &results) = 0;
 
     template<class KernelArgsT, class KernelArgsValuesT>
-    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values, const int totalAlphasCount)
+    void runKernel(CudaOptions &options, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values, const int totalAlphasCount)
     {
-        const int sharedMemorySize = sizeof(real) * blockSize + sizeof(uint16_t) * blockSize;
+        const int sharedMemorySize = (sizeof(real) + sizeof(uint16_t)) * BlockSize;
         thrust::device_vector<real> alphas(totalAlphasCount);
-        thrust::device_vector<real> result(cudaOptions.N);
+        thrust::device_vector<real> result(options.N);
 
-        if (isTest)
+        options.DeviceMemory += vectorsizeof(inds);
+        options.DeviceMemory += vectorsizeof(alphas);
+        options.DeviceMemory += vectorsizeof(result);
+
+        if (IsTest)
         {
-            deviceMemory += vectorsizeof(inds);
-            deviceMemory += vectorsizeof(alphas);
-            deviceMemory += vectorsizeof(result);
-
-            std::cout << "Running pricing for " << cudaOptions.N << 
+            std::cout << "Running pricing for " << options.N << 
             #ifdef USE_DOUBLE
             " double"
             #else
             " float"
             #endif
-            << " options with block size " << blockSize << std::endl;
+            << " options with block size " << BlockSize << std::endl;
             std::cout << "Shared memory size " << sharedMemorySize << ", alphas count " << totalAlphasCount << std::endl;
-            std::cout << "Global memory size " << deviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
+            std::cout << "Global memory size " << options.DeviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
 
             cudaDeviceSynchronize();
             size_t memoryFree, memoryTotal;
@@ -327,26 +324,26 @@ protected:
         KernelArgsT kernelArgs(values);
 
         auto time_begin_kernel = std::chrono::steady_clock::now();
-        kernelMultipleOptionsPerThreadBlock<<<inds.size(), blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
+        kernelMultipleOptionsPerThreadBlock<<<inds.size(), BlockSize, sharedMemorySize>>>(options.KernelOptions, kernelArgs);
         cudaDeviceSynchronize();
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
         CudaCheckError();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
 
         // Sort result
-        cudaOptions.sortResult(result);
+        options.sortResult(result);
 
         // Stop timing
-        auto time_end = std::chrono::steady_clock::now();
-        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();
+        auto timeEnd = std::chrono::steady_clock::now();
+        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - TimeBegin).count();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Total execution time " << runtime.TotalRuntime << " microsec" << std::endl;
         }
@@ -362,66 +359,42 @@ public:
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
         const int blockSize = -1, const SortType sortType = SortType::NONE, bool isTest = false)
     {
-        this->isTest = isTest;
-        this->blockSize = blockSize;
-
-        thrust::device_vector<real> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
-        thrust::device_vector<real> maturities(options.Maturities.begin(), options.Maturities.end());
-        thrust::device_vector<real> lengths(options.Lengths.begin(), options.Lengths.end());
-        thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
-        thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
-        thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
-        thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
-        thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
-
-        thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
-        thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+        CudaOptions cudaOptions(options, yield);
 
         // Start timing when input is copied to device
         cudaDeviceSynchronize();
-        time_begin = std::chrono::steady_clock::now();
+        auto timeBegin = std::chrono::steady_clock::now();
 
-        thrust::device_vector<int32_t> widths(options.N);
-        thrust::device_vector<int32_t> heights(options.N);
-        thrust::device_vector<int32_t> indices(sortType == SortType::NONE ? 0 : options.N);
-
-        if (isTest)
-        {
-            deviceMemory += vectorsizeof(strikePrices);
-            deviceMemory += vectorsizeof(maturities);
-            deviceMemory += vectorsizeof(lengths);
-            deviceMemory += vectorsizeof(termUnits);
-            deviceMemory += vectorsizeof(termStepCounts);
-            deviceMemory += vectorsizeof(reversionRates);
-            deviceMemory += vectorsizeof(volatilities);
-            deviceMemory += vectorsizeof(types);
-            deviceMemory += vectorsizeof(yieldPrices);
-            deviceMemory += vectorsizeof(yieldTimeSteps);
-            deviceMemory += vectorsizeof(widths);
-            deviceMemory += vectorsizeof(heights);
-            deviceMemory += vectorsizeof(indices);
-        }
-
-        CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
-            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights, indices);
+        cudaOptions.initialize();
 
         // Get the max width
-        maxWidth = *(thrust::max_element(widths.begin(), widths.end()));
+        auto maxWidth = *(thrust::max_element(cudaOptions.Widths.begin(), cudaOptions.Widths.end()));
 
-        if (blockSize <= 0) 
+        BlockSize = blockSize;
+        if (BlockSize <= 0) 
         {
             // Compute the smallest block size for the max width
-            this->blockSize = ((maxWidth + 32 - 1) / 32) * 32;
+            BlockSize = ((maxWidth + 32 - 1) / 32) * 32;
         }
 
-        if (maxWidth > this->blockSize)
+        if (maxWidth > BlockSize)
         {
             std::ostringstream oss;
-            oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
+            oss << "Block size (" << BlockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
             throw std::invalid_argument(oss.str());
         }
 
-        runPreprocessing(cudaOptions, results, widths, heights);
+        run(cudaOptions, results, timeBegin, blockSize, sortType, isTest);
+    }
+
+    void run(CudaOptions &cudaOptions, std::vector<real> &results, const std::chrono::time_point<std::chrono::steady_clock> timeBegin, 
+        const int blockSize, const SortType sortType = SortType::NONE, const bool isTest = false)
+    {
+        TimeBegin = timeBegin;
+        IsTest = isTest;
+
+        cudaOptions.sortOptions(sortType, isTest);
+        runPreprocessing(cudaOptions, results);
     }
 
 };

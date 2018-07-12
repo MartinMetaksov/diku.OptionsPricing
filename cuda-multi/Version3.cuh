@@ -66,24 +66,23 @@ class KernelRunCoalescedBlock : public KernelRunBase
 {
 
 protected:
-    void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) override
+    void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
     {
         // Compute indices.
-        thrust::host_vector<int32_t> hostWidths = widths;
-        thrust::host_vector<int32_t> hostHeights = heights;
+        thrust::host_vector<int32_t> hostWidths = options.Widths;
+        thrust::host_vector<int32_t> hostHeights = options.Heights;
         thrust::host_vector<int32_t> hInds;
         thrust::host_vector<int32_t> hAlphaInds;
 
         auto counter = 0;
         auto maxHeightBlock = 0;
-        for (auto i = 0; i < cudaOptions.N; ++i)
+        for (auto i = 0; i < options.N; ++i)
         {
             auto w = hostWidths[i];
             auto h = hostHeights[i];
 
             counter += w;
-            if (counter > blockSize)
+            if (counter > BlockSize)
             {
                 auto alphasBlock = maxHeightBlock * (i - (hInds.empty() ? 0 : hInds.back()));
                 hAlphaInds.push_back((hAlphaInds.empty() ? 0 : hAlphaInds.back()) + alphasBlock);
@@ -95,9 +94,9 @@ protected:
                 maxHeightBlock = h;
             }
         }
-        auto alphasBlock = maxHeightBlock * (cudaOptions.N - (hInds.empty() ? 0 : hInds.back()));
+        auto alphasBlock = maxHeightBlock * (options.N - (hInds.empty() ? 0 : hInds.back()));
         hAlphaInds.push_back((hAlphaInds.empty() ? 0 : hAlphaInds.back()) + alphasBlock);
-        hInds.push_back(cudaOptions.N);
+        hInds.push_back(options.N);
 
         thrust::device_vector<int32_t> dInds = hInds;
         thrust::device_vector<int32_t> dAlphaInds = hAlphaInds;
@@ -106,12 +105,9 @@ protected:
         KernelArgsValuesCoalescedBlock values;
         values.alphaInds = thrust::raw_pointer_cast(dAlphaInds.data());
 
-        if (isTest)
-        {
-            deviceMemory += vectorsizeof(dAlphaInds);
-        }
+        options.DeviceMemory += vectorsizeof(dAlphaInds);
 
-        runKernel<KernelArgsCoalescedBlock>(cudaOptions, results, dInds, values, totalAlphasCount);
+        runKernel<KernelArgsCoalescedBlock>(options, results, dInds, values, totalAlphasCount);
     }
 };
 
