@@ -1,2 +1,78 @@
-\chapter{Cool Stuff}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse eleifend non sem in sagittis. Mauris venenatis urna ligula, vel varius augue imperdiet eget. Integer egestas placerat imperdiet. Nunc elementum tincidunt felis, et gravida sapien euismod id. Fusce et turpis eget magna suscipit mattis. Vivamus et eleifend est. Proin tortor sapien, maximus nec urna nec, porta mattis velit. Nulla facilisi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos.
+\chapter{Sequential Implementation (pseudo-code)}
+\begin{lstlisting}
+for each option c:
+    c:optionConstant -- the calculation of option constants
+    -- option constants include:
+    -- c.T:real -- option maturity
+    -- c.t:int -- option length
+    -- c.n:int -- option term step count
+    -- c.dt:real -- 
+    -- c.X:real -- option strike price
+    -- c.dr:real --
+    -- c.M:real -- 
+    -- c.jmax: int -- max. j of the tree
+    -- c.width: int -- the tree width
+    
+    Qs : real[c.width]
+    QsCopy : real[c.width] 
+    alphas[] : real[c.n + 1]
+    
+    jmin : -c.jmax
+    
+    Qs[c.jmax] = 1
+    -- getYieldAtYear(t) returns the initial dt-period 
+    -- interest rate
+    alphas[0] = getYieldAtYear(c.dt) 
+    
+    -- iterates through nodes along tree height 
+    -- (can be done as a gather if changed to 
+    -- for i := 1 to to c.n included) 
+    for i := 0 to c.n
+        -- the highest allowed j index on step i
+        jhigh:int = min(i, c.jmax)
+        alpha:double = alphas[i]
+        
+        -- iterates through nodes along tree width
+        -- between allowed j indexes on step i
+        for j := -jhigh to jhigh
+            Compute QsCopy on j+1, j and j-1 (scatter)
+        end for
+        
+        -- iterates through the nodes along tree width
+        -- between allowed j indexes on step i + 1
+        jhigh1:int = min(i+1, c.jmax) 
+        alpha_p1:real = 0
+        for j := -jhigh1 to jhigh1
+            Aggregate alpha_p1 based on QsCopy[j] 
+        end for
+        Compute alphas[i+1] based on alpha_p1
+        
+        Qs = QsCopy
+        fill QsCopy with 0
+    end for 
+    
+    Call:real[c.width]
+    CallCopy:real[c.width]  
+    
+    for i := c.n-1 to 0 included
+        jhigh = min(i, c.jmax)
+        alpha:real=alphas[i]
+        
+        for j := -jhigh to jhigh
+            jind:int=j-jmin
+            Compute res based on j+1,j,j-1(gather)
+            if i-th step is the maturity
+                Call = max(c.X - res, 0)
+            else
+                Call = res
+            endif    
+        end for
+        
+        Call = CallCopy
+        fill CallCopy with 0
+    end for
+
+    return Call[jmax] -- price approximation
+    
+end for each option c
+\end{lstlisting}

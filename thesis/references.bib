@@ -17,3 +17,348 @@
     journal={The Journal of Derivatives},
     year={1996}
 }
+@article{cmcoic,
+    title={Cramming More Components onto Integrated Circuits},
+    author={Gordon E. Moore},
+    year={1965},
+    publisher={IEEE}
+}
+
+% From Cosmin
+% I. FINANCE:  (include this two papers, and try to follow the references from here related to other HPC work on finance domain)
+
+@article{FinPar:TACO,
+ author = {Andreetta, Christian and B{\'e}got, Vivien and Berthold, Jost and Elsman, Martin and Henglein, Fritz and Henriksen, Troels and Nordfang, Maj-Britt and Oancea, Cosmin E.},
+ title = {FinPar: A Parallel Financial Benchmark},
+ journal = {ACM Trans. Archit. Code Optim.},
+ issue_date = {June 2016},
+ volume = {13},
+ number = {2},
+ month = jun,
+ year = {2016},
+ issn = {1544-3566},
+ pages = {18:1--18:27},
+ articleno = {18},
+ numpages = {27},
+ urlOPT = {http://doi.acm.org/10.1145/2898354},
+ doiOPT = {10.1145/2898354},
+ acmid = {2898354},
+ publisher = {ACM},
+ addressOPT = {New York, NY, USA},
+ keywords = {Data-parallel functional language, fission, fusion, strength reduction},
+}
+
+@inproceedings{LexiFiPricing,
+ author = {Oancea, Cosmin E. and Andreetta, Christian and Berthold, Jost and Frisch, Alain and Henglein, Fritz},
+ title = {Financial {S}oftware on {GPU}s: Between {H}askell and {F}ortran},
+ booktitle = {Proceedings of the 1st ACM SIGPLAN Workshop on Functional High-performance Computing},
+ series = {FHPC '12},
+ year = {2012},
+ isbn = {978-1-4503-1577-7},
+ location = {Copenhagen, Denmark},
+ pages = {61--72},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/2364474.2364484},
+ doi = {10.1145/2364474.2364484},
+ acmid = {2364484},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {autoparallelization, functional language, memory coalescing, strength reduction, tiling},
+}
+
+% II. LANGUAGE CONSTRUCTS: 
+
+% This is the seminal paper on "scan" as a basic block of parallel programming:
+
+@article{segScan,
+  title={{S}cans as {P}rimitive {P}arallel {O}perations},
+  author={Guy E. Blelloch},
+  journal={Computers, IEEE Transactions},
+  volume={38},
+  number={11},
+  pages={1526--1538},
+  year={1989}
+}
+
+% Include some Futhark references (since you'll be using it):
+% - main Futhark paper:
+
+@inproceedings{henriksen2017futhark,
+ author = {Henriksen, Troels and Serup, Niels G. W. and Elsman, Martin and Henglein, Fritz and Oancea, Cosmin E.},
+ title = {Futhark: Purely Functional GPU-programming with Nested Parallelism and In-place Array Updates},
+ booktitle = {Proceedings of the 38th ACM SIGPLAN Conference on Programming Language Design and Implementation},
+ series = {PLDI 2017},
+ year = {2017},
+ isbn = {978-1-4503-4988-8},
+ location = {Barcelona, Spain},
+ pages = {556--571},
+ numpages = {16},
+ url = {http://doi.acm.org/10.1145/3062341.3062354},
+ doi = {10.1145/3062341.3062354},
+ acmid = {3062354},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {GPGPU, compilers, functional language, parallel},
+}
+
+% - efficient implementation of map-reduce composition:
+
+@inproceedings{Futhark:redomap,
+ author = {Henriksen, Troels and Larsen, Ken Friis and Oancea, Cosmin E.},
+ title = {Design and {GPGPU} Performance of Futhark's Redomap Construct},
+ booktitle = {Proceedings of the 3rd ACM SIGPLAN International Workshop on Libraries, Languages, and Compilers for Array Programming},
+ series = {ARRAY 2016},
+ year = {2016},
+ location = {Santa Barbara, CA, USA},
+ pages = {17--24},
+ numpages = {8},
+ acmid = {2935326},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {GPGPU, autoparallelization, functional language, map-reduce},
+}
+
+% - futhark interoperability with python, APL
+
+@inproceedings{Henriksen:2016:AGT:2975991.2975997,
+    Acmid = 2975997,
+    Address = {New York, NY, USA},
+    Author = {Henriksen, Troels and Dybdal, Martin and Urms, Henrik and Kiehn, Anna Sofie and Gavin, Daniel and Abelskov, Hjalte and Elsman, Martin and Oancea, Cosmin},
+    Booktitle = {Procs. of the 5th Int. Workshop on Functional High-Performance Computing},
+    Keywords = {APL, GPGPU, auto-parallelization, functional language},
+    Location = {Nara, Japan},
+    Numpages = 6,
+    Pages = {38--43},
+    Publisher = {ACM},
+    Series = {FHPC'16},
+    Title = {{APL} on {GPU}s: {A} {TAIL} from the {P}ast, {S}cribbled in {F}uthark},
+    Year = 2016
+}
+
+% III. STATIC ANALYSIS (no runtime overhead but inaccurate)
+
+% -- Flattening transformation -- respects the work-depth asymptotic of the nested-parallel program, but does not take into account communication/locality.
+% In fact it makes further locality optimizations impossible => slow
+
+@article{blelloch1994implementation,
+  title={Implementation of a {P}ortable {N}ested {D}ata-{P}arallel {L}anguage},
+  author={Blelloch, Guy E and Hardwick, Jonathan C and Sipelstein, Jay and Zagha, Marco and Chatterjee, Siddhartha},
+  journal={Journal of parallel and distributed computing},
+  volume={21},
+  number={1},
+  pages={4--14},
+  year={1994},
+  publisher={Elsevier}
+}
+
+@article{Bergstrom:2012:NDG:2398856.2364563,
+ author = {Bergstrom, Lars and Reppy, John},
+ title = {Nested Data-parallelism on the {GPU}},
+ journal = {SIGPLAN Not.},
+ issue_date = {September 2012},
+ volume = {47},
+ number = {9},
+ month = sep,
+ year = {2012},
+ issn = {0362-1340},
+ pages = {247--258},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/2398856.2364563},
+ doi = {10.1145/2398856.2364563},
+ acmid = {2364563},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {gpgpu, gpu, nesl, nested data parallelism},
+}
+
+% -- polyhedral analysis: exact for affine programs. for example it cannot analyze subscripted subscripts (accesses through indirect arrays).
+% Used for example in the context of automatic parallelization of loops or optimization of locality of reference.
+
+@inproceedings{PolyhedralOpt,
+ author = {Pouchet, Louis-No\"{e}l and Bondhugula, Uday and Bastoul, C{\'e}dric and Cohen, Albert and Ramanujam, J. and Sadayappan, P. and Vasilache, Nicolas},
+ title = {Loop Transformations: Convexity, Pruning and Optimization},
+ booktitle = {Proceedings of the 38th Annual ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+ series = {POPL '11},
+ year = {2011},
+ isbn = {978-1-4503-0490-0},
+ location = {Austin, Texas, USA},
+ pages = {549--562},
+ numpages = {14},
+ url = {http://doi.acm.org/10.1145/1926385.1926449},
+ doi = {10.1145/1926385.1926449},
+ acmid = {1926449},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {affine scheduling, compilation, compiler optimization, loop transformations, parallelism},
+}
+
+% IV. Mostly DYNAMIC ANALYSIS (i.e., accurate but at a significant time or/and space overhead) 
+% a) Inspector executor models:
+
+% -- for parallelizing irregular applications (extracting partial parallelism)
+
+@ARTICLE{InspExecWave,
+    author = {Lawrence Rauchwerger and Nancy Amato and David Padua},
+    title = {A {S}calable {M}ethod for {R}un {T}ime {L}oop {P}arallelization},
+    journal = {Int. Journal of Par. Prog},
+    journalOPT = {International Journal of Parallel Programming},
+    year = {1995},
+    volume = {26},
+    pages = {26--6}
+}
+
+% -- for optimizing locality
+
+@inproceedings{Strout:DataItReord,
+ author = {Strout, Michelle Mills and Carter, Larry and Ferrante, Jeanne},
+ title = {Compile-time Composition of Run-time Data and Iteration Reorderings},
+ booktitle = {Proceedings of the ACM SIGPLAN 2003 Conference on Programming Language Design and Implementation},
+ series = {PLDI '03},
+ year = {2003},
+ isbn = {1-58113-662-5},
+ location = {San Diego, California, USA},
+ pages = {91--102},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/781131.781142},
+ doi = {10.1145/781131.781142},
+ acmid = {781142},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {data remapping, inspector/executor, iteration reordering, optimization, run-time transformations, sparse tiling},
+}
+
+@inproceedings{Kennedy:DataReord,
+ author = {Ding, Chen and Kennedy, Ken},
+ title = {Improving Cache Performance in Dynamic Applications Through Data and Computation Reorganization at Run Time},
+ booktitle = {Proceedings of the ACM SIGPLAN 1999 Conference on Programming Language Design and Implementation},
+ series = {PLDI '99},
+ year = {1999},
+ isbn = {1-58113-094-5},
+ location = {Atlanta, Georgia, USA},
+ pages = {229--241},
+ numpages = {13},
+ url = {http://doi.acm.org/10.1145/301618.301670},
+ doi = {10.1145/301618.301670},
+ acmid = {301670},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+}
+
+% - for minimizing communication in distributed-parallel compuation
+
+@article{Saday:InspExec,
+ author = {Ravishankar, Mahesh and Eisenlohr, John and Pouchet, Louis-No\"{e}l and Ramanujam, J. and Rountev, Atanas and Sadayappan, P.},
+ title = {Automatic Parallelization of a Class of Irregular Loops for Distributed Memory Systems},
+ journal = {ACM Trans. Parallel Comput.},
+ issue_date = {September 2014},
+ volume = {1},
+ number = {1},
+ month = oct,
+ year = {2014},
+ issn = {2329-4949},
+ pages = {7:1--7:37},
+ articleno = {7},
+ numpages = {37},
+ url = {http://doi.acm.org/10.1145/2660251},
+ doi = {10.1145/2660251},
+ acmid = {2660251},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {Distributed-memory systems, inspector-executor, irregular applications, parallelization},
+}
+
+% b) Thread-Level Speculation:
+
+% seminal paper:
+
+@Article{LRPD,
+  author =      {L. Rauchwerger and D. Padua},
+  title =      {The {LRPD} {T}est: {S}peculative {R}un-{T}ime {P}arallelization
+of {L}oops with {P}rivatization and {R}eduction {P}arallelization},
+  journal =      "IEEE Trans. Parallel Distrib. System",
+  year =      {1999},
+  volume =      {10(2)},
+  monthOPT =      "Feb",
+  PAGES = "160-199"
+}
+% and follow up:
+
+@INPROCEEDINGS{R-LRPD,
+  author =      { Francis Dang and Hao Yu and Lawrence Rauchwerger},
+  title  =   {The {R-LRPD} {T}est: {S}peculative {P}arallelization of {P}artially {P}arallel {L}oops},
+  BOOKTITLE =   "Int. Par. and Distr. Processing Symp. (PDPS)",
+  pages =    {20--29},
+  year =      {2002}
+}
+
+% - TLS analysis for optimized memory layout:
+@incollection{Oancea:2008:SDA:1485701.1485712,
+ author = {Oancea, Cosmin E. and Mycroft, Alan},
+ chapter = {Set-Congruence Dynamic Analysis for Thread-Level Speculation (TLS)},
+ title = {Languages and Compilers for Parallel Computing},
+ editor = {Amaral, Jos{\'e} Nelson},
+ year = {2008},
+ isbn = {978-3-540-89739-2},
+ pages = {156--171},
+ numpages = {16},
+ url = {http://dx.doi.org/10.1007/978-3-540-89740-8_11},
+ doi = {10.1007/978-3-540-89740-8_11},
+ acmid = {1485712},
+ publisher = {Springer-Verlag},
+ address = {Berlin, Heidelberg},
+} 
+
+% - for optimizing communication overhead in distributed applications
+
+@INPROCEEDINGS{jaycos:DTLS,
+    AUTHOR = {C. E. Oancea and J. W. A. Selby and M. Giesbrecht and S. M. Watt},
+    TITLE = "Distributed {M}odels of {T}hread-{L}evel {S}peculation",
+    BOOKTITLE = "Proceedings of the PDPTA'05",
+    pages = {920--927},
+    URL = {http://www.csd.uwo.ca/~coancea/Publications},
+    YEAR = 2005
+}
+
+% V. HYBRID ANALYSIS (combines the advantages of static + dynamic, i.e., accurate at the cost of negligible runtime overhead)
+
+% -- for example used in the context of automatic parallelization, i.e., aggressively generates a cascade of "sufficient conditions" for the loop to be parallel; these are statically generated, but are tested at runtime; if none succeeds the loop is executed sequentially otherwise in parallel. 
+% It is shown that a large class of statically-unknown parallel loop can be identified, and moreover that the overhead is negligible in most cases (<1% of loop's runtime and in few cases the overhead is still significant, but it scales with parallelism -- i.e., the predicate is executed in parallel ...)
+
+@inproceedings{Oancea:2012:LIT:2254064.2254124,
+ author = {Oancea, Cosmin E. and Rauchwerger, Lawrence},
+ title = {Logical Inference Techniques for Loop Parallelization},
+ booktitle = {Proceedings of the 33rd ACM SIGPLAN Conference on Programming Language Design and Implementation},
+ series = {PLDI '12},
+ year = {2012},
+ isbn = {978-1-4503-1205-9},
+ location = {Beijing, China},
+ pages = {509--520},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/2254064.2254124},
+ doi = {10.1145/2254064.2254124},
+ acmid = {2254124},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {auto-parallelization, independence predicates, usr},
+} 
+
+@INPROCEEDINGS{SummaryMonot,
+    author = {Cosmin E. Oancea and Lawrence Rauchwerger},
+    title = {A {H}ybrid {A}pproach to {P}roving {M}emory {R}eference {M}onotonicity},
+    booktitle = {Int. Lang. Comp. Par. Comp. (LCPC'11)},
+    series = {LNCS},
+    volume = 7146,
+    year = {2013},
+    pages = {61-75}
+}
+
+@ARTICLE{HybAn,
+    author = {Silvius Rus and Jay Hoeflinger and Lawrence Rauchwerger},
+    title = {Hybrid {A}nalysis: {S}tatic \& {D}ynamic {M}emory {R}eference {A}nalysis},
+    journalopt = {International Journal of Parallel Programming},
+    journal = {Int. Journal of Par. Prog},
+    pages = {251--283},
+    volume = {31(3)},
+    DOIopt = {doi>10.1145/1075382.1075385},
+    year = {2003}
+}
