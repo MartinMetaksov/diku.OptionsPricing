@@ -2,8 +2,6 @@
 -- Run as e.g. $cat options.in yield.in | ./trinom-basic
 -- Join datasets with yield by running $sh test.sh create
 -- ==
--- compiled input @ ../data/fut/options-60000.in
--- output @ ../data/out/options-60000.out
 -- compiled input @ ../data/fut/0_UNIFORM.in
 -- output @ ../data/out/0_UNIFORM.out
 -- compiled input @ ../data/fut/1_RAND.in
@@ -20,28 +18,8 @@
 -- output @ ../data/out/6_SKEWEDCONSTWIDTH.out
 
 ------ More input files
--- compiled input @ ../data/100000/fut/rand_h_unif_w_100000.in
--- output @ ../data/100000/out/rand_h_unif_w_100000.out
--- compiled input @ ../data/100000/fut/rand_hw_100000.in
--- output @ ../data/100000/out/rand_hw_100000.out
--- compiled input @ ../data/100000/fut/rand_w_unif_h_100000.in
--- output @ ../data/100000/out/rand_w_unif_h_100000.out
--- compiled input @ ../data/100000/fut/skew_h_1_rand_w_100000.in
--- output @ ../data/100000/out/skew_h_1_rand_w_100000.out
--- compiled input @ ../data/100000/fut/skew_h_10_rand_w_100000.in
--- output @ ../data/100000/out/skew_h_10_rand_w_100000.out
--- compiled input @ ../data/100000/fut/skew_hw_1_100000.in
--- output @ ../data/100000/out/skew_hw_1_100000.out
--- compiled input @ ../data/100000/fut/skew_hw_10_100000.in
--- output @ ../data/100000/out/skew_hw_10_100000.out
--- compiled input @ ../data/100000/fut/skew_w_1_rand_h_100000.in
--- output @ ../data/100000/out/skew_w_1_rand_h_100000.out
--- compiled input @ ../data/100000/fut/skew_w_10_rand_h_100000.in
--- output @ ../data/100000/out/skew_w_10_rand_h_100000.out
--- compiled input @ ../data/100000/fut/unif_book_hw_100000.in
--- output @ ../data/100000/out/unif_book_hw_100000.out
--- compiled input @ ../data/100000/fut/unif_hw_100000.in
--- output @ ../data/100000/out/unif_hw_100000.out
+-- compiled input @ ../data/fut/options-60000.in
+-- output @ ../data/out/options-60000.out
 
 import "/futlib/math"
 
