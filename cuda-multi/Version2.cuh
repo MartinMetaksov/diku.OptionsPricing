@@ -16,6 +16,7 @@ struct KernelArgsValuesCoalesced
     real *alphas;
     int32_t *inds;
     int32_t maxHeight;
+    int32_t maxOptionsBlock;
 };
 
 class KernelArgsCoalesced : public KernelArgsBase<KernelArgsValuesCoalesced>
@@ -68,13 +69,9 @@ protected:
         thrust::host_vector<int32_t> hInds;
 
         auto counter = 0;
-<<<<<<< HEAD
         auto prevInd = 0;
         auto maxOptionsBlock = 0;
-        for (auto i = 0; i < cudaOptions.N; ++i)
-=======
         for (auto i = 0; i < options.N; ++i)
->>>>>>> master
         {
             auto w = hostWidths[i];
             counter += w;
@@ -82,7 +79,7 @@ protected:
             {
                 hInds.push_back(i);
                 counter = w;
-
+                
                 auto optionsBlock = i - prevInd;
                 if (optionsBlock > maxOptionsBlock) {
                     maxOptionsBlock = optionsBlock;
@@ -92,7 +89,7 @@ protected:
         }
         hInds.push_back(options.N);
 
-        auto optionsBlock = cudaOptions.N - prevInd;
+        auto optionsBlock = options.N - prevInd;
         if (optionsBlock > maxOptionsBlock) {
             maxOptionsBlock = optionsBlock;
         }
@@ -105,11 +102,7 @@ protected:
         values.maxHeight = thrust::max_element(options.Heights.begin(), options.Heights.end())[0];
         const int totalAlphasCount = options.N * values.maxHeight;
 
-<<<<<<< HEAD
-        runKernel<KernelArgsCoalesced>(cudaOptions, results, dInds, values, totalAlphasCount, maxOptionsBlock);
-=======
-        runKernel<KernelArgsCoalesced>(options, results, dInds, values, totalAlphasCount);
->>>>>>> master
+        runKernel<KernelArgsCoalesced>(options, results, dInds, values, totalAlphasCount, maxOptionsBlock);
     }
 };
 

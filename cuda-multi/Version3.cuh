@@ -16,6 +16,7 @@ struct KernelArgsValuesCoalescedBlock
     real *alphas;
     int32_t *inds;
     int32_t *alphaInds;
+    int32_t maxOptionsBlock;
 };
 
 class KernelArgsCoalescedBlock : public KernelArgsBase<KernelArgsValuesCoalescedBlock>
@@ -76,13 +77,9 @@ protected:
 
         auto counter = 0;
         auto maxHeightBlock = 0;
-<<<<<<< HEAD
         auto prevInd = 0;
         auto maxOptionsBlock = 0;
-        for (auto i = 0; i < cudaOptions.N; ++i)
-=======
         for (auto i = 0; i < options.N; ++i)
->>>>>>> master
         {
             auto w = hostWidths[i];
             auto h = hostHeights[i];
@@ -95,7 +92,7 @@ protected:
                 hInds.push_back(i);
                 counter = w;
                 maxHeightBlock = 0;
-
+                
                 auto optionsBlock = i - prevInd;
                 if (optionsBlock > maxOptionsBlock) {
                     maxOptionsBlock = optionsBlock;
@@ -110,7 +107,7 @@ protected:
         hAlphaInds.push_back((hAlphaInds.empty() ? 0 : hAlphaInds.back()) + alphasBlock);
         hInds.push_back(options.N);
 
-        auto optionsBlock = cudaOptions.N - prevInd;
+        auto optionsBlock = options.N - prevInd;
         if (optionsBlock > maxOptionsBlock) {
             maxOptionsBlock = optionsBlock;
         }
@@ -124,11 +121,7 @@ protected:
 
         options.DeviceMemory += vectorsizeof(dAlphaInds);
 
-<<<<<<< HEAD
-        runKernel<KernelArgsCoalescedBlock>(cudaOptions, results, dInds, values, totalAlphasCount, maxOptionsBlock);
-=======
-        runKernel<KernelArgsCoalescedBlock>(options, results, dInds, values, totalAlphasCount);
->>>>>>> master
+        runKernel<KernelArgsCoalescedBlock>(options, results, dInds, values, totalAlphasCount, maxOptionsBlock);
     }
 };
 
