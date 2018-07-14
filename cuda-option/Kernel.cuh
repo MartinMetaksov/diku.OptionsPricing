@@ -38,7 +38,7 @@ public:
     
     __device__ inline int getIdx() const { return threadIdx.x + blockDim.x * blockIdx.x; }
 
-    __device__ virtual void init(const CudaOptions &options) = 0;
+    __device__ virtual void init(const KernelOptions &options) = 0;
 
     __device__ virtual void switchQs()
     {
@@ -63,7 +63,7 @@ public:
 };
 
 template<class KernelArgsT>
-__global__ void kernelOneOptionPerThread(const CudaOptions options, KernelArgsT args)
+__global__ void kernelOneOptionPerThread(const KernelOptions options, KernelArgsT args)
 {
     auto idx = args.getIdx();
 
@@ -211,42 +211,41 @@ class KernelRunBase
 {
 
 private:
-    std::chrono::time_point<std::chrono::steady_clock> time_begin;
+    std::chrono::time_point<std::chrono::steady_clock> TimeBegin;
+    bool IsTest;
 
 protected:
-    bool isTest;
-    int blockSize;
-    size_t deviceMemory = 0;
+    int BlockSize;
 
-    virtual void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
+    virtual void runPreprocessing(CudaOptions &options, std::vector<real> &results) = 0;
 
     template<class KernelArgsT, class KernelArgsValuesT>
-    void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, const int totalQsCount, const int totalAlphasCount, KernelArgsValuesT &values)
+    void runKernel(CudaOptions &options, std::vector<real> &results, const int totalQsCount, const int totalAlphasCount, KernelArgsValuesT &values)
     {
         thrust::device_vector<real> Qs(totalQsCount);
         thrust::device_vector<real> QsCopy(totalQsCount);
         thrust::device_vector<real> alphas(totalAlphasCount);
-        thrust::device_vector<real> result(cudaOptions.N);
+        thrust::device_vector<real> result(options.N);
 
-        const auto blockCount = ceil(cudaOptions.N / ((float)blockSize));
+        const auto blockCount = ceil(options.N / ((float)BlockSize));
 
-        if (isTest)
+        options.DeviceMemory += vectorsizeof(Qs);
+        options.DeviceMemory += vectorsizeof(QsCopy);
+        options.DeviceMemory += vectorsizeof(alphas);
+        options.DeviceMemory += vectorsizeof(result);
+        runtime.DeviceMemory = options.DeviceMemory;
+
+        if (IsTest)
         {
-            deviceMemory += vectorsizeof(Qs);
-            deviceMemory += vectorsizeof(QsCopy);
-            deviceMemory += vectorsizeof(alphas);
-            deviceMemory += vectorsizeof(result);
-
-            std::cout << "Running pricing for " << cudaOptions.N << 
+            std::cout << "Running pricing for " << options.N << 
             #ifdef USE_DOUBLE
             " double"
             #else
             " float"
             #endif
-            << " options with block size " << blockSize << std::endl;
+            << " options with block size " << BlockSize << std::endl;
             std::cout << "Qs count " << totalQsCount << ", alphas count " << totalAlphasCount << std::endl;
-            std::cout << "Global memory size " << deviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
+            std::cout << "Global memory size " << options.DeviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
 
             cudaDeviceSynchronize();
             size_t memoryFree, memoryTotal;
@@ -261,26 +260,26 @@ protected:
         KernelArgsT kernelArgs(values);
 
         auto time_begin_kernel = std::chrono::steady_clock::now();
-        kernelOneOptionPerThread<<<blockCount, blockSize>>>(cudaOptions, kernelArgs);
+        kernelOneOptionPerThread<<<blockCount, BlockSize>>>(options.KernelOptions, kernelArgs);
         cudaDeviceSynchronize();
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
         CudaCheckError();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
 
         // Sort result
-        cudaOptions.sortResult(result);
+        options.sortResult(result);
 
         // Stop timing
-        auto time_end = std::chrono::steady_clock::now();
-        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();
+        auto timeEnd = std::chrono::steady_clock::now();
+        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - TimeBegin).count();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Total execution time " << runtime.TotalRuntime << " microsec" << std::endl;
         }
@@ -296,50 +295,25 @@ public:
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
         const int blockSize = -1, const SortType sortType = SortType::NONE, const bool isTest = false)
     {
-        this->isTest = isTest;
-        this->blockSize = blockSize > 0 ? blockSize : DEFAULT_BLOCK_SIZE;
-
-        thrust::device_vector<real> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
-        thrust::device_vector<real> maturities(options.Maturities.begin(), options.Maturities.end());
-        thrust::device_vector<real> lengths(options.Lengths.begin(), options.Lengths.end());
-        thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
-        thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
-        thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
-        thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
-        thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
-
-        thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
-        thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+        CudaOptions cudaOptions(options, yield);
 
         // Start timing when input is copied to device
         cudaDeviceSynchronize();
-        time_begin = std::chrono::steady_clock::now();
+        auto timeBegin = std::chrono::steady_clock::now();
 
-        thrust::device_vector<int32_t> widths(options.N);
-        thrust::device_vector<int32_t> heights(options.N);
-        thrust::device_vector<int32_t> indices(sortType == SortType::NONE ? 0 : options.N);
+        cudaOptions.initialize();
+        run(cudaOptions, results, timeBegin, blockSize, sortType, isTest);
+    }
 
-        if (isTest)
-        {
-            deviceMemory += vectorsizeof(strikePrices);
-            deviceMemory += vectorsizeof(maturities);
-            deviceMemory += vectorsizeof(lengths);
-            deviceMemory += vectorsizeof(termUnits);
-            deviceMemory += vectorsizeof(termStepCounts);
-            deviceMemory += vectorsizeof(reversionRates);
-            deviceMemory += vectorsizeof(volatilities);
-            deviceMemory += vectorsizeof(types);
-            deviceMemory += vectorsizeof(yieldPrices);
-            deviceMemory += vectorsizeof(yieldTimeSteps);
-            deviceMemory += vectorsizeof(widths);
-            deviceMemory += vectorsizeof(heights);
-            deviceMemory += vectorsizeof(indices);
-        }
+    void run(CudaOptions &cudaOptions, std::vector<real> &results, const std::chrono::time_point<std::chrono::steady_clock> timeBegin, 
+        const int blockSize = -1, const SortType sortType = SortType::NONE, const bool isTest = false)
+    {
+        TimeBegin = timeBegin;
+        IsTest = isTest;
+        BlockSize = blockSize > 0 ? blockSize : DEFAULT_BLOCK_SIZE;
 
-        CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
-            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights, indices);
-
-        runPreprocessing(cudaOptions, results, widths, heights);
+        cudaOptions.sortOptions(sortType, isTest);
+        runPreprocessing(cudaOptions, results);
     }
 
 };

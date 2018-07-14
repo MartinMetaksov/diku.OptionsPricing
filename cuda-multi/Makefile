@@ -1,10 +1,9 @@
-CXX        	  = nvcc -std=c++11 -O3 #--ptxas-options=-v
+CXX        	  = nvcc -std=c++11 -O3 -arch=sm_35 #--ptxas-options=-v
 DEBUG_OPTIONS = -G -DCUDA_ERROR_CHECK
 
 SOURCES_CPP = CudaMultiMain.cu
 EXECUTABLE  = ../build/CudaMulti
 DATA		= ../data
-COMPARE		= compare
 
 ifeq ($(REAL),64)
   DEFINE_DOUBLE = -DUSE_DOUBLE
@@ -15,7 +14,11 @@ endif
 ifeq ($(REG),32)
   REG_COUNT = --maxrregcount=32
 else
-  REG_COUNT =
+	ifeq ($(REG),64)
+	REG_COUNT = --maxrregcount=64
+	else
+	REG_COUNT =
+	endif
 endif
 
 default: run

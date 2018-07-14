@@ -8,7 +8,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <thrust/transform_scan.h>
-#include <climits>
+#include <limits>
 
 #include "../common/Options.hpp"
 #include "../common/OptionConstants.hpp"
@@ -19,6 +19,27 @@ using namespace trinom;
 
 namespace cuda
 {
+
+struct KernelOptions
+{
+    int N;
+    int YieldSize;
+
+    real *StrikePrices;
+    real *Maturities;
+    real *Lengths;
+    uint16_t *TermUnits;
+    uint16_t *TermStepCounts;
+    real *ReversionRates;
+    real *Volatilities;
+    OptionType *Types;
+
+    real *YieldPrices;
+    int32_t *YieldTimeSteps;
+
+    int32_t *Widths;
+    int32_t *Heights;
+};
 
 struct compute_width_height
 {
@@ -58,85 +79,115 @@ struct sort_tuple_desc
     }
 };
 
-struct CudaOptions
+template<typename T>
+size_t vectorsizeof(const typename thrust::device_vector<T>& vec)
 {
-    int N;
-    int YieldSize;
-    SortType Sort;
+    return sizeof(T) * vec.size();
+}
 
-    const real *StrikePrices;
-    const real *Maturities;
-    const real *Lengths;
-    const uint16_t *TermUnits;
-    const uint16_t *TermStepCounts;
-    const real *ReversionRates;
-    const real *Volatilities;
-    const OptionType *Types;
+class CudaOptions
+{
+private:
+    thrust::device_vector<real> StrikePrices;
+    thrust::device_vector<real> Maturities;
+    thrust::device_vector<real> Lengths;
+    thrust::device_vector<uint16_t> TermUnits;
+    thrust::device_vector<uint16_t> TermStepCounts;
+    thrust::device_vector<real> ReversionRates;
+    thrust::device_vector<real> Volatilities;
+    thrust::device_vector<OptionType> Types;
 
-    const real *YieldPrices;
-    const int32_t *YieldTimeSteps;
+    thrust::device_vector<real> YieldPrices;
+    thrust::device_vector<int32_t> YieldTimeSteps;
 
-    const int32_t *Widths;
-    const int32_t *Heights;
-    thrust::device_vector<int32_t>::iterator IndicesBegin;
-    thrust::device_vector<int32_t>::iterator IndicesEnd;
+public:
+    const int N;
+    const int YieldSize;
+    KernelOptions KernelOptions;
 
-    CudaOptions(
-        const Options &options,
-        const int yieldSize,
-        const SortType sort,
-        const bool isTest,
-        thrust::device_vector<real> &strikePrices,
-        thrust::device_vector<real> &maturities,
-        thrust::device_vector<real> &lengths,
-        thrust::device_vector<uint16_t> &termUnits,
-        thrust::device_vector<uint16_t> &termStepCounts,
-        thrust::device_vector<real> &reversionRates,
-        thrust::device_vector<real> &volatilities,
-        thrust::device_vector<OptionType> &types,
-        thrust::device_vector<real> &yieldPrices,
-        thrust::device_vector<int32_t> &yieldTimeSteps,
-        thrust::device_vector<int32_t> &widths,
-        thrust::device_vector<int32_t> &heights,
-        thrust::device_vector<int32_t> &indices)
+    thrust::device_vector<int32_t> Widths;
+    thrust::device_vector<int32_t> Heights;
+    thrust::device_vector<int32_t> Indices;
+
+    long DeviceMemory = 0;
+
+    CudaOptions(const Options &options, const Yield &yield) : 
+        
+        StrikePrices(options.StrikePrices.begin(), options.StrikePrices.end()),
+        Maturities(options.Maturities.begin(), options.Maturities.end()),
+        Lengths(options.Lengths.begin(), options.Lengths.end()),
+        TermUnits(options.TermUnits.begin(), options.TermUnits.end()),
+        TermStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end()),
+        ReversionRates(options.ReversionRates.begin(), options.ReversionRates.end()),
+        Volatilities(options.Volatilities.begin(), options.Volatilities.end()),
+        Types(options.Types.begin(), options.Types.end()),
+        YieldPrices(yield.Prices.begin(), yield.Prices.end()),
+        YieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end()),
+        N(options.N),
+        YieldSize(yield.N)
     {
-        N = options.N;
-        YieldSize = yieldSize;
-        Sort = sort;
-        StrikePrices = thrust::raw_pointer_cast(strikePrices.data());
-        Maturities = thrust::raw_pointer_cast(maturities.data());
-        Lengths = thrust::raw_pointer_cast(lengths.data());
-        TermUnits = thrust::raw_pointer_cast(termUnits.data());
-        TermStepCounts = thrust::raw_pointer_cast(termStepCounts.data());
-        ReversionRates = thrust::raw_pointer_cast(reversionRates.data());
-        Volatilities = thrust::raw_pointer_cast(volatilities.data());
-        Types = thrust::raw_pointer_cast(types.data());
-        YieldPrices = thrust::raw_pointer_cast(yieldPrices.data());
-        YieldTimeSteps = thrust::raw_pointer_cast(yieldTimeSteps.data());
-        Widths = thrust::raw_pointer_cast(widths.data());
-        Heights = thrust::raw_pointer_cast(heights.data());
+
+    }
+
+    void initialize()
+    {
+        Widths.resize(N);
+        Heights.resize(N);
+
+        KernelOptions.N = N;
+        KernelOptions.YieldSize = YieldSize, 
+        KernelOptions.StrikePrices = thrust::raw_pointer_cast(StrikePrices.data());
+        KernelOptions.Maturities = thrust::raw_pointer_cast(Maturities.data());
+        KernelOptions.Lengths = thrust::raw_pointer_cast(Lengths.data());
+        KernelOptions.TermUnits = thrust::raw_pointer_cast(TermUnits.data());
+        KernelOptions.TermStepCounts = thrust::raw_pointer_cast(TermStepCounts.data());
+        KernelOptions.ReversionRates = thrust::raw_pointer_cast(ReversionRates.data());
+        KernelOptions.Volatilities = thrust::raw_pointer_cast(Volatilities.data());
+        KernelOptions.Types = thrust::raw_pointer_cast(Types.data());
+        KernelOptions.YieldPrices = thrust::raw_pointer_cast(YieldPrices.data());
+        KernelOptions.YieldTimeSteps = thrust::raw_pointer_cast(YieldTimeSteps.data());
+        KernelOptions.Widths = thrust::raw_pointer_cast(Widths.data());
+        KernelOptions.Heights = thrust::raw_pointer_cast(Heights.data());
+
+        DeviceMemory += vectorsizeof(StrikePrices);
+        DeviceMemory += vectorsizeof(Maturities);
+        DeviceMemory += vectorsizeof(Lengths);
+        DeviceMemory += vectorsizeof(TermUnits);
+        DeviceMemory += vectorsizeof(TermStepCounts);
+        DeviceMemory += vectorsizeof(ReversionRates);
+        DeviceMemory += vectorsizeof(Volatilities);
+        DeviceMemory += vectorsizeof(Types);
+        DeviceMemory += vectorsizeof(YieldPrices);
+        DeviceMemory += vectorsizeof(YieldTimeSteps);
+        DeviceMemory += vectorsizeof(Widths);
+        DeviceMemory += vectorsizeof(Heights);
 
         // Fill in widths and heights for all options.
-        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(termUnits.begin(), termStepCounts.begin(), maturities.begin(), reversionRates.begin(), widths.begin(), heights.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(termUnits.end(), termStepCounts.end(), maturities.end(), reversionRates.end(), widths.end(), heights.end())),
+        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(TermUnits.begin(), TermStepCounts.begin(), Maturities.begin(), ReversionRates.begin(), Widths.begin(), Heights.begin())),
+                     thrust::make_zip_iterator(thrust::make_tuple(TermUnits.end(), TermStepCounts.end(), Maturities.end(), ReversionRates.end(), Widths.end(), Heights.end())),
                      compute_width_height());
 
+        cudaDeviceSynchronize();
+    }
+
+    void sortOptions(const SortType sort, const bool isTest)
+    {
         if (sort != SortType::NONE)
         {
             // Create indices
-            IndicesBegin = indices.begin();
-            IndicesEnd = indices.end();
-            thrust::sequence(IndicesBegin, IndicesEnd);
+            Indices = thrust::device_vector<int32_t>(N);
+            thrust::sequence(Indices.begin(), Indices.end());
+            DeviceMemory += vectorsizeof(Indices);
 
-            auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(strikePrices.begin(), maturities.begin(), lengths.begin(), termUnits.begin(), 
-                termStepCounts.begin(), reversionRates.begin(), volatilities.begin(), types.begin(), indices.begin()));
+            auto optionBegin = thrust::make_zip_iterator(thrust::make_tuple(StrikePrices.begin(), Maturities.begin(), Lengths.begin(), TermUnits.begin(), 
+                TermStepCounts.begin(), ReversionRates.begin(), Volatilities.begin(), Types.begin(), Indices.begin()));
     
             auto keysBegin = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
-                ? thrust::make_zip_iterator(thrust::make_tuple(widths.begin(), heights.begin()))
-                : thrust::make_zip_iterator(thrust::make_tuple(heights.begin(), widths.begin()));
+                ? thrust::make_zip_iterator(thrust::make_tuple(Widths.begin(), Heights.begin()))
+                : thrust::make_zip_iterator(thrust::make_tuple(Heights.begin(), Widths.begin()));
             auto keysEnd = (sort == SortType::WIDTH_ASC || sort == SortType::WIDTH_DESC) 
-                ? thrust::make_zip_iterator(thrust::make_tuple(widths.end(), heights.end()))
-                : thrust::make_zip_iterator(thrust::make_tuple(heights.end(), widths.end()));
+                ? thrust::make_zip_iterator(thrust::make_tuple(Widths.end(), Heights.end()))
+                : thrust::make_zip_iterator(thrust::make_tuple(Heights.end(), Widths.end()));
 
             // Sort options
             switch (sort)
@@ -154,38 +205,34 @@ struct CudaOptions
                     thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_desc());
                     break;
             }
+            cudaDeviceSynchronize();
         }
-        cudaDeviceSynchronize();
     }
 
     void sortResult(thrust::device_vector<real> &deviceResults)
     {
         // Sort result
-        if (Sort != SortType::NONE)
+        if (!Indices.empty())
         {
-            thrust::sort_by_key(IndicesBegin, IndicesEnd, deviceResults.begin());
+            thrust::sort_by_key(Indices.begin(), Indices.end(), deviceResults.begin());
             cudaDeviceSynchronize();
         }
     }
 };
 
-template<typename T>
-size_t vectorsizeof(const typename thrust::device_vector<T>& vec)
-{
-    return sizeof(T) * vec.size();
-}
-
 struct CudaRuntime
 {
-    long KernelRuntime = LONG_MAX;
-    long TotalRuntime = LONG_MAX;
+    long KernelRuntime = std::numeric_limits<long>::max();
+    long TotalRuntime = std::numeric_limits<long>::max();
+    long DeviceMemory = 0;
+
 };
 
 bool operator <(const CudaRuntime& x, const CudaRuntime& y) {
     return std::tie(x.KernelRuntime, x.TotalRuntime) < std::tie(y.KernelRuntime, y.TotalRuntime);
 }
 
-__device__ void computeConstants(OptionConstants &c, const CudaOptions &options, const int idx)
+__device__ void computeConstants(OptionConstants &c, const KernelOptions &options, const int idx)
 {
     c.termUnit = options.TermUnits[idx];
     auto T = options.Maturities[idx];

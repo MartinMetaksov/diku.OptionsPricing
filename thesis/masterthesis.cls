@@ -77,12 +77,12 @@
 	\addcontentsline{toc}{chapter}{\numberline{}Abstract}
 }
 
-\newcommand{\acknowledgments}{
-    \newpage
-	\chapter*{Acknowledgments}
-	\input{frontmatter/acknowledgments}
-	\addcontentsline{toc}{chapter}{\numberline{}Acknowledgments}
-}
+% \newcommand{\acknowledgments}{
+%     \newpage
+% 	\chapter*{Acknowledgments}
+% 	\input{frontmatter/acknowledgments}
+% 	\addcontentsline{toc}{chapter}{\numberline{}Acknowledgments}
+% }
 
 \newcommand{\contents}{
     \newpage

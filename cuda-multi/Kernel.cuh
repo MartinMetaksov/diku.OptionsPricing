@@ -15,6 +15,8 @@ namespace cuda
 namespace multi
 {
 
+volatile extern __shared__ char sh_mem[];
+
 /**
 Base class for kernel arguments.
 Important! Don't call defined pure virtual functions within your implementation.
@@ -38,23 +40,42 @@ public:
     __device__ virtual int getMaxHeight() const = 0;
 
     __device__ virtual int getOptionIdx() const = 0;
+
+    __device__ inline volatile real* getQs()
+    {
+        return (real *)&sh_mem;
+    }
+
+    __device__ inline volatile int32_t* getOptionInds()
+    {
+        return (int32_t *)&sh_mem;  // Sharing the same array with Qs!
+    }
+
+    __device__ inline volatile uint16_t* getOptionFlags()
+    {
+        return (uint16_t *)&sh_mem[blockDim.x * sizeof(real)];
+    }
 };
 
 template<class KernelArgsT>
-__global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, KernelArgsT args)
+__global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options, KernelArgsT args)
 {
+<<<<<<< HEAD
     extern __shared__ char sh_mem[];
     volatile real *Qs = (real *)&sh_mem;
     volatile int32_t *values = (int32_t *) &sh_mem;     // Sharing the same array with Qs!
     volatile uint16_t *flags = (uint16_t *) &Qs[blockDim.x];
     volatile OptionConstants *constants = (OptionConstants *) &flags[blockDim.x];
 
+=======
+>>>>>>> master
     // Compute option indices and init Qs
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
     const auto idxBlockNext = args.values.inds[blockIdx.x];
     const auto idx = idxBlock + threadIdx.x;
     if (idx < idxBlockNext)    // Don't fetch options from next block
     {
+<<<<<<< HEAD
         OptionConstants c;
         computeConstants(c, options, idx);
         values[threadIdx.x] = c.width;
@@ -79,21 +100,46 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     // Scan widths
     // TODO: maybe use scanIncBlock<Add<int32_t>>(values);
     sgmScanIncBlock<Add<int32_t>>(values, flags);
+=======
+        width = options.Widths[idx];
+        args.getOptionInds()[threadIdx.x] = width;
+    }
+    else
+    {
+        args.getOptionInds()[threadIdx.x] = 0;
+    }
+    args.getOptionFlags()[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
+    __syncthreads();
+
+    // Scan widths
+    // TODO: maybe use scanIncBlock<Add<int32_t>>(args.getOptionInds());
+    sgmScanIncBlock<Add<int32_t>>(args.getOptionInds(), args.getOptionFlags());
+>>>>>>> master
     
     int scannedWidthIdx = -1;
     if (idx <= idxBlockNext)
     {
+<<<<<<< HEAD
         scannedWidthIdx = threadIdx.x == 0 ? 0 : values[threadIdx.x - 1];
+=======
+        scannedWidthIdx = threadIdx.x == 0 ? 0 : args.getOptionInds()[threadIdx.x - 1];
+>>>>>>> master
     }
     __syncthreads();
 
     // Send option indices to all threads
+<<<<<<< HEAD
     values[threadIdx.x] = 0;
     flags[threadIdx.x] = 0;
+=======
+    args.getOptionInds()[threadIdx.x] = 0;
+    args.getOptionFlags()[threadIdx.x] = 0;
+>>>>>>> master
     __syncthreads();
 
     if (idx < idxBlockNext)
     {
+<<<<<<< HEAD
         values[scannedWidthIdx] = threadIdx.x;
         flags[scannedWidthIdx] = constants[threadIdx.x].width;
     }
@@ -105,10 +151,24 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     __syncthreads();
 
     sgmScanIncBlock<Add<int32_t>>(values, flags);
+=======
+        args.getOptionInds()[scannedWidthIdx] = threadIdx.x;
+        args.getOptionFlags()[scannedWidthIdx] = width;
+    }
+    else if (idx == idxBlockNext && scannedWidthIdx < blockDim.x) // fake option to fill block
+    {
+        args.getOptionInds()[scannedWidthIdx] = threadIdx.x;
+        args.getOptionFlags()[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
+    }
+    __syncthreads();
+
+    sgmScanIncBlock<Add<int32_t>>(args.getOptionInds(), args.getOptionFlags());
+>>>>>>> master
 
     // Let all threads know about their Q start
     if (idx <= idxBlockNext)
     {
+<<<<<<< HEAD
         flags[threadIdx.x] = scannedWidthIdx;
     }
     __syncthreads();
@@ -118,20 +178,36 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     auto optIdx = values[threadIdx.x];
     args.init(optIdx, idxBlock, idxBlockNext, options.N);
     if (args.getOptionIdx() >= idxBlockNext)
+=======
+        args.getOptionFlags()[threadIdx.x] = scannedWidthIdx;
+    }
+    __syncthreads();
+    scannedWidthIdx = args.getOptionFlags()[args.getOptionInds()[threadIdx.x]];
+
+    // Get the option and compute its constants
+    OptionConstants c;
+    args.init(args.getOptionInds()[threadIdx.x], idxBlock, idxBlockNext, options.N);
+    if (args.getOptionIdx() < idxBlockNext)
+>>>>>>> master
     {
         optIdx = -1;
     }
     __syncthreads();
 
     // Zero out Qs
-    Qs[threadIdx.x] = 0;
+    args.getQs()[threadIdx.x] = 0;
     __syncthreads();
 
     // Set the initial alpha and Q values
     if (threadIdx.x == scannedWidthIdx && optIdx != -1)
     {
+<<<<<<< HEAD
         args.setAlphaAt(0, getYieldAtYear(constants[optIdx].dt, constants[optIdx].termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
         Qs[scannedWidthIdx + constants[optIdx].jmax] = 1;    // Set starting Qs to 1$
+=======
+        args.setAlphaAt(0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
+        args.getQs()[scannedWidthIdx + c.jmax] = 1;    // Set starting Qs to 1$
+>>>>>>> master
     }
     __syncthreads();
 
@@ -139,6 +215,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
     for (int i = 1; i <= args.getMaxHeight(); ++i)
     {
         real Q = 0;
+<<<<<<< HEAD
         int j = 0;
         if (optIdx != -1)
         {
@@ -162,6 +239,39 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
                     } else {
                         Q = computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 2) * expm;
                     }
+=======
+        if (i <= c.n && j >= -jhigh && j <= jhigh)
+        {   
+            auto alpha = args.getAlphaAt(i - 1);
+            auto expp1 = j == jhigh ? zero : args.getQs()[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
+            auto expm = args.getQs()[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
+            auto expm1 = j == -jhigh ? zero : args.getQs()[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
+
+            if (i == 1) {
+                if (j == -jhigh) {
+                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
+                } else {
+                    Q = computeJValue(j, c.jmax, c.M, 2) * expm;
+                }
+            }
+            else if (i <= c.jmax) {
+                if (j == -jhigh) {
+                    Q = computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
+                } else if (j == -jhigh + 1) {
+                    Q = computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
+                } else if (j == jhigh) {
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1;
+                } else if (j == jhigh - 1) {
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm;
+                } else {
+                    Q = computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1;
+>>>>>>> master
                 }
                 else if (i <= constants[optIdx].jmax) {
                     if (j == -jhigh) {
@@ -180,6 +290,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
                             computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
                     }
                 } else {
+<<<<<<< HEAD
                     if (j == -jhigh) {
                         Q = computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * expm +
                             computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1;
@@ -203,11 +314,19 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
                             computeJValue(j + 1, constants[optIdx].jmax, constants[optIdx].M, 3) * expp1 +
                             ((j == jhigh - 2) ? computeJValue(j + 2, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x + 2] * exp(-(alpha + (j + 2) * constants[optIdx].dr) * constants[optIdx].dt) : zero);
                     }
+=======
+                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQs()[threadIdx.x - 2] * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
+                        computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
+                        computeJValue(j, c.jmax, c.M, 2) * expm +
+                        computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
+                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQs()[threadIdx.x + 2] * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
+>>>>>>> master
                 }
             }
         }
         __syncthreads();
 
+<<<<<<< HEAD
         if (optIdx != -1)
         {
             Qs[threadIdx.x] = Q > zero ? Q * exp(-j * constants[optIdx].dr * constants[optIdx].dt) : zero;
@@ -216,23 +335,34 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
 
         // Repopulate flags
         flags[threadIdx.x] = threadIdx.x == scannedWidthIdx ? (optIdx == -1 ? blockDim.x - scannedWidthIdx : constants[optIdx].width) : 0;
+=======
+        args.getQs()[threadIdx.x] = Q > zero ? Q * exp(-j * c.dr * c.dt) : zero;
+        __syncthreads();
+
+        // Repopulate flags
+        args.getOptionFlags()[threadIdx.x] = threadIdx.x == scannedWidthIdx ? c.width : 0;
+>>>>>>> master
         __syncthreads();
         
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
+<<<<<<< HEAD
         real Qexp = sgmScanIncBlock<Add<real>>(Qs, flags);
+=======
+        real Qexp = sgmScanIncBlock<Add<real>>(args.getQs(), args.getOptionFlags());
+>>>>>>> master
         
         if (optIdx != -1 && i <= constants[optIdx].n && threadIdx.x == scannedWidthIdx + constants[optIdx].width - 1)
         {
             real alpha = computeAlpha(Qexp, i-1, constants[optIdx].dt, constants[optIdx].termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
             args.setAlphaAt(i, alpha);
         }
-        Qs[threadIdx.x] = Q;
+        args.getQs()[threadIdx.x] = Q;
         __syncthreads();
     }
 
     // Backward propagation
-    Qs[threadIdx.x] = 100; // initialize to 100$
+    args.getQs()[threadIdx.x] = 100; // initialize to 100$
 
     for (auto i = args.getMaxHeight() - 1; i >= 0; --i)
     {
@@ -241,11 +371,16 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         {
             int jhigh = min(i, constants[optIdx].jmax);
 
+<<<<<<< HEAD
             // Forward iteration step, compute Qs in the next time step
             int j = threadIdx.x - constants[optIdx].jmax - scannedWidthIdx;
+=======
+        real call = args.getQs()[threadIdx.x];
+>>>>>>> master
 
             call = Qs[threadIdx.x];
 
+<<<<<<< HEAD
             if (i < constants[optIdx].n && j >= -jhigh && j <= jhigh)
             {
                 auto alpha = args.getAlphaAt(i);
@@ -277,6 +412,33 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
                         computeJValue(j, constants[optIdx].jmax, constants[optIdx].M, 3) * Qs[threadIdx.x - 1]) *
                             callExp;
                 }
+=======
+            real res;
+            if (j == c.jmax)
+            {
+                // Top edge branching
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x - 1] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x - 2]) *
+                        callExp;
+            }
+            else if (j == -c.jmax)
+            {
+                // Bottom edge branching
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x + 2] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x + 1] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x]) *
+                        callExp;
+            }
+            else
+            {
+                // Standard branching
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x + 1] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x - 1]) *
+                        callExp;
+            }
+>>>>>>> master
 
                 // after obtaining the result from (i+1) nodes, set the call for ith node
                 call = computeCallValue(isMaturity, constants[optIdx].X, constants[optIdx].type, res);
@@ -284,13 +446,17 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const CudaOptions options, K
         }
         __syncthreads();
 
-        Qs[threadIdx.x] = call;
+        args.getQs()[threadIdx.x] = call;
         __syncthreads();
     }
     
     if (threadIdx.x == scannedWidthIdx && optIdx != -1)
     {
+<<<<<<< HEAD
         args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + constants[optIdx].jmax];
+=======
+        args.values.res[args.getOptionIdx()] = args.getQs()[scannedWidthIdx + c.jmax];
+>>>>>>> master
     }
 }
 
@@ -298,40 +464,44 @@ class KernelRunBase
 {
 
 private:
-    std::chrono::time_point<std::chrono::steady_clock> time_begin;
+    std::chrono::time_point<std::chrono::steady_clock> TimeBegin;
+    bool IsTest;
 
 protected:
-    bool isTest;
-    int blockSize;
-    int maxWidth;
-    size_t deviceMemory = 0;
+    int BlockSize;
 
-    virtual void runPreprocessing(CudaOptions &cudaOptions, std::vector<real> &results,
-        thrust::device_vector<int32_t> &widths, thrust::device_vector<int32_t> &heights) = 0;
+    virtual void runPreprocessing(CudaOptions &options, std::vector<real> &results) = 0;
 
     template<class KernelArgsT, class KernelArgsValuesT>
+<<<<<<< HEAD
     void runKernel(CudaOptions &cudaOptions, std::vector<real> &results, thrust::device_vector<int32_t> &inds, 
         KernelArgsValuesT &values, const int totalAlphasCount, const int maxOptionsBlock)
     {
         const int sharedMemorySize = sizeof(real) * blockSize + sizeof(uint16_t) * blockSize + sizeof(OptionConstants) * maxOptionsBlock;
+=======
+    void runKernel(CudaOptions &options, std::vector<real> &results, thrust::device_vector<int32_t> &inds, KernelArgsValuesT &values, const int totalAlphasCount)
+    {
+        const int sharedMemorySize = (sizeof(real) + sizeof(uint16_t)) * BlockSize;
+>>>>>>> master
         thrust::device_vector<real> alphas(totalAlphasCount);
-        thrust::device_vector<real> result(cudaOptions.N);
+        thrust::device_vector<real> result(options.N);
 
-        if (isTest)
+        options.DeviceMemory += vectorsizeof(inds);
+        options.DeviceMemory += vectorsizeof(alphas);
+        options.DeviceMemory += vectorsizeof(result);
+        runtime.DeviceMemory = options.DeviceMemory;
+
+        if (IsTest)
         {
-            deviceMemory += vectorsizeof(inds);
-            deviceMemory += vectorsizeof(alphas);
-            deviceMemory += vectorsizeof(result);
-
-            std::cout << "Running pricing for " << cudaOptions.N << 
+            std::cout << "Running pricing for " << options.N << 
             #ifdef USE_DOUBLE
             " double"
             #else
             " float"
             #endif
-            << " options with block size " << blockSize << std::endl;
+            << " options with block size " << BlockSize << std::endl;
             std::cout << "Shared memory size " << sharedMemorySize << ", alphas count " << totalAlphasCount << std::endl;
-            std::cout << "Global memory size " << deviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
+            std::cout << "Global memory size " << options.DeviceMemory / (1024.0 * 1024.0) << " MB" << std::endl;
 
             cudaDeviceSynchronize();
             size_t memoryFree, memoryTotal;
@@ -345,26 +515,26 @@ protected:
         KernelArgsT kernelArgs(values);
 
         auto time_begin_kernel = std::chrono::steady_clock::now();
-        kernelMultipleOptionsPerThreadBlock<<<inds.size(), blockSize, sharedMemorySize>>>(cudaOptions, kernelArgs);
+        kernelMultipleOptionsPerThreadBlock<<<inds.size(), BlockSize, sharedMemorySize>>>(options.KernelOptions, kernelArgs);
         cudaDeviceSynchronize();
         auto time_end_kernel = std::chrono::steady_clock::now();
         runtime.KernelRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end_kernel - time_begin_kernel).count();
 
         CudaCheckError();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Kernel executed in " << runtime.KernelRuntime << " microsec" << std::endl;
         }
 
         // Sort result
-        cudaOptions.sortResult(result);
+        options.sortResult(result);
 
         // Stop timing
-        auto time_end = std::chrono::steady_clock::now();
-        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count();
+        auto timeEnd = std::chrono::steady_clock::now();
+        runtime.TotalRuntime = std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - TimeBegin).count();
 
-        if (isTest)
+        if (IsTest)
         {
             std::cout << "Total execution time " << runtime.TotalRuntime << " microsec" << std::endl;
         }
@@ -380,66 +550,42 @@ public:
     void run(const Options &options, const Yield &yield, std::vector<real> &results, 
         const int blockSize = -1, const SortType sortType = SortType::NONE, bool isTest = false)
     {
-        this->isTest = isTest;
-        this->blockSize = blockSize;
-
-        thrust::device_vector<real> strikePrices(options.StrikePrices.begin(), options.StrikePrices.end());
-        thrust::device_vector<real> maturities(options.Maturities.begin(), options.Maturities.end());
-        thrust::device_vector<real> lengths(options.Lengths.begin(), options.Lengths.end());
-        thrust::device_vector<uint16_t> termUnits(options.TermUnits.begin(), options.TermUnits.end());
-        thrust::device_vector<uint16_t> termStepCounts(options.TermStepCounts.begin(), options.TermStepCounts.end());
-        thrust::device_vector<real> reversionRates(options.ReversionRates.begin(), options.ReversionRates.end());
-        thrust::device_vector<real> volatilities(options.Volatilities.begin(), options.Volatilities.end());
-        thrust::device_vector<OptionType> types(options.Types.begin(), options.Types.end());
-
-        thrust::device_vector<real> yieldPrices(yield.Prices.begin(), yield.Prices.end());
-        thrust::device_vector<int32_t> yieldTimeSteps(yield.TimeSteps.begin(), yield.TimeSteps.end());
+        CudaOptions cudaOptions(options, yield);
 
         // Start timing when input is copied to device
         cudaDeviceSynchronize();
-        time_begin = std::chrono::steady_clock::now();
+        auto timeBegin = std::chrono::steady_clock::now();
 
-        thrust::device_vector<int32_t> widths(options.N);
-        thrust::device_vector<int32_t> heights(options.N);
-        thrust::device_vector<int32_t> indices(sortType == SortType::NONE ? 0 : options.N);
-
-        if (isTest)
-        {
-            deviceMemory += vectorsizeof(strikePrices);
-            deviceMemory += vectorsizeof(maturities);
-            deviceMemory += vectorsizeof(lengths);
-            deviceMemory += vectorsizeof(termUnits);
-            deviceMemory += vectorsizeof(termStepCounts);
-            deviceMemory += vectorsizeof(reversionRates);
-            deviceMemory += vectorsizeof(volatilities);
-            deviceMemory += vectorsizeof(types);
-            deviceMemory += vectorsizeof(yieldPrices);
-            deviceMemory += vectorsizeof(yieldTimeSteps);
-            deviceMemory += vectorsizeof(widths);
-            deviceMemory += vectorsizeof(heights);
-            deviceMemory += vectorsizeof(indices);
-        }
-
-        CudaOptions cudaOptions(options, yield.N, sortType, isTest, strikePrices, maturities, lengths, termUnits, 
-            termStepCounts, reversionRates, volatilities, types, yieldPrices, yieldTimeSteps, widths, heights, indices);
+        cudaOptions.initialize();
 
         // Get the max width
-        maxWidth = *(thrust::max_element(widths.begin(), widths.end()));
+        auto maxWidth = *(thrust::max_element(cudaOptions.Widths.begin(), cudaOptions.Widths.end()));
 
-        if (blockSize <= 0) 
+        BlockSize = blockSize;
+        if (BlockSize <= 0) 
         {
             // Compute the smallest block size for the max width
-            this->blockSize = ((maxWidth + 32 - 1) / 32) * 32;
+            BlockSize = ((maxWidth + 32 - 1) / 32) * 32;
         }
 
-        if (maxWidth > this->blockSize)
+        if (maxWidth > BlockSize)
         {
             std::ostringstream oss;
-            oss << "Block size (" << blockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
+            oss << "Block size (" << BlockSize << ") cannot be smaller than max option width (" << maxWidth << ").";
             throw std::invalid_argument(oss.str());
         }
 
-        runPreprocessing(cudaOptions, results, widths, heights);
+        run(cudaOptions, results, timeBegin, blockSize, sortType, isTest);
+    }
+
+    void run(CudaOptions &cudaOptions, std::vector<real> &results, const std::chrono::time_point<std::chrono::steady_clock> timeBegin, 
+        const int blockSize, const SortType sortType = SortType::NONE, const bool isTest = false)
+    {
+        TimeBegin = timeBegin;
+        IsTest = isTest;
+
+        cudaOptions.sortOptions(sortType, isTest);
+        runPreprocessing(cudaOptions, results);
     }
 
 };

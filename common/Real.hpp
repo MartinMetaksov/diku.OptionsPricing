@@ -1,6 +1,8 @@
 #ifndef REAL_H
 #define REAL_H
 
+#include <cfloat>
+
 namespace trinom
 {
 
@@ -9,11 +11,16 @@ namespace trinom
 #ifdef USE_DOUBLE
 typedef double real;
 #define ROUND(X) round((X))
+#define REAL_MAX DBL_MAX
+#define REAL_MIN DBL_MIN
 #else
 typedef float real;
 #define ROUND(X) roundf((X))
+#define REAL_MAX FLT_MAX
+#define REAL_MIN FLT_MIN
 #endif
 
+#define infinity (real) INFINITY
 #define zero (real)0.0
 #define one (real)1.0
 #define two (real)2.0

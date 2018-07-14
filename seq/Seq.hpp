@@ -157,7 +157,7 @@ real computeSingleOption(const OptionConstants &c, const Yield &yield)
             }
 
             // after obtaining the result from (i+1) nodes, set the call for ith node
-            callCopy[jind] = computeCallValue(isMaturity, c, res);
+            callCopy[jind] = computeCallValue(isMaturity, c.X, c.type, res);
         }
 
         // Switch call arrays

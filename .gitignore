@@ -590,3 +590,4 @@ build
 !data/**/*.out
 data/wmp
 .Rhistory
+*.Rproj

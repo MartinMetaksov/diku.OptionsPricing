@@ -65,7 +65,7 @@ const int blockSize, const SortType sortType, const int runs, const bool isTest)
         }
         else
         {
-            cout << version << ',' << blockSize << ',' << (char)sortType << ',' << best.KernelRuntime << ',' << best.TotalRuntime << endl;
+            cout << version << ',' << blockSize << ',' << (char)sortType << ',' << best.KernelRuntime << ',' << best.TotalRuntime << ',' << best.DeviceMemory << endl;
         }
     }
     else
