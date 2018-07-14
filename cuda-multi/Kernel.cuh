@@ -15,6 +15,8 @@ namespace cuda
 namespace multi
 {
 
+volatile extern __shared__ char sh_mem[];
+
 /**
 Base class for kernel arguments.
 Important! Don't call defined pure virtual functions within your implementation.
@@ -38,16 +40,26 @@ public:
     __device__ virtual int getMaxHeight() const = 0;
 
     __device__ virtual int getOptionIdx() const = 0;
+
+    __device__ inline volatile real* getQs()
+    {
+        return (real *)&sh_mem;
+    }
+
+    __device__ inline volatile int32_t* getOptionInds()
+    {
+        return (int32_t *)&sh_mem;  // Sharing the same array with Qs!
+    }
+
+    __device__ inline volatile uint16_t* getOptionFlags()
+    {
+        return (uint16_t *)&sh_mem[blockDim.x * sizeof(real)];
+    }
 };
 
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options, KernelArgsT args)
 {
-    volatile extern __shared__ char sh_mem[];
-    volatile real *Qs = (real *)&sh_mem;
-    volatile int32_t *optionInds = (int32_t *) &sh_mem;     // Sharing the same array with Qs!
-    volatile uint16_t *optionFlags = (uint16_t *) &Qs[blockDim.x];
-
     // Compute option indices and init Qs
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
     const auto idxBlockNext = args.values.inds[blockIdx.x];
@@ -56,56 +68,56 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
     if (idx < idxBlockNext)    // Don't fetch options from next block
     {
         width = options.Widths[idx];
-        optionInds[threadIdx.x] = width;
+        args.getOptionInds()[threadIdx.x] = width;
     }
     else
     {
-        optionInds[threadIdx.x] = 0;
+        args.getOptionInds()[threadIdx.x] = 0;
     }
-    optionFlags[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
+    args.getOptionFlags()[threadIdx.x] = threadIdx.x == 0 ? blockDim.x : 0;
     __syncthreads();
 
     // Scan widths
-    // TODO: maybe use scanIncBlock<Add<int32_t>>(optionInds);
-    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
+    // TODO: maybe use scanIncBlock<Add<int32_t>>(args.getOptionInds());
+    sgmScanIncBlock<Add<int32_t>>(args.getOptionInds(), args.getOptionFlags());
     
     int scannedWidthIdx = -1;
     if (idx <= idxBlockNext)
     {
-        scannedWidthIdx = threadIdx.x == 0 ? 0 : optionInds[threadIdx.x - 1];
+        scannedWidthIdx = threadIdx.x == 0 ? 0 : args.getOptionInds()[threadIdx.x - 1];
     }
     __syncthreads();
 
     // Send option indices to all threads
-    optionInds[threadIdx.x] = 0;
-    optionFlags[threadIdx.x] = 0;
+    args.getOptionInds()[threadIdx.x] = 0;
+    args.getOptionFlags()[threadIdx.x] = 0;
     __syncthreads();
 
     if (idx < idxBlockNext)
     {
-        optionInds[scannedWidthIdx] = threadIdx.x;
-        optionFlags[scannedWidthIdx] = width;
+        args.getOptionInds()[scannedWidthIdx] = threadIdx.x;
+        args.getOptionFlags()[scannedWidthIdx] = width;
     }
     else if (idx == idxBlockNext && scannedWidthIdx < blockDim.x) // fake option to fill block
     {
-        optionInds[scannedWidthIdx] = threadIdx.x;
-        optionFlags[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
+        args.getOptionInds()[scannedWidthIdx] = threadIdx.x;
+        args.getOptionFlags()[scannedWidthIdx] = blockDim.x - scannedWidthIdx;
     }
     __syncthreads();
 
-    sgmScanIncBlock<Add<int32_t>>(optionInds, optionFlags);
+    sgmScanIncBlock<Add<int32_t>>(args.getOptionInds(), args.getOptionFlags());
 
     // Let all threads know about their Q start
     if (idx <= idxBlockNext)
     {
-        optionFlags[threadIdx.x] = scannedWidthIdx;
+        args.getOptionFlags()[threadIdx.x] = scannedWidthIdx;
     }
     __syncthreads();
-    scannedWidthIdx = optionFlags[optionInds[threadIdx.x]];
+    scannedWidthIdx = args.getOptionFlags()[args.getOptionInds()[threadIdx.x]];
 
     // Get the option and compute its constants
     OptionConstants c;
-    args.init(optionInds[threadIdx.x], idxBlock, idxBlockNext, options.N);
+    args.init(args.getOptionInds()[threadIdx.x], idxBlock, idxBlockNext, options.N);
     if (args.getOptionIdx() < idxBlockNext)
     {
         computeConstants(c, options, args.getOptionIdx());
@@ -118,14 +130,14 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
     __syncthreads();
 
     // Zero out Qs
-    Qs[threadIdx.x] = 0;
+    args.getQs()[threadIdx.x] = 0;
     __syncthreads();
 
     // Set the initial alpha and Q values
     if (threadIdx.x == scannedWidthIdx && args.getOptionIdx() < idxBlockNext)
     {
         args.setAlphaAt(0, getYieldAtYear(c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize));
-        Qs[scannedWidthIdx + c.jmax] = 1;    // Set starting Qs to 1$
+        args.getQs()[scannedWidthIdx + c.jmax] = 1;    // Set starting Qs to 1$
     }
     __syncthreads();
 
@@ -141,9 +153,9 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
         if (i <= c.n && j >= -jhigh && j <= jhigh)
         {   
             auto alpha = args.getAlphaAt(i - 1);
-            auto expp1 = j == jhigh ? zero : Qs[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
-            auto expm = Qs[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
-            auto expm1 = j == -jhigh ? zero : Qs[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
+            auto expp1 = j == jhigh ? zero : args.getQs()[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
+            auto expm = args.getQs()[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
+            auto expm1 = j == -jhigh ? zero : args.getQs()[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
 
             if (i == 1) {
                 if (j == -jhigh) {
@@ -188,38 +200,38 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
                         computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
                             
                 } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * Qs[threadIdx.x - 2] * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
+                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQs()[threadIdx.x - 2] * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
                         computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
                         computeJValue(j, c.jmax, c.M, 2) * expm +
                         computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * Qs[threadIdx.x + 2] * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
+                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQs()[threadIdx.x + 2] * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
                 }
             }
         }
         __syncthreads();
 
-        Qs[threadIdx.x] = Q > zero ? Q * exp(-j * c.dr * c.dt) : zero;
+        args.getQs()[threadIdx.x] = Q > zero ? Q * exp(-j * c.dr * c.dt) : zero;
         __syncthreads();
 
         // Repopulate flags
-        optionFlags[threadIdx.x] = threadIdx.x == scannedWidthIdx ? c.width : 0;
+        args.getOptionFlags()[threadIdx.x] = threadIdx.x == scannedWidthIdx ? c.width : 0;
         __syncthreads();
         
         // Determine the new alpha using equation 30.22
         // by summing up Qs from the next time step
-        real Qexp = sgmScanIncBlock<Add<real>>(Qs, optionFlags);
+        real Qexp = sgmScanIncBlock<Add<real>>(args.getQs(), args.getOptionFlags());
         
         if (i <= c.n && threadIdx.x == scannedWidthIdx + c.width - 1)
         {
             real alpha = computeAlpha(Qexp, i-1, c.dt, c.termUnit, options.YieldPrices, options.YieldTimeSteps, options.YieldSize);
             args.setAlphaAt(i, alpha);
         }
-        Qs[threadIdx.x] = Q;
+        args.getQs()[threadIdx.x] = Q;
         __syncthreads();
     }
 
     // Backward propagation
-    Qs[threadIdx.x] = 100; // initialize to 100$
+    args.getQs()[threadIdx.x] = 100; // initialize to 100$
 
     for (auto i = args.getMaxHeight() - 1; i >= 0; --i)
     {
@@ -228,7 +240,7 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
         // Forward iteration step, compute Qs in the next time step
         int j = threadIdx.x - c.jmax - scannedWidthIdx;
 
-        real call = Qs[threadIdx.x];
+        real call = args.getQs()[threadIdx.x];
 
         if (i < c.n && j >= -jhigh && j <= jhigh)
         {
@@ -240,25 +252,25 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
             if (j == c.jmax)
             {
                 // Top edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x - 1] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x - 2]) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x - 1] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x - 2]) *
                         callExp;
             }
             else if (j == -c.jmax)
             {
                 // Bottom edge branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x + 2] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x + 1] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x]) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x + 2] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x + 1] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x]) *
                         callExp;
             }
             else
             {
                 // Standard branching
-                res = (computeJValue(j, c.jmax, c.M, 1) * Qs[threadIdx.x + 1] +
-                    computeJValue(j, c.jmax, c.M, 2) * Qs[threadIdx.x] +
-                    computeJValue(j, c.jmax, c.M, 3) * Qs[threadIdx.x - 1]) *
+                res = (computeJValue(j, c.jmax, c.M, 1) * args.getQs()[threadIdx.x + 1] +
+                    computeJValue(j, c.jmax, c.M, 2) * args.getQs()[threadIdx.x] +
+                    computeJValue(j, c.jmax, c.M, 3) * args.getQs()[threadIdx.x - 1]) *
                         callExp;
             }
 
@@ -267,13 +279,13 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
         }
         __syncthreads();
 
-        Qs[threadIdx.x] = call;
+        args.getQs()[threadIdx.x] = call;
         __syncthreads();
     }
     
     if (args.getOptionIdx() < idxBlockNext && threadIdx.x == scannedWidthIdx)
     {
-        args.values.res[args.getOptionIdx()] = Qs[scannedWidthIdx + c.jmax];
+        args.values.res[args.getOptionIdx()] = args.getQs()[scannedWidthIdx + c.jmax];
     }
 }
 
@@ -299,6 +311,7 @@ protected:
         options.DeviceMemory += vectorsizeof(inds);
         options.DeviceMemory += vectorsizeof(alphas);
         options.DeviceMemory += vectorsizeof(result);
+        runtime.DeviceMemory = options.DeviceMemory;
 
         if (IsTest)
         {

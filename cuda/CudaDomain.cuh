@@ -109,7 +109,7 @@ public:
     thrust::device_vector<int32_t> Heights;
     thrust::device_vector<int32_t> Indices;
 
-    int DeviceMemory = 0;
+    long DeviceMemory = 0;
 
     CudaOptions(const Options &options, const Yield &yield) : 
         
@@ -224,6 +224,8 @@ struct CudaRuntime
 {
     long KernelRuntime = std::numeric_limits<long>::max();
     long TotalRuntime = std::numeric_limits<long>::max();
+    long DeviceMemory = 0;
+
 };
 
 bool operator <(const CudaRuntime& x, const CudaRuntime& y) {

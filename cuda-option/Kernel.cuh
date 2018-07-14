@@ -233,6 +233,7 @@ protected:
         options.DeviceMemory += vectorsizeof(QsCopy);
         options.DeviceMemory += vectorsizeof(alphas);
         options.DeviceMemory += vectorsizeof(result);
+        runtime.DeviceMemory = options.DeviceMemory;
 
         if (IsTest)
         {
