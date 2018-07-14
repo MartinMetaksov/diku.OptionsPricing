@@ -205,6 +205,7 @@ public:
                     thrust::sort_by_key(keysBegin, keysEnd, optionBegin, sort_tuple_desc());
                     break;
             }
+            cudaDeviceSynchronize();
         }
     }
 
