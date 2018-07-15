@@ -146,23 +146,26 @@ DEVICE real computeJValue(const int j, const int jmax, const real M, const int e
 
 DEVICE inline real computeCallValue(bool isMaturity, const real X, const OptionType type, const real res)
 {
+    real ret = res;
     if (isMaturity)
     {
         switch (type)
         {
         case OptionType::PUT:
-            return MAX(X - res, zero);
+            ret = MAX(X - res, zero);
+            break;
         case OptionType::CALL:
-            return MAX(res - X, zero);
+            ret = MAX(res - X, zero);
+            break;
         }
     }
 
-    if (res == infinity)
+    if (ret == infinity)
         return REAL_MAX;
-    else if (res == -infinity)
+    else if (ret == -infinity)
         return REAL_MIN;
     else
-        return res;
+        return ret;
 }
 
 } // namespace trinom
