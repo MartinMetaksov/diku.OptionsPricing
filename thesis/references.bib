@@ -23,6 +23,13 @@
     year={1965},
     publisher={IEEE}
 }
+@article{blackscholes,
+    title={The Pricing of Options and Corporate Liabilities},
+    author={Fischer Black, Myron Scholes},
+    year={1973},
+    publisher={The University of Chicago Press},
+    urlOPT={https://www.jstor.org/stable/1831029?origin=JSTOR-pdf&seq=1#page_scan_tab_contents}
+}
 
 % From Cosmin
 % I. FINANCE:  (include this two papers, and try to follow the references from here related to other HPC work on finance domain)
@@ -70,6 +77,85 @@
 
 % This is the seminal paper on "scan" as a basic block of parallel programming:
 
+@inproceedings{Accelerate-ICFP,
+ author = {McDonell, Trevor L. and Chakravarty, Manuel M.T. and Keller, Gabriele and Lippmeier, Ben},
+ title = {Optimising Purely Functional GPU Programs},
+ booktitle = {Proceedings of the 18th ACM SIGPLAN International Conference on Functional Programming},
+ series = {ICFP '13},
+ year = {2013},
+ isbn = {978-1-4503-2326-0},
+ location = {Boston, Massachusetts, USA},
+ pages = {49--60},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/2500365.2500595},
+ doi = {10.1145/2500365.2500595},
+ acmid = {2500595},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {array fusion, arrays, data parallelism, dynamic compilation, embedded language, gpgpu, haskell, sharing recovery},
+} 
+
+@inproceedings{AccelerateStreaming,
+ author = {Clifton-Everest, Robert and McDonell, Trevor L. and Chakravarty, Manuel M. T. and Keller, Gabriele},
+ title = {Streaming Irregular Arrays},
+ booktitle = {Proceedings of the 10th ACM SIGPLAN International Symposium on Haskell},
+ series = {Haskell 2017},
+ year = {2017},
+ isbn = {978-1-4503-5182-9},
+ location = {Oxford, UK},
+ pages = {174--185},
+ numpages = {12},
+ url = {http://doi.acm.org/10.1145/3122955.3122971},
+ doi = {10.1145/3122955.3122971},
+ acmid = {3122971},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {Data parallelism, Embedded languages, Functional languages, Parallel programming languages, Streaming languages},
+}
+
+@phdthesis{svensson2011obsidian,
+  title={Obsidian: {GPU} Kernel Programming in {H}askell},
+  author={Svensson, Joel},
+  year={2011},
+  school={Chalmers University of Technology}
+}
+
+@ARTICLE{ GrelSchoIJPP06,
+  AUTHOR    = {Clemens Grelck and Sven-Bodo Scholz},
+  TITLE     = {{SAC}: A Functional Array Language for Efficient Multithreaded Execution},
+  JOURNAL   = {Int. Journal of Parallel Programming},
+  YEAR         = 2006,
+  VOLUME    = {34},
+  NUMBER    = {4},
+  PAGES     = {383--427},
+  NOTEOPT      = {},
+  CONTENTS  = {[ISSN: 0885-7458 (Paper) 1573-7640 (Online)]},
+  sourceURL = {http://dx.doi.org/10.1007/s10766-006-0018-x},
+  TOPICSOPT    = {SAC},
+  AFFILOPT     = {ctca}
+}
+
+@INPROCEEDINGS{ HybType,
+  AUTHOR    = {Clemens Grelck and Fangyong Tang},
+  TITLE     = {Towards {H}ybrid {A}rray {T}ypes in {SAC}},
+  EDITOR    = {V. Zs\'ok and Z. Horv\'ath and R. Plasmeijer},
+  BOOKTITLE = {7th Workshop on Prg. Lang., (Soft. Eng. Conf.)},
+  YEAR      = 2014,
+  PAGES     = {129-145},
+  location = {Kiel, Germany},
+  TOPICSOPT    = {SAC}
+}
+
+@article{SaCShared2005,
+  author = {Clemens Grelck},
+  title = {Shared Memory Multiprocessor Support for Functional Array Processing in {SAC}},
+  journal = {Journal of Functional Programming (JFP)},
+  volume = {15},
+  number = {3},
+  pages = {353--401},
+  year = {2005}
+}
+
 @article{segScan,
   title={{S}cans as {P}rimitive {P}arallel {O}perations},
   author={Guy E. Blelloch},
@@ -79,6 +165,114 @@
   pages={1526--1538},
   year={1989}
 }
+
+@inproceedings{Halide,
+ author = {Ragan-Kelley, Jonathan and Barnes, Connelly and Adams, Andrew and Paris, Sylvain and Durand, Fr{\'e}do and Amarasinghe, Saman},
+ title = {Halide: A Language and Compiler for Optimizing Parallelism, Locality, and Recomputation in Image Processing Pipelines},
+ booktitle = {Proceedings of the 34th ACM SIGPLAN Conference on Programming Language Design and Implementation},
+ series = {PLDI '13},
+ year = {2013},
+ isbn = {978-1-4503-2014-6},
+ location = {Seattle, Washington, USA},
+ pages = {519--530},
+ numpages = {12},
+ urlOPT = {http://doi.acm.org/10.1145/2491956.2462176},
+ doi = {10.1145/2491956.2462176},
+ acmid = {2462176},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {autotuning, compiler, domain specific language, gpu, image processing, locality, optimization, parallelism, redundant computation, vectorization},
+}
+
+@inproceedings{tang2011pochoir,
+	Author = {Tang, Yuan and Chowdhury, Rezaul Alam and Kuszmaul, Bradley C and Luk, Chi-Keung and Leiserson, Charles E},
+	Booktitle = {Proceedings of the twenty-third annual ACM symposium on Parallelism in algorithms and architectures},
+	Organization = {ACM},
+	Pages = {117--128},
+	Title = {The pochoir stencil compiler},
+	Year = {2011}
+}
+
+@inproceedings{HPAT,
+	Acmid = {3079099},
+	Address = {New York, NY, USA},
+	Articleno = {9},
+	Author = {Totoni, Ehsan and Anderson, Todd A. and Shpeisman, Tatiana},
+	Booktitle = {Proceedings of the International Conference on Supercomputing},
+	Doi = {10.1145/3079079.3079099},
+	Isbn = {978-1-4503-5020-4},
+	Keywords = {automatic parallelization, big data analytics, high performance computing},
+	Location = {Chicago, Illinois},
+	Numpages = {10},
+	Pages = {9:1--9:10},
+	Publisher = {ACM},
+	Series = {ICS '17},
+	Title = {HPAT: High Performance Analytics with Scripting Ease-of-use},
+	Url = {http://doi.acm.org/10.1145/3079079.3079099},
+	Year = {2017},
+	Bdsk-Url-1 = {http://doi.acm.org/10.1145/3079079.3079099},
+	Bdsk-Url-2 = {http://dx.doi.org/10.1145/3079079.3079099}
+}
+
+@article{OP2-Mesh,
+	Acmid = {2562939},
+	Address = {Amsterdam, The Netherlands, The Netherlands},
+	Author = {Mudalige, G.R. and Giles, M.B. and Thiyagalingam, J. and Reguly, I.Z. and Bertolli, C. and Kelly, P.H.J. and Trefethen, A.E.},
+	Doi = {10.1016/j.parco.2013.09.004},
+	Issn = {0167-8191},
+	Issue_Date = {November, 2013},
+	Journal = {Parallel Comput.},
+	Keywords = {Active library, Domain specific language, GPU, Heterogeneous systems, OP2, Unstructured mesh},
+	Month = nov,
+	Number = {11},
+	Numpages = {24},
+	Pages = {669--692},
+	Publisher = {Elsevier Science Publishers B. V.},
+	Title = {Design and Initial Performance of a High-level Unstructured Mesh Framework on Heterogeneous Parallel Systems},
+	Url = {http://dx.doi.org/10.1016/j.parco.2013.09.004},
+	Volume = {39},
+	Year = {2013},
+	Bdsk-Url-1 = {http://dx.doi.org/10.1016/j.parco.2013.09.004}
+}
+
+@article{DeliteDSLs,
+ author = {Sujeeth, Arvind K. and Brown, Kevin J. and Lee, Hyoukjoong and Rompf, Tiark and Chafi, Hassan and Odersky, Martin and Olukotun, Kunle},
+ title = {Delite: A Compiler Architecture for Performance-Oriented Embedded Domain-Specific Languages},
+ journal = {ACM Trans. Embed. Comput. Syst.},
+ issue_date = {July 2014},
+ volume = {13},
+ number = {4s},
+ month = apr,
+ year = {2014},
+ issn = {1539-9087},
+ pages = {134:1--134:25},
+ articleno = {134},
+ numpages = {25},
+ urlOPT = {http://doi.acm.org/10.1145/2584665},
+ doi = {10.1145/2584665},
+ acmid = {2584665},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {Domain-specific languages, code generation, language virtualization, multistage programming},
+}
+
+@inproceedings{StreamJava8,
+ author = {Ishizaki, Kazuaki and Hayashi, Akihiro and Koblents, Gita and Sarkar, Vivek},
+ title = {Compiling and Optimizing Java 8 Programs for GPU Execution},
+ booktitle = {Proceedings of the 2015 International Conference on Parallel Architecture and Compilation (PACT)},
+ series = {PACT '15},
+ year = {2015},
+ isbn = {978-1-4673-9524-3},
+ pages = {419--431},
+ numpages = {13},
+ url = {http://dx.doi.org/10.1109/PACT.2015.46},
+ doi = {10.1109/PACT.2015.46},
+ acmid = {2923809},
+ publisher = {IEEE Computer Society},
+ address = {Washington, DC, USA}
+}
+
+
 
 % Include some Futhark references (since you'll be using it):
 % - main Futhark paper:
@@ -133,6 +327,25 @@
     Series = {FHPC'16},
     Title = {{APL} on {GPU}s: {A} {TAIL} from the {P}ast, {S}cribbled in {F}uthark},
     Year = 2016
+}
+
+@inproceedings{henriksen2014bounds,
+ author = {Henriksen, Troels and Oancea, Cosmin E.},
+ title = {Bounds Checking: An Instance of Hybrid Analysis},
+ booktitle = {Proceedings of ACM SIGPLAN International Workshop on Libraries, Languages, and Compilers for Array Programming},
+ series = {ARRAY'14},
+ year = {2014},
+ isbn = {978-1-4503-2937-8},
+ location = {Edinburgh, United Kingdom},
+ pages = {88:88--88:94},
+ articleno = {88},
+ numpages = {7},
+ url = {http://doi.acm.org/10.1145/2627373.2627388},
+ doi = {10.1145/2627373.2627388},
+ acmid = {2627388},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {autoparallelization, functional language, subscripts bounds checking},
 }
 
 % III. STATIC ANALYSIS (no runtime overhead but inaccurate)
@@ -192,6 +405,86 @@
  keywords = {affine scheduling, compilation, compiler optimization, loop transformations, parallelism},
 }
 
+@inproceedings{PolyPluto1,
+	Acmid = {1375595},
+	Address = {New York, NY, USA},
+	Author = {Bondhugula, Uday and Hartono, Albert and Ramanujam, J. and Sadayappan, P.},
+	Booktitle = {Proceedings of the 29th ACM SIGPLAN Conference on Programming Language Design and Implementation},
+	Doi = {10.1145/1375581.1375595},
+	Isbn = {978-1-59593-860-2},
+	Keywords = {affine transformations, automatic parallelization, locality optimization, loop transformations, polyhedral model, tiling},
+	Location = {Tucson, AZ, USA},
+	Numpages = {13},
+	Pages = {101--113},
+	Publisher = {ACM},
+	Series = {PLDI '08},
+	Title = {A Practical Automatic Polyhedral Parallelizer and Locality Optimizer},
+	Url = {http://doi.acm.org/10.1145/1375581.1375595},
+	Year = {2008},
+	Bdsk-Url-1 = {http://doi.acm.org/10.1145/1375581.1375595},
+	Bdsk-Url-2 = {http://dx.doi.org/10.1145/1375581.1375595}}
+
+@article{PolyPluto2,
+ author = {Verdoolaege, Sven and Carlos Juega, Juan and Cohen, Albert and Ignacio G\'{o}mez, Jos{\'e} and Tenllado, Christian and Catthoor, Francky},
+ title = {Polyhedral Parallel Code Generation for CUDA},
+ journal = {ACM Trans. Archit. Code Optim.},
+ issue_date = {January 2013},
+ volume = {9},
+ number = {4},
+ month = jan,
+ year = {2013},
+ issn = {1544-3566},
+ pages = {54:1--54:23},
+ articleno = {54},
+ numpages = {23},
+ url = {http://doi.acm.org/10.1145/2400682.2400713},
+ doi = {10.1145/2400682.2400713},
+ acmid = {2400713},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {C-to-CUDA, CUDA, GPU, PPCG., Par4All, Polyhedral model, code generation, compilers, loop transformations},
+}
+
+@article{SadayAnalModCache,
+ author = {Bao, Wenlei and Krishnamoorthy, Sriram and Pouchet, Louis-Noel and Sadayappan, P.},
+ title = {Analytical Modeling of Cache Behavior for Affine Programs},
+ journal = {Proc. ACM Program. Lang.},
+ issue_date = {January 2018},
+ volume = {2},
+ number = {POPL},
+ month = dec,
+ year = {2017},
+ issn = {2475-1421},
+ pages = {32:1--32:26},
+ articleno = {32},
+ numpages = {26},
+ url = {http://doi.acm.org/10.1145/3158120},
+ doi = {10.1145/3158120},
+ acmid = {3158120},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {Compiler optimization, performance analysis, static analysis},
+}
+
+@inproceedings{HexaTiling,
+ author = {Grosser, Tobias and Cohen, Albert and Holewinski, Justin and Sadayappan, P. and Verdoolaege, Sven},
+ title = {Hybrid Hexagonal/Classical Tiling for GPUs},
+ booktitle = {Procs. Int. Symposium on Code Generation and Optimization},
+ series = {CGO '14},
+ year = {2014},
+ isbnOPT = {978-1-4503-2670-4},
+ locationOPT = {Orlando, FL, USA},
+ pages = {66:66--66:75},
+ articlenoOPT = {66},
+ numpagesOPT = {10},
+ urlOPT = {http://doi.acm.org/10.1145/2544137.2544160},
+ doi = {10.1145/2544137.2544160},
+ acmidOPT = {2544160},
+ publisher = {ACM},
+ addressOPT = {New York, NY, USA},
+ keywords = {CUDA, GPGPU, Polyhedral compilation, code generation, loop transformations, stencil, time tiling},
+}
+
 % IV. Mostly DYNAMIC ANALYSIS (i.e., accurate but at a significant time or/and space overhead) 
 % a) Inspector executor models:
 
@@ -244,7 +537,7 @@
  address = {New York, NY, USA},
 }
 
-% - for minimizing communication in distributed-parallel compuation
+% - for minimizing communication in distributed-parallel computation
 
 @article{Saday:InspExec,
  author = {Ravishankar, Mahesh and Eisenlohr, John and Pouchet, Louis-No\"{e}l and Ramanujam, J. and Rountev, Atanas and Sadayappan, P.},
@@ -292,10 +585,10 @@ of {L}oops with {P}rivatization and {R}eduction {P}arallelization},
 }
 
 % - TLS analysis for optimized memory layout:
-@incollection{Oancea:2008:SDA:1485701.1485712,
+@INPROCEEDINGS{Oancea:2008:SDA:1485701.1485712,
  author = {Oancea, Cosmin E. and Mycroft, Alan},
- chapter = {Set-Congruence Dynamic Analysis for Thread-Level Speculation (TLS)},
- title = {Languages and Compilers for Parallel Computing},
+ title = {Set-Congruence Dynamic Analysis for Thread-Level Speculation ({TLS})},
+ booktitle = {Languages and Compilers for Parallel Computing},
  editor = {Amaral, Jos{\'e} Nelson},
  year = {2008},
  isbn = {978-3-540-89739-2},
@@ -307,6 +600,7 @@ of {L}oops with {P}rivatization and {R}eduction {P}arallelization},
  publisher = {Springer-Verlag},
  address = {Berlin, Heidelberg},
 } 
+
 
 % - for optimizing communication overhead in distributed applications
 
@@ -345,7 +639,7 @@ of {L}oops with {P}rivatization and {R}eduction {P}arallelization},
 @INPROCEEDINGS{SummaryMonot,
     author = {Cosmin E. Oancea and Lawrence Rauchwerger},
     title = {A {H}ybrid {A}pproach to {P}roving {M}emory {R}eference {M}onotonicity},
-    booktitle = {Int. Lang. Comp. Par. Comp. (LCPC'11)},
+    booktitle = {Int. Languages and Compilers for Parallel Computing (LCPC'11)},
     series = {LNCS},
     volume = 7146,
     year = {2013},
@@ -361,4 +655,30 @@ of {L}oops with {P}rivatization and {R}eduction {P}arallelization},
     volume = {31(3)},
     DOIopt = {doi>10.1145/1075382.1075385},
     year = {2003}
+}
+
+@ARTICLE{SUIF,
+    author = {Mary W. Hall and Saman P. Amarasinghe and Brian R. Murphy and Shih-Wei Liao and Monica S. Lam},
+    title = {Interprocedural {P}arallelization {A}nalysis in {SUIF}},
+    journal = {Trans. on Prog. Lang. and Sys. (TOPLAS)},
+    journalOPT = {ACM Transactions on Programming Languages and Systems (TOPLAS)},
+    pages = {662--731},
+    volume = {27(4)},
+    DOIopt = {doi>10.1145/1075382.1075385},
+    year = {2005}
+}
+
+@INPROCEEDINGS{Moon99PredArrDataFlow,
+    author = {Sungdo Moon and Mary W. Hall},
+    title = {Evaluation of {P}redicated {A}rray {D}ata-{F}low {A}nalysis for {A}utomatic {P}arallelization},
+    booktitle = {Int. Symp. Princ. and Practice of Par. Prog. (PPoPP)},
+    year = {1999},
+    pages = {84--95}
+}
+
+@techreport{cudnn,
+ author = {NVIDIA},
+ title = {{CUDNN} Library User Guide DU-06702-001 v07},
+ institution = {NVIDIA},
+ year = 2017
 }

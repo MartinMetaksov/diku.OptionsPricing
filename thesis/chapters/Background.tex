@@ -5,7 +5,8 @@
 Derivatives have become important in finance in the last 30 years with futures and options actively traded worldwide. The derivatives market is much bigger than the stock market when underlying assets are measured. Derivatives can be used for hedging, speculation or arbitrage as they transfer a wide range of risks in the economy from one entity to another. A \textit{derivative} is a financial instrument with a value that derives from the value of some other basic underlying asset.~\cite[pg.1]{ofod}
 
 \subsection{Options}
-This thesis will focus on one type of derivatives - \textit{options}. These are contracts that give the holder the right to buy or sell an underlying asset at a certain point in time for a certain price, both specified when purchasing the option. This is in contrast with other derivatives - \textit{forwards} and \textit{futures}, where the holder is obligated to buy or sell the underlying asset.
+This thesis will focus on only one specific type of derivatives - \textit{options}. These are contracts that give the holder the right to buy or sell an underlying asset at a certain point in time for a certain price, both specified when purchasing the option. This is in contrast with other derivatives - \textit{forwards} and \textit{futures}, where the holder is obligated to buy or sell the underlying asset. 
+
 \paragraph{}
 There are two types of options. A \textit{call option} gives the holder the right to buy the underlying asset by a certain date for a certain price. A \textit{put option} gives the holder the right to sell the underlying asset by a certain date for a certain price. The price in the contract is called \textit{strike price} and the expiration date is called \textit{maturity}. Options that can be exercised at any time before maturity are known as \textit{American options} and options that can be exercised only on the expiration date itself are known as \textit{European options}. One contract usually allows to buy or sell 100 shares.~\cite[pg.7-8]{ofod}
 \paragraph{Example}
@@ -62,12 +63,24 @@ A bond's yield is the single discount rate that gives a bond price equal to its 
 \end{equation*}
 This equation gets solved by setting $y = 6.76\%$.~\cite[pg.81]{ofod}
 
-
 \subsection{Trinomial trees}
-- what are they best for and why?
-* analytical tractability
-* path-dependent derivatives -> exotics
-* small-dimensions derivatives -> dependent on two/three stochastic variables at most, one-factor, two-factor 
+Determining the value of a derivative is key to successful/profitable options trading. There are multiple ways of pricing options and the most common ones are the Black-Scholes model\cite{blackscholes}, binomial and trinomial trees. Using the Black-Scholes formula, requires several assumptions to be made:
+\begin{itemize}
+    \item The option must be European and can only be exercised at expiration.
+    \item No dividends are paid out during the life of the option.
+    \item Markets are efficient (i.e., market movements cannot be predicted).
+    \item There are no transaction costs in buying the option.
+    \item The risk-free rate and volatility of the underlying are known and constant.
+    \item The returns on the underlying are normally distributed.
+\end{itemize}
+Using Binomial trees on the other hand is a numerical method, which can work regardless of the option types and is far more flexible. For example, it provides a stream of valuations for a derivative for each node in a span of time (analytical tractability), as well as can be used on other,  path-dependent derivatives, such as exotic options. Last, but not least, it is much simpler than the Black-Scholes model, as it is dependent only on a few stochastic variables at most, hence it is suitable for one-factor models such as Hull-White. 
+
+The trinomial option pricing model is quite similar to the binomial option pricing model, with one key difference - incorporating another possible value in one time period. This assumption makes the trinomial model more relevant to real life situations, as it is possible that the value of an underlying asset may not change over a time period, such as a month or a year.
+
+% * small-dimensions derivatives -> dependent on two/three stochastic variables at most, one-factor, two-factor 
+% mean-reversion
+% volatility
+% Day-count conversions
 \subsection{Other numerical methods}
 - finite difference methods (FDM) to solve partial differential equations (POE1)
 - Monte Carlo simulations

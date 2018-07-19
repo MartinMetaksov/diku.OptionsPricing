@@ -23,6 +23,8 @@
 \RequirePackage{url}
 \RequirePackage{comment}
 \RequirePackage[toc,page]{appendix}
+\RequirePackage[linesnumbered,ruled,commentsnumbered]{algorithm2e}
+\usepackage{caption}
 
 \RequirePackage{color}
 \definecolor{special}{rgb}{0.3, 0.3, 0.3}
@@ -138,6 +140,8 @@
     
     \chapterheadline{-8}
 }
+
+\newcommand{\source}[1]{\caption*{Source: {#1}} }
 
 \def\degree#1{\gdef\@degree{#1}}
 \def\university#1{\gdef\@university{#1}}
