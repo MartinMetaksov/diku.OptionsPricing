@@ -36,6 +36,9 @@ Interest rate on an investment that starts today and lasts for $n$ years are cal
     100 \times e^{0.05 \times 5} = 128.40
 \end{equation*}
 
+% \subsection{Mean reversion}
+%  An important property of interest rates is that they appear to be pulled back to some long-run average level over time. This phenomenon is known as mean reversion. When the short rate is high, mean reversion tends to cause it to have a negative drift; when the short rate is low, mean reversion tends to cause it to have a positive drift. Mean reversion is illustrated in fig. \ref{fig:meanreversion}\cite{ofod}.
+
 \paragraph{Bond pricing}
 The theoretical price of a bond can be calculated as the present value of all cash flows received by the holder. For example, there is a 2-year bond with 100\$ principal that pays coupons at the rate of 6\% semiannually. When the zero rates are as in table~\ref{table:zero-rates}, we can calculate the present value of the first coupon of 3\$ by discounting it at 5.0\% for 6 months, second coupon at 1 year and so on. Then the theoretical price of the bond is~\cite[pg.80-81]{ofod}
 \begin{equation*}
@@ -63,8 +66,16 @@ A bond's yield is the single discount rate that gives a bond price equal to its 
 \end{equation*}
 This equation gets solved by setting $y = 6.76\%$.~\cite[pg.81]{ofod}
 
+\subsection{Volatility}
+Volatility is a statistical measure showing the uncertainty of the returns of a given security or a market index \cite{ofod}[pg. 303]. The higher the volatility, the higher the risk of the security will be. In the one-factor Hull–White model, mean reversion causes the forward rate volatility to be a declining function of the maturity\cite{ofod}[pg. 698]. 
+% 30.5 in HW, 14.4 in example of stocks 
+
+\subsection{Day-count conventions}
+Day-count conventions is a method for computing the amount of accrued\footnote{accumulated or received payments or benefits over time.} interest or the present value when the next coupon payment is less than a full coupon period away. Typically, bond markets and financial instruments have their own day-count conventions, which vary on the type of instrument, the interest rate type, and the issuance country. 
+% 28.8 https://en.wikipedia.org/wiki/Day_count_convention
+
 \subsection{Trinomial trees}
-Determining the value of a derivative is key to successful/profitable options trading. There are multiple ways of pricing options and the most common ones are the Black-Scholes model\cite{blackscholes}, binomial and trinomial trees. Using the Black-Scholes formula, requires several assumptions to be made:
+Determining the value of a derivative is key to successful/profitable options trading. There are various ways of pricing options and some of the more common ones are the Black-Scholes model\cite{blackscholes}, binomial and trinomial trees. Using the Black-Scholes formula, requires several assumptions to be made: 
 \begin{itemize}
     \item The option must be European and can only be exercised at expiration.
     \item No dividends are paid out during the life of the option.
@@ -73,19 +84,60 @@ Determining the value of a derivative is key to successful/profitable options tr
     \item The risk-free rate and volatility of the underlying are known and constant.
     \item The returns on the underlying are normally distributed.
 \end{itemize}
-Using Binomial trees on the other hand is a numerical method, which can work regardless of the option types and is far more flexible. For example, it provides a stream of valuations for a derivative for each node in a span of time (analytical tractability), as well as can be used on other,  path-dependent derivatives, such as exotic options. Last, but not least, it is much simpler than the Black-Scholes model, as it is dependent only on a few stochastic variables at most, hence it is suitable for one-factor models such as Hull-White. 
+Constructing binomial trees on the other hand is a far more flexible approach. It valuations for a derivative to be performed on each node in a span of time (analytical tractability), as well as can be used on other, path-dependent derivatives, such as exotic options. 
 
-The trinomial option pricing model is quite similar to the binomial option pricing model, with one key difference - incorporating another possible value in one time period. This assumption makes the trinomial model more relevant to real life situations, as it is possible that the value of an underlying asset may not change over a time period, such as a month or a year.
+Furthermore, the trinomial option pricing model is quite similar to binomial trees, with the difference that it consolidates another possible value per one time period. This makes the trinomial model even more relevant to real life situations, as it ensures the possibility that the value of the underlying asset may not change over a time period. Last, but not least, tree methods are much simpler to use than the Black-Scholes model, as they are dependent only on a few stochastic variables at most.
 
-% * small-dimensions derivatives -> dependent on two/three stochastic variables at most, one-factor, two-factor 
-% mean-reversion
-% volatility
-% Day-count conversions
-\subsection{Other numerical methods}
-- finite difference methods (FDM) to solve partial differential equations (POE1)
-- Monte Carlo simulations
+\subsection{Mean reversion}
+One-factor short-rate models are one such example, where the tree is dependent on a single stochastic factor – the short rate\footnote{A mathematical model that describes the future evolution of interest rates.}. In short-rate models, on the long run, interest rates appear to be drawn back to their average level over time\cite{ofod}[pg. 684]. This phenomenon is known as \textbf{mean reversion}. When the short rate - typically denoted as r - is high, mean reversion tends to cause the interest rates to decrease; vice verse, when r is low, mean reversion tends to cause them to increase. This is explained visually on fig. \ref{fig:background:meanreversion} below. 
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.8\textwidth]{img/meanreversion.png}
+	\caption{Illustration of mean reversion}
+	\label{fig:background:meanreversion}
+	\source{Based on Options, Futures and Other Derivatives\cite{ofod}[pg. 684].}
+\end{figure}
+
+Unlike other methods, trinomial trees conveniently incorporate mean-reversion, by using a width limit and modified branching methods for the tree. Standard branching(see fig.\ref{fig:background:standardbranching}) remains the same throughout the tree. At the bottom of the tree, where interest rates are very low, the ‘‘up one/straight along/down one’’(see fig.\ref{fig:background:altbranchingbottom}) branching is used. At the top of the tree, where interest rates are very high, the ‘‘straight along/down one/ down two’’ branching is used (see fig.\ref{fig:background:altbranchingtop}). 
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{.3\textwidth}
+  \centering
+  \includegraphics[width=.7\linewidth]{img/standardbranch.jpg}
+  \caption{Standard branching}
+  \label{fig:background:standardbranching}
+\end{subfigure}
+\begin{subfigure}{.3\textwidth}
+  \centering
+  \includegraphics[width=.93\linewidth]{img/bottombranch.jpg}
+  \caption{Bottom branching}
+  \label{fig:background:altbranchingbottom}
+\end{subfigure}
+\begin{subfigure}{.3\textwidth}
+  \centering
+  \includegraphics[width=.7\linewidth]{img/topbranch.jpg}
+  \caption{Top branching}
+  \label{fig:background:altbranchingtop}
+\end{subfigure}
+\caption{Alternative branching methods for a trinomial tree.}
+\source{Based on Options, Futures and Other Derivatives\cite{ofod}[pg. 698].}
+\end{figure}
+
 \subsection{Yield curve}
-\subsection{Volatility curve}
+Typically for most pricing models, the probability distributions of interest rates, bond prices, or other variables at a future point in time are lognormal. However, this does not provide any information of how interest rates evolve over time. \cite{ofod}[pg. 682]. This can achieved by building a term structure model, also known as a yield curve. The term structure model describes the evolution of all zero-coupon interest rates. For simplicity, in this thesis we have chosen to use the yield curves provided by the book examples.
+% a.k.a. term structure section 30.1 and intro to chapter 30
+
+\subsection{Other numerical methods}
+Beside the Black-Scholes method and the binomial/trinomial tree approaches, there are yet other popular means for valuing derivatives. They have their advantages, but are either much more inefficient in terms of computation time, or perform similarly to trinomial trees. 
+
+\textbf{Monte Carlo} simulations is a method, where different paths are sampled to obtain the expected payoff of the asset in a risk-neutral world and are then discounted at this risk-free rate. The key advantage of Monte Carlo simulations is their ability to be used when the payoff depends on the path followed by the underlying single-market variable, as well as when it depends only on the final value of this variable. Unfortunately, the method consumes a high computation time and cannot easily handle situations with early exercise opportunities \cite{ofod}[pg. 448].   
+% 20.6
+% - Monte Carlo simulations
+
+% 20.8
+\textbf{Finite difference methods (FDM)} value a derivative by solving the differential equation that the derivative satisfies. The differential equations are converted into sets of difference equations and are are solved iteratively. This is similar to the trinomial trees method, since the computations also work back from the end of the derivative maturity to the beginning. The explicit finite difference method is functionally the same as using a trinomial tree, while the implicit finite difference method takes far longer computational time\cite{ofod}[pg.455 - 466].
 
 \section{Flattening background}
 ...

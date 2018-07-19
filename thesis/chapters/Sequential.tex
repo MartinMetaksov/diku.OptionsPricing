@@ -41,9 +41,16 @@ Pricing of one option starts with computing its constants such as tree width and
 \paragraph{Forward propagation}
 The purpose of forward propagation is to compute an array of alphas of size tree height + 1 that will be used during backward propagation. The first alpha is set to the interest rate at time of one time step. To capture the tree values at any given time step, only the current and previous tree slices of size tree width are needed, these two arrays are named $Qs$ and $QsCopy$. The single starting value in the middle of the tree in $Qs$ array is initalized to 1\$.
 
-After the arrays are initialized, the program iterates through time steps along the tree height. At each time step, it goes through the values Q computed in the previous step. Every value contributes to three values in the next time step ($QsCopy$) according to the precomputed rates and probabilities. After all $Qs$ in he next step are computed, their values are aggregated to compute the next alpha. Lastly, arrays $Qs$ and $QsCopy$ are swapped and $QsCopy$ is reset to zeros for the next iteration.
+After the arrays are initialized, the program iterates through time steps along the tree height. At each time step, it goes through the values Q computed in the previous step. Every value contributes to three values in the next time step ($QsCopy$) as illustrated in figure~\ref{fig:seqforward}, according to the precomputed rates and probabilities. After all $Qs$ in he next step are computed, their values are aggregated to compute the next alpha. Lastly, arrays $Qs$ and $QsCopy$ are swapped and $QsCopy$ is reset to zeros for the next iteration.
 
-(TODO: Add a nice illustration of scattering Qs to QsCopy)
+\begin{figure}[H]
+    \centering
+    \def\svgwidth{0.5\textwidth}
+	\caption{Forward propagation - computing the next step}
+    \input{img/seqforward.pdf_tex}
+	\source{Compiled by the authors}
+	\label{fig:seqforward}
+\end{figure}
 
 {
 \setlength{\interspacetitleruled}{-.4pt}%
@@ -85,9 +92,16 @@ After the arrays are initialized, the program iterates through time steps along 
 \paragraph{Backward propagation}
 After all alphas are computed, they are carried over to backward propagation along with two arrays of size tree width. These arrays called Prices and $PricesCopy$ are used to store the current and previous tree slices similarly to forward propagation. Prices are initialized to 100\$ which represents the payoff at bond maturity.
 
-Afterwards, the program iterates through time steps along the tree height starting from the end of the tree. At each time step, the values at step $i-1$ in $PricesCopy$ are computed from three values in $Prices$ at step $i$ using alpha at $i$ and the precomputed probabilities. If the current time step is the option maturity, every computed price is discounted by the option strike price, taking care of the option type being call or put as well. Lastly, arrays Prices and $PricesCopy$ are swapped and $PricesCopy$ is reset to zeros for the next iteration.
+Afterwards, the program iterates through time steps along the tree height starting from the end of the tree. At each time step, the values at step $i-1$ in $PricesCopy$ are computed from three values in $Prices$ at step $i$ using alpha at $i$ and the precomputed probabilities as illustrated in figure~\ref{fig:seqbackward}. If the current time step is the option maturity, every computed price is discounted by the option strike price, taking care of the option type being call or put as well. Lastly, arrays Prices and $PricesCopy$ are swapped and $PricesCopy$ is reset to zeros for the next iteration.
 
-(TODO: Add a nice illustration of computing PricesCopy from Prices)
+\begin{figure}[H]
+    \centering
+    \def\svgwidth{0.5\textwidth}
+	\caption{Backward propagation - computing the previous step}
+    \input{img/seqbackward.pdf_tex}
+	\source{Compiled by the authors}
+	\label{fig:seqbackward}
+\end{figure}
 
 {
 \setlength{\interspacetitleruled}{-.4pt}%
