@@ -10,17 +10,24 @@ reg=32
 
 # program options
 device=0
-sorts=("-" "h" "H" "w" "W")
-versions=("1" "2" "3")
-block_sizes=("1024")
+sorts="- w W h H"
+block_sizes="1024"
+versions="1 2 3"
 
 # data
 data_path="../data"
-files=("book" "options-1000" "options-60000")
-# files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
-# data_path="../data/100000"
-# files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
-#        "skew_hw_1_100000" "skew_hw_10_100000" "skew_w_1_rand_h_100000" "skew_w_10_rand_h_100000" "unif_book_hw_100000" "unif_hw_100000")
+# files=("book" "options-1000" "options-60000")
+files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
+# data_path="../data/unifdist_100000"
+# files=( "rand_h_unif_w_unifdist_100000" "rand_hw_unifdist_100000" "rand_hw_w_256_unifdist_100000" "rand_w_unif_h_unifdist_100000"
+#         "skew_h_1_rand_w_unifdist_100000" "skew_h_10_rand_w_unifdist_100000" "skew_hw_1_unifdist_100000" "skew_hw_1_w_256_unifdist_100000"
+#         "skew_hw_10_unifdist_100000" "skew_hw_10_w_256_unifdist_100000" "skew_w_1_rand_h_unifdist_100000" "skew_w_10_rand_h_unifdist_100000"
+#         "unif_book_hw_100000" "unif_hw_100000")
+# data_path="../data/normdist_100000"
+# files=( "rand_h_unif_w_normdist_100000" "rand_hw_normdist_100000" "rand_hw_w_256_normdist_100000" "rand_w_unif_h_normdist_100000"
+#         "skew_h_1_rand_w_normdist_100000" "skew_h_10_rand_w_normdist_100000" "skew_hw_1_normdist_100000" "skew_hw_1_w_256_normdist_100000"
+#         "skew_hw_10_normdist_100000" "skew_hw_10_w_256_normdist_100000" "skew_w_1_rand_h_normdist_100000" "skew_w_10_rand_h_normdist_100000"
+#         "unif_book_hw_100000" "unif_hw_100000")
 yield="yield"
 out_path="$data_path/out"
 # out_path="$data_path/out32"

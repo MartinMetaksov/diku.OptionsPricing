@@ -80,18 +80,26 @@ __global__ void kernelOneOptionPerThread(const KernelOptions options, KernelArgs
     // Forward propagation
     for (auto i = 1; i <= c.n; ++i)
     {
-        auto jhigh = min(i, c.jmax);
-        auto alpha = args.getAlphaAt(i-1);
+        const auto jhigh = min(i, c.jmax);
+        const auto alpha = args.getAlphaAt(i-1);
         real alpha_val = 0;
+
+        // Precompute Qexp
+        for (auto j = -jhigh; j <= jhigh; ++j)
+        {
+            const auto jind = j + c.jmax;      // array index for j
+            real Qexp = args.getQAt(jind) * exp(-(alpha + j * c.dr) * c.dt);
+            args.setQAt(jind, Qexp);
+        }
 
         // Forward iteration step, compute Qs in the next time step
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
-            auto jind = j + c.jmax;      // array index for j            
+            const auto jind = j + c.jmax;      // array index for j            
             
-            auto expp1 = j == jhigh ? zero : args.getQAt(jind + 1) * exp(-(alpha + (j + 1) * c.dr) * c.dt);
-            auto expm = args.getQAt(jind) * exp(-(alpha + j * c.dr) * c.dt);
-            auto expm1 = j == -jhigh ? zero : args.getQAt(jind - 1) * exp(-(alpha + (j - 1) * c.dr) * c.dt);
+            const auto expp1 = j == jhigh ? zero : args.getQAt(jind + 1);
+            const auto expm = args.getQAt(jind);
+            const auto expm1 = j == -jhigh ? zero : args.getQAt(jind - 1);
             real Q;
 
             if (i == 1) {
@@ -137,11 +145,11 @@ __global__ void kernelOneOptionPerThread(const KernelOptions options, KernelArgs
                         computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
                             
                 } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQAt(jind - 2) * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
+                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQAt(jind - 2) : zero) +
                         computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
                         computeJValue(j, c.jmax, c.M, 2) * expm +
                         computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQAt(jind + 2) * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
+                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQAt(jind + 2) : zero);
                 }
             }
             // Determine the new alpha using equation 30.22
@@ -161,14 +169,14 @@ __global__ void kernelOneOptionPerThread(const KernelOptions options, KernelArgs
 
     for (auto i = c.n - 1; i >= 0; --i)
     {
-        auto jhigh = min(i, c.jmax);
-        auto alpha = args.getAlphaAt(i);
-        auto isMaturity = i == ((int)(c.t / c.dt));
+        const auto jhigh = min(i, c.jmax);
+        const auto alpha = args.getAlphaAt(i);
+        const auto isMaturity = i == ((int)(c.t / c.dt));
 
         for (auto j = -jhigh; j <= jhigh; ++j)
         {
-            auto jind = j + c.jmax;      // array index for j
-            auto callExp = exp(-(alpha + j * c.dr) * c.dt);
+            const auto jind = j + c.jmax;      // array index for j
+            const auto callExp = exp(-(alpha + j * c.dr) * c.dt);
 
             real res;
             if (j == c.jmax)

@@ -7,21 +7,14 @@
 # program options
 rep=5
 device=0
-sorts="W"
-block_sizes="256"
-versions="4"
-# sorts="- h H w W"
-# block_sizes="64 128 256 512 1024"
-# versions="1 2 3 4"
+sorts="- w W h H"
+block_sizes="32 64 128 256 512 1024"
+versions="1 2 3 4"
 
 # data
 data_path="../data"
 # files=("book" "options-1000" "options-60000")
 files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
-# files=("7_RAND_HEIGHT_IN_0-3500" "8_RAND_HEIGHT_IN_0-1200" "9_RAND_HEIGHT_IN_50-250" "10_RAND_HEIGHT_IN_50-500" "11_RAND_HEIGHT_IN_100-300" "12_RAND_HEIGHT_IN_100-700")
-# data_path="../data/100000"
-# files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
-#        "skew_hw_1_100000" "skew_hw_10_100000" "skew_w_1_rand_h_100000" "skew_w_10_rand_h_100000" "unif_book_hw_100000" "unif_hw_100000")
 yield="yield"
 
 # executables
@@ -50,7 +43,7 @@ compile() {
 }
 
 test() {
-    echo "file,precision,registers,version,block,sort,kernel time,total time"
+    echo "file,precision,registers,version,block,sort,kernel time,total time,memory"
     for file in ${files[*]}
     do
         for index in ${exes_to_run[*]}

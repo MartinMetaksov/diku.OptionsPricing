@@ -169,12 +169,11 @@ let computeJValue (j : i32) (jmax : i32) (M : real) (expout : i32) : real =
 ----------------------------------
 --- forward propagation helper ---
 ----------------------------------
-let fwdHelper (M : real) (dr : real) (dt : real) (alpha : real) (Qs : []real) 
-              (i : i32) (jhigh : i32) (jmax : i32) (j : i32) (jind : i32) : real =  
+let fwdHelper (M : real) (Qs : []real) (i : i32) (jhigh : i32) (jmax : i32) (j : i32) (jind : i32) : real =  
 
-    let expp1 = if (j == jhigh) then zero else Qs[jind + 1] * r_exp (-(alpha + (i2r (j + 1)) * dr) * dt)
-    let expm = Qs[jind] * r_exp (-(alpha + (i2r j) * dr) * dt)
-    let expm1 = if (j == -jhigh) then zero else Qs[jind - 1] * r_exp(-(alpha + (i2r (j - 1)) * dr) * dt)
+    let expp1 = if (j == jhigh) then zero else Qs[jind + 1]
+    let expm = Qs[jind]
+    let expm1 = if (j == -jhigh) then zero else Qs[jind - 1]
 
     in
     if (i == 1)
@@ -214,11 +213,11 @@ let fwdHelper (M : real) (dr : real) (dt : real) (alpha : real) (Qs : []real)
                 (computeJValue (j + 1) jmax M 2) * expp1
                     
         else
-            (if (j == -jhigh + 2) then (computeJValue (j - 2) jmax M 1) * Qs[jind - 2] * r_exp (-(alpha + (i2r (j - 2)) * dr) * dt) else zero) +
+            (if (j == -jhigh + 2) then (computeJValue (j - 2) jmax M 1) * Qs[jind - 2] else zero) +
             (computeJValue (j - 1) jmax M 1) * expm1 +
             (computeJValue j jmax M 2) * expm +
             (computeJValue (j + 1) jmax M 3) * expp1 +
-            (if (j == jhigh - 2) then (computeJValue (j + 2) jmax M 3) * Qs[jind + 2] * r_exp (-(alpha + (i2r (j + 2)) * dr) * dt) else zero)
+            (if (j == jhigh - 2) then (computeJValue (j + 2) jmax M 3) * Qs[jind + 2] else zero)
 
 
 -----------------------------------
@@ -311,14 +310,21 @@ let trinomialFlat [ycCount] [numAllOptions]
     -- FORWARD PROPAGATION --
     -------------------------
     let (_,alphas) = loop (Qs: *[w]real, alphas: *[total_len]real) for i < max_height do
-        let jhighs = map (\jmax -> i32.min (i+1) jmax) jmaxs
-        let QsCopy = copy Qs
+        let jhighs = map (\jmax -> i32.min (i + 1) jmax) jmaxs
+
+        -- Precompute Qexp
+        let Qs = map3 (\q jind wind ->
+            let opt_ind = sgm_inds[wind]
+            let j = jind - jmaxs[opt_ind] in
+                if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
+                else q * r_exp (-(alphas[opt_ind * seq_len + i] + (i2r j) * drs[opt_ind]) * dts[opt_ind])
+        ) (Qs) (q_lens) (iota w)
 
         let Qs = map2 (\jind wind ->
             let opt_ind = sgm_inds[wind]
             let j = jind - jmaxs[opt_ind] in
                 if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
-                else fwdHelper Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len+i] QsCopy (i + 1) jhighs[opt_ind] jmaxs[opt_ind] j wind
+                else fwdHelper Ms[opt_ind] Qs (i + 1) jhighs[opt_ind] jmaxs[opt_ind] j wind
         ) (q_lens) (iota w)
 
         -- compute tmps
@@ -334,7 +340,7 @@ let trinomialFlat [ycCount] [numAllOptions]
         let alpha_vals = map (\opt_ind -> 
             if (i >= (ns[opt_ind])) then zero
             else 
-                let t = (i2r (i+2)) * dts[opt_ind]
+                let t = (i2r (i + 2)) * dts[opt_ind]
                 let R = getYieldAtYear t tus[opt_ind] h_YieldCurve
                 let P = r_exp(-R * t)
                 in (r_log (alpha_vals[scanned_lens[opt_ind]-1] / P) ) / dts[opt_ind]
@@ -363,7 +369,7 @@ let trinomialFlat [ycCount] [numAllOptions]
                 else
                     let j = jind - jmaxs[opt_ind] in
                     if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
-                    else bkwdHelper Xs[opt_ind] ops[opt_ind] Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len+i] callCopy jmaxs[opt_ind] j wind (i == (r2i (lens[opt_ind] / dts[opt_ind])))
+                    else bkwdHelper Xs[opt_ind] ops[opt_ind] Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len + i] callCopy jmaxs[opt_ind] j wind (i == (r2i (lens[opt_ind] / dts[opt_ind])))
             ) (q_lens) (iota w)
     in call
 

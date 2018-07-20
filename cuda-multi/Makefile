@@ -1,4 +1,4 @@
-CXX        	  = nvcc -std=c++11 -O3 -arch=sm_35 #--ptxas-options=-v
+CXX        	  = nvcc -std=c++11 -O3 -arch=sm_35 -DCUDA_ERROR_CHECK #--ptxas-options=-v
 DEBUG_OPTIONS = -G -DCUDA_ERROR_CHECK
 
 SOURCES_CPP = CudaMultiMain.cu

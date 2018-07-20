@@ -10,17 +10,14 @@ reg=""
 
 # program options
 device=0
-sorts=("-" "h" "H" "w" "W")
-versions=("1" "2" "3" "4")
-block_sizes=("256")
+sorts="- w W h H"
+block_sizes="32 64 128 256 512"
+versions="1 2 3 4"
 
 # data
 data_path="../data"
 # files=("book" "options-1000" "options-60000")
 files=("0_UNIFORM" "1_RAND" "2_RANDCONSTHEIGHT" "3_RANDCONSTWIDTH" "4_SKEWED" "5_SKEWEDCONSTHEIGHT" "6_SKEWEDCONSTWIDTH")
-# data_path="../data/100000"
-# files=("rand_h_unif_w_100000" "rand_hw_100000" "rand_w_unif_h_100000" "skew_h_1_rand_w_100000" "skew_h_10_rand_w_100000"
-#        "skew_hw_1_100000" "skew_hw_10_100000" "skew_w_1_rand_h_100000" "skew_w_10_rand_h_100000" "unif_book_hw_100000" "unif_hw_100000")
 yield="yield"
 out_path="$data_path/out"
 # out_path="$data_path/out32"

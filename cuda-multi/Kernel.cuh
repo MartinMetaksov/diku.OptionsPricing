@@ -144,18 +144,24 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
     // Forward propagation
     for (int i = 1; i <= args.getMaxHeight(); ++i)
     {
-        int jhigh = min(i, c.jmax);
+        const int jhigh = min(i, c.jmax);
+        const int j = threadIdx.x - c.jmax - scannedWidthIdx;
+        const real alpha = args.getAlphaAt(i - 1);
+
+        // Precompute Qexp
+        if (i <= c.n && j >= -jhigh && j <= jhigh)
+        {
+            args.getQs()[threadIdx.x] *= exp(-(alpha + j * c.dr) * c.dt);
+        }
+        __syncthreads();
 
         // Forward iteration step, compute Qs in the next time step
-        int j = threadIdx.x - c.jmax - scannedWidthIdx;
-
         real Q = 0;
         if (i <= c.n && j >= -jhigh && j <= jhigh)
         {   
-            auto alpha = args.getAlphaAt(i - 1);
-            auto expp1 = j == jhigh ? zero : args.getQs()[threadIdx.x + 1] * exp(-(alpha + (j + 1) * c.dr) * c.dt);
-            auto expm = args.getQs()[threadIdx.x] * exp(-(alpha + j * c.dr) * c.dt);
-            auto expm1 = j == -jhigh ? zero : args.getQs()[threadIdx.x - 1] * exp(-(alpha + (j - 1) * c.dr) * c.dt);
+            const auto expp1 = j == jhigh ? zero : args.getQs()[threadIdx.x + 1];
+            const auto expm = args.getQs()[threadIdx.x];
+            const auto expm1 = j == -jhigh ? zero : args.getQs()[threadIdx.x - 1];
 
             if (i == 1) {
                 if (j == -jhigh) {
@@ -200,11 +206,11 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
                         computeJValue(j + 1, c.jmax, c.M, 2) * expp1;
                             
                 } else {
-                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQs()[threadIdx.x - 2] * exp(-(alpha + (j - 2) * c.dr) * c.dt) : zero) +
+                    Q = ((j == -jhigh + 2) ? computeJValue(j - 2, c.jmax, c.M, 1) * args.getQs()[threadIdx.x - 2] : zero) +
                         computeJValue(j - 1, c.jmax, c.M, 1) * expm1 +
                         computeJValue(j, c.jmax, c.M, 2) * expm +
                         computeJValue(j + 1, c.jmax, c.M, 3) * expp1 +
-                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQs()[threadIdx.x + 2] * exp(-(alpha + (j + 2) * c.dr) * c.dt) : zero);
+                        ((j == jhigh - 2) ? computeJValue(j + 2, c.jmax, c.M, 3) * args.getQs()[threadIdx.x + 2] : zero);
                 }
             }
         }
@@ -235,18 +241,18 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
 
     for (auto i = args.getMaxHeight() - 1; i >= 0; --i)
     {
-        int jhigh = min(i, c.jmax);
+        const int jhigh = min(i, c.jmax);
 
         // Forward iteration step, compute Qs in the next time step
-        int j = threadIdx.x - c.jmax - scannedWidthIdx;
+        const int j = threadIdx.x - c.jmax - scannedWidthIdx;
 
         real call = args.getQs()[threadIdx.x];
 
         if (i < c.n && j >= -jhigh && j <= jhigh)
         {
-            auto alpha = args.getAlphaAt(i);
-            auto isMaturity = i == ((int)(c.t / c.dt));
-            auto callExp = exp(-(alpha + j * c.dr) * c.dt);
+            const auto alpha = args.getAlphaAt(i);
+            const auto isMaturity = i == ((int)(c.t / c.dt));
+            const auto callExp = exp(-(alpha + j * c.dr) * c.dt);
 
             real res;
             if (j == c.jmax)
