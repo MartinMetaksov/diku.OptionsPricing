@@ -129,10 +129,6 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
     }
     __syncthreads();
 
-    // Zero out Qs
-    args.getQs()[threadIdx.x] = 0;
-    __syncthreads();
-
     // Set the initial alpha and Q values
     if (threadIdx.x == scannedWidthIdx && args.getOptionIdx() < idxBlockNext)
     {
