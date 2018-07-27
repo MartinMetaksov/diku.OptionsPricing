@@ -25,6 +25,9 @@
 \RequirePackage[toc,page]{appendix}
 \RequirePackage[linesnumbered,ruled,commentsnumbered]{algorithm2e}
 \usepackage{caption}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 
 \RequirePackage{color}
 \definecolor{special}{rgb}{0.3, 0.3, 0.3}
@@ -93,18 +96,18 @@
     \tableofcontents
 }
 
-\newcommand{\listfigures}{
-    \newpage
-    \addcontentsline{toc}{chapter}{\numberline{}List of figures}
-    \listoffigures
-}
+% \newcommand{\listfigures}{
+%     \newpage
+%     \addcontentsline{toc}{chapter}{\numberline{}List of figures}
+%     \listoffigures
+% }
 
-\newcommand{\listtables}{
-    \newpage
-    \addcontentsline{toc}{chapter}{\numberline{}List of tables}
-    \setlength{\parskip}{1em}
-    \listoftables
-}
+% \newcommand{\listtables}{
+%     \newpage
+%     \addcontentsline{toc}{chapter}{\numberline{}List of tables}
+%     \setlength{\parskip}{1em}
+%     \listoftables
+% }
 
 \newcommand{\chapterheadline}[1]{
     \renewcommand\chapterheadstartvskip{\vspace*{#1\baselineskip}}
