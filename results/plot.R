@@ -3,6 +3,9 @@ require(plotly)
 require(htmlwidgets)
 require(jsonlite)
 require(dplyr)
+require(plyr)
+require(reshape2)
+require(processx)
 
 readFuthark <- function(file, real) {
   json <- fromJSON(file)
