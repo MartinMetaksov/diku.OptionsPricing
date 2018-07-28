@@ -1,23 +1,106 @@
-\chapter{One option per thread}
+\chapter{One Option per Thread}
 \label{chapter:oneoptionperthread}
-one option per thread
-\begin{itemize}
-\item general introduction to approach
-\item memory allocation
-\item data races
-\item measure performance (later)
-\item what more ?
-\end{itemize}
+This chapter describes the first parallel approach that exploits only outer parallelism, i.e. it computes a batch of options in parallel where one thread prices a single option. 
+This algorithm is therefore similar to the sequential implementation with some caveats concerning GPGPU architectures that were tackled in an iterative process producing multiple versions of the code.
 
+\section{Sequential Implementation to CUDA}
+\paragraph{Global memory setup}
+First, it was necessary to identify arrays being used and consider how to store them in device memory. The input is a structure of arrays of size number of options, each array representing one parameter of the options. This structure is ideal for coalesced memory access because consecutive threads will load contiguous memory, optimizing the number of memory transactions and thus speed. The algorithm itself requires two arrays of tree width size for $\mathit{Qs}$ and $\mathit{QsCopy}$, and one array of tree height size for $\mathit{alphas}$ per option. We place the three arrays in GPU's global memory, where each thread uses a single part of each array which size depends on the option being computed.
+
+\paragraph{Global memory access}
+Second, array access had to be analyzed to avoid race conditions and optimize performance. The sequential implementation computes $\mathit{Qs}$ at the next time step by a single computation on the current node and adding the value to three nodes in the next step as shown in figure~\ref{fig:seqforward}. This performs 1 read for the computation and 3 reads followed by 3 writes for the addition. For all parallel implementations, this scatter pattern was replaced by a gather pattern illustrated in fig.~\ref{fig:scattervsgather}, which performs 3 reads/computations and 1 write in this scenario. This makes it necessary to pre-compute and save the values for $\mathit{Qs}$ first to avoid computing the same value multiple times. The final result makes 1 read/computation/write in the pre-computation step followed by 3 reads and 1 write in computing the next time step. This approach eliminates 1 write and the need to have atomic additions, which would be necessary when exploiting inner parallelism described in chapter~\ref{chapter:multoptionsperthreadblock}. However, since the tree is trinomial (fig.~\ref{fig:treeconststage1}), a value can be computed from up to 5 values from the previous time step. Thus all possible types of branching have to be enumerated which makes the code more verbose and more difficult to maintain.
 
 \begin{figure}[H]
     \centering
-    \def\svgwidth{0.9\textwidth}
-	\caption{scatter vs. gather operations}
+    \def\svgwidth{0.8\textwidth}
+	\caption{Comparison of scatter and gather operations}
     \input{img/scattervsgather.pdf_tex}
 	\source{Compiled by the authors}
 	\label{fig:scattervsgather}
 \end{figure}
 
+\section{Implementations}
+We iteratively implemented 4 versions of this first parallel approach. They all share the same kernel but they store and access the three global arrays $\mathit{Qs}$, $\mathit{QsCopy}$ and $\mathit{alphas}$ in different ways.
+
+The general steps for all the versions described further are as follows:
+\begin{enumerate}
+    \item Load all options to GPU device memory.
+    \item Compute widths and heights for all options.
+    \item Allocate two arrays of total width size for $\mathit{Qs}$ and $\mathit{QsCopy}$, and one array of total height size for $\mathit{alphas}$ in GPU device memory.
+    \item Price all options using our CUDA kernel.
+    \item Copy results to host memory.
+\end{enumerate}
+
+All preprocessing is performed on the GPU and is implemented using CUDA's Thrust library~\footnote{\url{https://developer.nvidia.com/thrust}}.
+
+\subsection*{Version 1 - Naive}
+The first version stores arrays in a simple way where one thread gets contiguous parts of memory with sizes that match the computed option's width/height. Table~\ref{table:cuda-option-memory-naive} shows an example of storing $\mathit{alphas}$ for 3 options of heights 2-4-3 computed by 3 threads in a single flat array. Each thread needs to know only the start index of its array chunk along with the option's width/height and then it can access array elements consecutively. The indices can be easily computed by running inclusive scans on widths and heights, obtaining also total sizes for the arrays in the process.
+
+\begin{table}[H]
+\centering
+\caption{Memory alignment in version 1}
+\source{Compiled by the authors}
+\label{table:cuda-option-memory-naive}
+\begin{tabular}{|l|l|
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |l|l|l|}
+\hline
+T1         & T1         & T2         & T2         & T2         & T2         & T3         & T3         & T3         \\ \hline
+$\alpha_0$ & $\alpha_1$ & $\alpha_0$ & $\alpha_1$ & $\alpha_2$ & $\alpha_3$ & $\alpha_0$ & $\alpha_1$ & $\alpha_2$ \\ \hline
+\end{tabular}
+\end{table}
+
+This approach is very efficient in terms of storage space, however, very inefficient when it comes to performance. When we analyze how array elements are accessed in forward (alg.~\ref{alg:sequential-forward}) and backward propagation (alg.~\ref{alg:sequential-backward}), we find out that all threads access their $\alpha_0$ at the same time, then move to $\alpha_1$ and so on. This results in strided, not coalesced access which ineffectively uses GPU resources. The next 3 versions tackle this problem by padding the arrays on different levels.
+
+\subsection*{Version 2 - Global-level Padding}
+In order to make array access coalesced, the second version stores arrays padded to the maximum width/height across all options. Continuing with the example from above, the new alignment is illustrated in table~\ref{table:cuda-option-memory-global}. This obviously leads to some array elements not being used, unless the widths/heights are equal across options. However, when threads access the same array index at the same time, the access is now coalesced and can be performed in fewer memory transactions, greatly improving performance.
+
+\begin{table}[H]
+\centering
+\caption{Memory alignment in version 2}
+\source{Compiled by the authors}
+\label{table:cuda-option-memory-global}
+\begin{tabular}{|l|l|l|
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |l|l|l|
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |
+>{\columncolor[HTML]{EFEFEF}}l |}
+\hline
+T1         & T2         & T3         & T1         & T2         & T3         & T1 & T2         & T3         & T1 & T2         & T3 \\ \hline
+$\alpha_0$ & $\alpha_0$ & $\alpha_0$ & $\alpha_1$ & $\alpha_1$ & $\alpha_1$ &    & $\alpha_2$ & $\alpha_2$ &    & $\alpha_3$ &    \\ \hline
+\end{tabular}
+\end{table}
+
+To compute sizes of the arrays, it is necessary just to find out the maximum width/height
+and multiply them by the number of all options. Indexing to array elements can be simply computed as $\mathit{index} * \mathit{optionsCount} + \mathit{optionIndex}$.
+
+The only downside is that the global padding might require very large memory chunks to be allocated but unused, especially if the dataset is skewed, i.e. with a small number of options that have very large widths/heights. The next two versions try to minimize the memory footprint by padding on a smaller scale.
+
+\subsection*{Version 3 - Block-level Padding}
+The third version is designed to save memory compared to the second version, while keeping memory access coalesced. Here we look at what options get computed in a single CUDA block (of up to 1024 threads). The maximum width/height of the options is computed per block and the total size of an array is then the sum of all block maxima multiplied by the block size.
+
+The pre-processing of options is thus more complex. It is implemented using $\mathit{reduce\_by\_key}$ and $\mathit{transform\_inclusive\_scan}$ Thrust routines with custom operations. As a result, arrays $\mathit{QsInds}$ and $\mathit{alphasInds}$ storing indices to the respective arrays are computed, created using two addition helper arrays, all of size $\lceil \mathit{optionsCount} / \mathit{blockSize} \rceil$. The computed indices represent the start of an array part specific to a block, elements can then be accessed as $\mathit{blockSize} * \mathit{index} + \mathit{threadId}$.
+
+The downsides of this version are that if options in the dataset are not sorted by widths and heights, the amount of saved memory compared to version 2 may be very small while this version requires more pre-processing time and intermediate arrays. The last version further reduces the array padding.
+
+\subsection*{Version 4 - Warp-level Padding}
+The fourth version is similar to version 3 with a difference that we look at what options get computed by a single warp of 32 threads instead of the whole block. In effect, array padding is added with more granularity while still keeping memory access coalesced since threads in a single warp perform the same instruction on multiple options (SIMD parallelism). Depending on a dataset, the added warp-level padding might be smaller than block-level padding, in exchange for $\mathit{blockSize} / 32$ more indices to be stored.
+
+\subsection*{Futhark implementation}
+This one option per thread parallel approach was also implemented in Futhark as a proof of concept and is equivalent to version 2 since Futhark uses global padding on arrays to ensure memory access is coalesced. This version will be discussed further in chapter~\ref{chapter:fullflattening}.
+
+\section{Validation}\label{section:option:validation}
+To validate computed results from the CUDA implementations, we created a test case that uses the example mentioned in section~\ref{section:sequential:validation}. 100 instances of this option with gradually more time steps are first computed on the CPU using the sequential implementation from chapter~\ref{chapter:sequential} and then compared with results computed from all 4 versions. The test case was written using Catch2~\footnote{\url{https://github.com/catchorg/Catch2}} test framework for its simplicity.
+
+The differences between floating point GPU results and CPU results must be interpreted carefully, since there are many reasons why the same sequence of operations may not be performed on the GPU and CPU, e.g. because of fused multiply-add on the GPU, rearranging operations for parallelization, higher than expected precision for computations on the CPU and rounding not required by common math operations by the IEEE 754 standard~\cite[pg. 16]{whitehead2018}.
+
+Despite this, we successfully validated our results using a small epsilon value of std::numeric\_limits<\textbf{real}>::epsilon() $* 1000$,
+where \textbf{real} is either single or double precision floating point number. This equals to $0.000119209$ for single and $0.00000000000022204$ for double precision, which makes double precision much more reliable for real world use.
+
 \section*{Summary}
-% To summarize the chapter, ...
+This chapter provided an overview of our parallel one option per thread implementation using CUDA with focus on explaining the challenges of parallelizing the sequential implementation from chapter~\ref{chapter:sequential}. It introduced 4 versions of this parallel implementation, each with its own advantages and disadvantages. Finally, it described how the GPU results were validated against the CPU results and the challenges of doing that. 
+The following chapter will describe how this implementation was adapted for a parallel multiple options per thread block version.

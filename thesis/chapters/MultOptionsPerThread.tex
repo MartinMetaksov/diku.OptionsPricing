@@ -1,6 +1,84 @@
-\chapter{Multiple options per thread block}
+\chapter{Multiple Options per Thread Block}
 \label{chapter:multoptionsperthreadblock}
-multiple options per thread block
+
+This chapter describes our CUDA implementation that prices multiple options in one thread block. This approach also exploits inner parallelism, leveraging fast shared memory for computations of $\mathit{Qs}$ and $\mathit{Prices}$. The limitation of this version is that it cannot price options with widths bigger than the size of a thread block (1024), since every thread computes one value along the tree width. The description focuses on CUDA-specific challenges, while flattening will be described in detail in chapter~\ref{chapter:fullflattening}. 
+
+\section{CUDA-option to CUDA-multi}
+To implement this parallel approach, we used CUDA-option as a basis, reusing code that is not specific to each version, such as parts of pre-processing and some computations.
+
+\subsection*{Memory setup}
+In this implementation one thread does not compute the whole tree for an option, rather it computes a single value on the tree width. This allows us to move the array of $\mathit{Qs}$ to shared memory and even remove the array of $\mathit{QsCopy}$, as it was used to hold $\mathit{Qs}$ temporarily between computations, and now a single $Q$ value can be temporarily stored in a thread register. Shared memory thus comprises of one real array of $\mathit{Qs}$ and one uint16\_t array of $\mathit{flags}$ (used for segmented scans), both of thread block size. Global memory then stores all the options along with their pre-computed widths and heights, and the array of all $\mathit{alphas}$.
+
+\subsection*{Pre-processing}
+After the options are loaded to GPU memory and their widths and heights are computed, they have to be split into chunks. A chunk represents one or more options whose combined widths can fit into the chosen thread block size. This process is also known as bin packing, which is a combinatorial NP-hard problem, so we decided to implement it in a simple way on the CPU, since it is not a focus of this thesis. The options are packed by a for-loop, in which an option is put into the current chunk if its size does not exceed the thread block size, otherwise a new chunk is created and the current option index is added to an array of indices. This produces an array of option indices, e.g. $[1, 3, 5]$, which describes that there are 5 options computed by 3 thread blocks, the first block will compute option 0, the second one options 1 and 2, and the third one options 3 and 4.
+
+It is obvious that this simple implementation packs options into a smaller number of chunks/blocks if the options are sorted by width. However, it should also be desirable to sort the options by height to optimize thread divergence, since computations on the tree width are parallelized. Therefore a better bin packing implementation might improve performance by packing more options into chunks by their widths, while optimizing thread divergence on heights, probably as a trade-off for more pre-processing time.
+
+\subsection*{Kernel}
+Algorithm~\ref{alg:cuda-multi} outlines the kernel written for this implementation, which is much more complex than the kernel that computes one option per thread described in chapter~\ref{chapter:oneoptionperthread}. Since computed values are dependent on results from multiple threads, it is important to synchronize threads in the block to prevent race conditions. However, special care has to be taken for this not to result in deadlocks because of thread divergence, caused by options with different widths and heights inside a block. 
+
+\paragraph{Initialization}
+First, option indices for a block have to be distributed to threads based on option widths, such that each thread can compute one value in $\mathit{Qs}$. For example, threads 0-200 compute option 0 with width 201 and threads 201-1000 compute option 1 with width 799, leaving threads 1001-1023 unoccupied. This is done by a series of segmented scans on arrays with indices and widths, resulting in every thread with id $\mathit{tid}$ getting an index of the option to compute ($\mathit{optionIdx}$) and $\mathit{scannedWidthIdx}$ representing the start index of $\mathit{Qs}$. Afterwards, one thread per option initalizes the first $Q$ and $\mathit{alpha}$ value.
+
+\paragraph{Forward propagation}
+In the loop, it is important that all threads use the maximum height of options in the block, not the height of their option which might be smaller. This way block-level synchronization can be used inside the loop without the possibility of deadlocks. First, a thread pre-computes the next $Q$ value, then all threads can quickly compute the next $Q$ value from multiple $\mathit{Qs}$ in the previous step and save it in a local variable. Afterwards, $\mathit{Qs}$ are multiplied in order to be summed up using parallel segmented scan. Next, a new alpha value is computed from the last scanned $Qs$ per option. Lastly, all threads set $\mathit{Qs}$ to the new $Q$ values.
+
+\paragraph{Backward propagation}
+Before the loop, each threads sets $\mathit{Prices}$ to 100 (actually the same array as $\mathit{Qs}$. Then in the loop, threads have to use max height again in order to use thread synchronization. Each thread computes one price in the previous time step and after all of them are done, they store the values and move to another step. After the whole tree is traversed, one thread per option sets the price result in the global results array.
+
+\pagebreak
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\caption{Multiple options per thread block kernel\label{alg:cuda-multi}}
+\SetKw{Sgmscan}{sgmscan}
+
+Distribute options in the block\;
+\If(\tcc*[f]{One thread per option}){tid == scannedWidthIdx}{
+    alphas[0] = compute yield at dt\tcc*{Initial alpha value}
+    Qs[jmax] = 1\tcc*{Initial Q value}
+}
+\;
+\tcc{Forward propagation}
+\For{i = 1 \KwTo maxHeight}{
+    Qs[tid] *= exp(...)\tcc*{Pre-compute Qs}
+    Q = Compute next step from Qs\;
+    Qs[tid] = Q * exp(...)\tcc*{Set Qs for summation}
+    \Sgmscan{Qs flags}\tcc*{Sum up Qs}
+    \If{tid == scannedWidthIdx}{
+        alphas[i] = Compute alpha from Qs[tid + width - 1]
+    }
+    Qs[tid] = Q\tcc*{Set Qs to new values at once}
+}
+\;
+Prices[tid] = 100\tcc*{Init Prices to 100\textdollar}
+\tcc{Backward propagation}
+\For{i = maxHeight-1 \KwTo 0}{
+    price = Compute next price from Prices\;
+    Prices[tid] = price\tcc*{Set all prices to new ones at once}
+}
+\;
+\tcc{Set results to prices on the first nodes}
+\If{tid == scannedWidthIdx}{
+    results[optionIdx] = Prices[jmax]
+}
+
+\end{algorithm}
+
+\section{Implementations \& Validation}
+We derived 3 implementations that differ only in the way how the array of $\mathit{alphas}$ in global memory is stored and accessed. It is similar to the 4 CUDA-option versions, except that the array of $\mathit{Qs}$ is not of concern here because it is in shared memory.
+
+\subsection*{Version 1 - Naive}
+The first simple version was created to be a starting point for the other versions and for comparison. The $\mathit{alphas}$ are padded on a global level, thus the size equals the maximum height of all options times the number of options. Values are accessed in a straightforward way as $\mathit{maxHeight} * \mathit{optionIndex} + \mathit{index}$. However, this access is not coalesced and the next two versions solve that to improve performance.
+
+\subsection*{Version 2 - Global-level Padding}
+The second version is similar as the $\mathit{alphas}$ are padded on a global level. However, the vales are being accessed in transposed form as $\mathit{optionsCount} * \mathit{index} + \mathit{optionIndex}$. This simple change in indexing should result in performance speed-ups for no additional cost, either in terms of storage requirements or pre-processing time.
+
+\subsection*{Version 3 - Block-level Padding}
+The third version tries to improve on storage requirements as it uses padding for $\mathit{alphas}$ on block level. It does so by computing an array of indices to $\mathit{alphas}$, each value representing the beginning of a segment allocated for a single block. One segment is of size maximum height of options in the block times the number of options in the block. The values are then accessed in a slightly more complicated way as $\mathit{alphaIndexForBlock} + \mathit{optionIndexInBlock} + \mathit{optionsCountBlock} * \mathit{index}$. This should result in less global memory being allocated in trade-off for an array of indices created, and then accessed in the kernel.
+
+
+\subsection*{Validation}
+Computed results from all 3 versions are validated by expanding the test case described in section~\ref{section:option:validation}. Furthermore, chapter~\ref{chapter:experimentalresults} will describe tests using bigger datasets of options.
 
 \section*{Summary}
-To summarize the chapter, ...
+This chapter provided an overview of our parallel multiple options per thread block implementation using CUDA with focus on explaining the challenges of exploiting the inner parallelism, compared to the one option per thread implementation from chapter~\ref{chapter:sequential}. It introduced 3 versions of this parallel implementation, the final third version being the most optimized one. Finally, it described how the GPU results were validated against the CPU results using our common CUDA test case. The following chapter will describe a fully flattened Futhark implementation.

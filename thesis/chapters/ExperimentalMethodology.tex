@@ -1,0 +1,57 @@
+\chapter{Experimental methodology}
+\label{chapter:experimentalmethodology}
+\section{Data generation}
+Until this point, all implementations have been tested and validated on examples from the book (files \textit{book.in} and \textit{options-60000.in}). Doing this helps determine the correctness of the implementations and gives some hints about the running times of each version, however neither of the data sets can be used to infer meaningful conclusions for the implementations. While book.in is too small, options-60000.in has an uniform distribution, where a single option is replicated 60000 times. To challenge the implementations we have created a simple data set generator, which works with several different distributions. This chapter will introduce the reader to the data set generator and the sets that were generated to put the implementations to test and help discover performance differences.   
+
+\subsection{Generator overview}
+The generator was implemented in C++ and takes 3 arguments as input - total number of options in the set, a skewness parameter and the data distribution type to be generated. The inputted number of options is used as a max limit when generating options. All of the generated sets described in this chapter have been created with $2^16=65536$ options, which is double of the total number of available threads on the GPU that was used for this thesis\footnote{Hardware will be described later in chapter \ref{section:hardware}} (32768) . The skewness parameter represents the amount (in percent) of options that will be skewed (have significantly different height and/or width than the rest of the file). This parameter is applied only for the skewed distributions, which will be described later in this chapter. Last but not least, the data distribution type is used to specify the data set which will be generated. The generator currently works with 6 different sets, which will be described next in this paper. 
+
+\subsection{Uniform}
+The uniform data set consists of the same option replicated multiple times. Each entry in this set has the same height and the same width as the others. Note that options-60000.in has the same distribution type, however we have decided to keep consistency by making a new set with the same amount of options as the other ones described in this chapter. All widths in the newly generated set are equal to 47 and all heights to 109. As this set is uniformly distributed, all other statistics such as variance, std, skewness are 0 for both widths and heights. The data distribution and statistics about it are shown in Appendix \ref{appendix:data:uniform}\footnote{Note that this and the following data distribution plots consist of a scatter plot where each dot represents an option, and histogram plots next to their corresponding axis, indicating on the data distribution}, where it can be seen that a dot is formed in the center of the plot. While pricing the same option this many times is not practically/financially useful, there is a possibility that many real-life inputs will have a uniform distribution, where both their widths and heights will have close values. In such a case, the dots on the plot will be separated, but will still remain close to the center. This suggests that in these distributions, pricing individual options will also take similar times. In our generated set, each option should be priced in exactly the same amount of time. Furthermore, since there is no difference in the heights and the widths, it is not expected that pricing this data distribution in parallel will benefit from any sorting or padding, which should be an interesting experiment. 
+
+\subsection{Random}
+The random data set (see Appendix \ref{appendix:data:rand} for plot and details) consists of options with both uniformly distributed random widths and uniformly distributed random heights. This data set is interesting, as it presents a wide variety of option sizes. Both padding and sorting can benefit the processing of such a data distribution, hence it can help answer questions concerned with the various optimization techniques that can possibly improve the performance of the algorithm.
+
+\subsection{Random with constant height/width}
+The following two data sets (see Appendix \ref{apendix:data:randconstheight} and Appendix \ref{appendix:data:randconstwidth} for plots and details) have a similar structures to the random one described above, however one of their parameters is being held in place (kept constant). In the case of constant height, the width is uniformly random distributed, while the height remains the same throughout all options. The other set is vice verse, where the width remains the same, while the height is randomly distributed. It will be interesting to experiment whether having a constant width or height benefits the performance of any implementation. It should also be interesting to see if sorting and padding can benefit the performance. 
+
+\subsection{Skewed}
+This data set introduces data skewness, where a small percent of all options is significantly different than the rest. As it can be seen in Appendix \ref{appendix:data:skewed} the majority of the data has widths up to approx. 100 and heights up to approx. 400. Several options with much larger heights and widths stand out with a larger range for both widths and heights. This data distribution can also often occur in real life situations, where several data entries significantly deviate from the rest. This introduces problems with memory padding in some of the implementations, but can benefit from sorting both along the height and along the width. It will be interesting to experiment with the behaviour of \txtit{CUDA-multi} on similar data sets where the majority of options have small widths, hence allowing to pack and process more options in parallel. 
+
+\subsection{Skewed with constant height/width}
+The last two data sets (see Appendix \ref{appendix:data:skewedconstheight} and Appendix \ref{appendix:data:skewedconstwidth} for plots and details) introduce similar concepts as the skewed data set. Similarly, the majority of the data has a relatively small uniform random distribution on both axes. The difference comes in the skewed part, where either the height or the width are constant and their constant values are kept relatively low in comparison to the rest of the data. Contrary, the free parameter (the one that is not held constant) in this case is much larger than the rest of the options which creates the actual contrast between the skewed and the uniformly distributed parts. These two data sets can show interesting information about the dominance of either widths or heights in a data and help determine whether any of the implementations perform better on widths or on heights. It should also be interesting to observe the runtime when sorting and padding are used on each of the different axes. 
+
+% \section{Other data used}
+% - shall we write a bit about Wojciechs data ?
+
+\section{Experimental environment}
+\paragraph{Hardware}
+In order to test our code, we have used the GPU cluster at DIKU\footnote{Find more information on https://di.ku.dk/it/documentation/gpu/}. It is composed of 5 servers with multicore CPUs and 2 GPUs per machine. We have only used four of the machines (GPU01-04) each with 2 x \textit{nVidia GeForce GTX 780 GPUs}. The complete hardware specification for each of the 4 GPUs is described below:
+\begin{itemize}
+\item \textbf{Case}: 1x Supermicro SYS-7047GR-TPRF, 4U/Tower barebone LGA2011, 2x1620W PSU, 8x3.5" htswp trays
+
+\item \textbf{CPU}: 2x Intel Xeon E5-2650v2, 8-core CPU, 2.6GHz, 20MB cache, 8GT/s QPI
+
+\item \textbf{RAM}: 8x Samsung 16GB DDR3(128GB total) 1866MHz Reg. ECC server module
+
+\item \textbf{GPU}: 2x nVidia GeForce GTX 780 Ti, 3072MB, 384 bit GDDR5, PCI-E 3.0 16x
+
+\item \textbf{SSD}: 1xIntel S3500 serie 240GB SATA
+
+\item \textbf{HDD}: 1x	Seagate Constellation ES.3 4TB 7200RPM SATA 6Gb/s 128MB cache 3,5"
+\end{itemize}
+
+The GTX 700 series were first released in 2013 and GPU technology has noticeably improved since. Despite that, both CUDA and Futhark provide portability, allowing to easily switch hardware, or scale the solution, allowing to run the code on even more modern hardware, without the need to re-write it.
+
+
+
+% CUDA C++ and the NVIDIA NVCC compiler tool chain provide a number of features designed to make it easier to write portable code, including language-level integration of host and device code and data, declaration specifiers (e.g. __host__ and __device__) and preprocessor definitions (e.g. __CUDACC__). Together, these features enable developers to write code that can be compiled and run on either the host, the device, or both.
+
+\paragraph{Software}
+We also turn to software as another aspect of portability. Even though CUDA and Futhark allow code to be ran on many different architectures and operating systems, it is often a good idea to align compiler versions on different systems. All experiments described in chapter \ref{chapter:experimentalresults} have been ran on \textbf{Red Hat Enterprise Linux Server 7.5 (Maipo)} with a \textbf{Linux 3.10.0-862.6.3.el7.x86\_64} kernel. All CUDA programs have been compiled by \textbf{Cuda compilation tools, release 9.2, V9.2.148} and all Futhark programs by the \textbf{Futhark 0.6.0} compiler. Note that the use of older versions of both may result in compile errors, as we have used modern language features introduced in the newer releases. The same applies for newer compiler versions, since we cannot guarantee that neither nVidia products, nor the Futhark language are going to be backward compatible.
+
+\paragraph{Experiments}
+With the large number of combinations between data sets, computation precision, implementations, optimizations and more, we have created a testing framework, running one combination at a time and writing the output to a file. For each run we obtain the name of the file; the precision; number of registers; the implementation version; the block size; the sort option; kernel time in microseconds; total time in microseconds and the total allocated memory.
+
+\section*{Summary}
+This chapter provided an overview of the methodology used in order to set up the experiment environment. This has included the data sets we have generated in order to put the implementations to a test, the hardware and software used to run them and a brief description of what the outcome is expected to be. The following chapter will introduce the actual experiments and elaborate on the results we have obtained, in order to determine different performance characteristics and obtain an empirical validation for answering the thesis questions.

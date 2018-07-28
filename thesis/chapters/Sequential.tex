@@ -1,6 +1,6 @@
 % Sequential IMPLEMENTATION
-\chapter{Sequential implementation}
-\label{sequential}
+\chapter{Sequential Implementation}
+\label{chapter:sequential}
 In order to better understand the algorithm, we have started with a basic sequential implementation of it in C++. While this step could be done in any language, we have chosen to work with C++, as it would allow us to re-use pieces of code for the parallel CUDA implementations, described further in this paper. Running this version with a large number of options will likely result in a significant amount of computation time, however, the purpose of this implementation is rather a proof of concept that the algorithm produces correct approximations, as well as to provide a set of results, which can be used to test against with the other implementations.
 
 The algorithm described in the book is used to price one option at a time and the natural way to start a sequential implementation would be to create a single function that prices one option. Looping through all options in the data set and calling this function for each of them will then produce the end results. Pseudo-code in Algorithm~\ref{alg:sequential} describes the approach we took based on the book and articles by Hull and White. Note that real is a data type that can be either single or double precision floating point number based on the required accuracy.
@@ -8,7 +8,7 @@ The algorithm described in the book is used to price one option at a time and th
 The implementation iterates through all given options, constructs a trinomial tree for each of them and propagates prices back through the tree, obtaining the price approximations for each option and returning them in the end. The algorithm follows the intuition provided in the previous chapter \ref{chapter:hullwhitemodel}. The focus of this implementation is on correctness and simplicity.
 
 \pagebreak
-\section{Algorithm description}
+\section{Algorithm Description}
 \paragraph{Precomputation}
 Pricing of one option starts with computing its constants such as tree width and rate step, tree height and time step, and other helper values using formulas by Hull and White. Afterwards, for each width step j, rate and probabilities (up, middle, down) are precomputed for use during both forward and backward propagations.
 
@@ -23,7 +23,7 @@ Pricing of one option starts with computing its constants such as tree width and
     \Output{Price approximation for the option}
     \;
     precompute probabilities for all width steps j\;
-    $c$ : OptionConstants := compute constants for the option\;
+    c : OptionConstants := compute constants for the option\;
     \tcc{option constants include:}
     \tcc{c.t : int      - option length}
     \tcc{c.X : real     - option strike price}
@@ -34,14 +34,14 @@ Pricing of one option starts with computing its constants such as tree width and
     \tcc{c.n : int - tree height}
     \tcc{c.type : CALL | PUT - option type}
     \;
-    $alphas$ : real[$c.n + 1$]\;
-    $alphas[0]$ := compute yield at $c.dt$ \tcc*{dt-period interest rate}
+    alphas : real[c.n + 1]\;
+    alphas[0] := compute yield at c.dt \tcc*{dt-period interest rate}
 \end{algorithm}
 
 \paragraph{Forward propagation}
-The purpose of forward propagation is to compute an array of alphas of size tree height + 1 that will be used during backward propagation. The first alpha is set to the interest rate at time of one time step. To capture the tree values at any given time step, only the current and previous tree slices of size tree width are needed, these two arrays are named $Qs$ and $QsCopy$. The single starting value in the middle of the tree in $Qs$ array is initalized to 1\$.
+The purpose of forward propagation is to compute an array of alphas of size tree height + 1 that will be used during backward propagation. The first alpha is set to the interest rate at time of one time step. To capture the tree values at any given time step, only the current and previous tree slices of size tree width are needed, these two arrays are named $\mathit{Qs}$ and $\mathit{QsCopy}$. The single starting value in the middle of the tree in $\mathit{Qs}$ array is initalized to 1\$.
 
-After the arrays are initialized, the program iterates through time steps along the tree height. At each time step, it goes through the values Q computed in the previous step. Every value contributes to three values in the next time step ($QsCopy$) as illustrated in figure~\ref{fig:seqforward}, according to the precomputed rates and probabilities. After all $Qs$ in he next step are computed, their values are aggregated to compute the next alpha. Lastly, arrays $Qs$ and $QsCopy$ are swapped and $QsCopy$ is reset to zeros for the next iteration.
+After the arrays are initialized, the program iterates through time steps along the tree height. At each time step, it goes through the values Q computed in the previous step. Every value contributes to three values in the next time step ($\mathit{QsCopy}$) as illustrated in figure~\ref{fig:seqforward}, according to the precomputed rates and probabilities. Note that this is an example of standard branching and there is also bottom and top branching, see fig.~\ref{fig:background:allbranchings}. After all $\mathit{Qs}$ in he next step are computed, their values are aggregated to compute the next alpha. Lastly, arrays $\mathit{Qs}$ and $\mathit{QsCopy}$ are swapped and $\mathit{QsCopy}$ is reset to zeros for the next iteration.
 
 \begin{figure}[H]
     \centering
@@ -52,41 +52,39 @@ After the arrays are initialized, the program iterates through time steps along 
 	\label{fig:seqforward}
 \end{figure}
 
-{
-\setlength{\interspacetitleruled}{-.4pt}%
 \begin{algorithm}[H]
     \DontPrintSemicolon
     \setcounter{AlgoLine}{16}
+    \caption{Sequential implementation - forward propagation\label{alg:sequential-forward}}
     
     \tcc{Forward propagation}\;
-    $Qs$ : real[$c.width$]\;
-    $QsCopy$ : real[$c.width$]\;
-    $Qs[c.jmax]$ = 1 \tcc*{set initial node to 1\textdollar}
+    Qs = real[c.width]\;
+    QsCopy = real[c.width]\;
+    Qs[c.jmax] = 1\tcc*{set initial node to 1\textdollar}
     \;
     \tcc{iterate through nodes along tree height}
-    \For{$i := 0$ \KwTo $c.n-1$}{
+    \For{i = 0 \KwTo c.n - 1}{
         \tcc{the highest allowed j index on step i}
-        $jhigh$ : int = min($i$, $c.jmax$)\;
-        $alpha$ : real = $alphas[i]$\;
+        jhigh : int = min(i, c.jmax)\;
+        alpha : real = alphas[i]\;
         
-        \tcc{iterate along width between j indexes on step $i$}
-        \For{$j := -jhigh$ \KwTo $jhigh$} {
+        \tcc{iterate along width between j indexes on step i}
+        \For{j = -jhigh \KwTo jhigh} {
             Compute and add to QsCopy on j+1, j, j-1
         }
         \;
-        \tcc{iterate along width between j indexes on step $i+1$}
-        $jhigh1$ : int = min($i+1$, $c.jmax$)\; 
-        $alpha\_p1$ : real = 0\;
-        \For{$j := -jhigh1$ \KwTo $jhigh1$}{
-            Aggregate $alpha_p1$ based on $QsCopy[j]$
+        \tcc{iterate along width between j indexes on step i+1}
+        jhigh1 : int = min(i+1, c.jmax)\; 
+        alpha\_p1 : real = 0\;
+        \For{j = -jhigh1 \KwTo jhigh1}{
+            Aggregate alpha\_p1 based on QsCopy[j]
         }
-        Compute $alphas[i+1]$ based on $alpha\_p1$\;
+        Compute alphas[i+1] based on alpha\_p1\;
         
-        $Qs := QsCopy$\;
-        fill $QsCopy$ with 0\;
+        Qs := QsCopy\;
+        fill QsCopy with 0\;
     }
 \end{algorithm}
-}
 
 \pagebreak
 \paragraph{Backward propagation}
@@ -103,53 +101,52 @@ Afterwards, the program iterates through time steps along the tree height starti
 	\label{fig:seqbackward}
 \end{figure}
 
-{
-\setlength{\interspacetitleruled}{-.4pt}%
 \begin{algorithm}[H]
     \DontPrintSemicolon
     \setcounter{AlgoLine}{42}
+    \caption{Sequential implementation - backward propagation\label{alg:sequential-backward}}
     
     \tcc{Backward propagation}\;
-    $Prices$ : real[$c.width$]\;
-    $PricesCopy$ : real[$c.width$]\;
-    fill $Prices$ with 100 \tcc*{initialize prices to 100\textdollar}
+    Prices : real[c.width]\;
+    PricesCopy : real[c.width]\;
+    fill Prices with 100 \tcc*{initialize prices to 100\textdollar}
     
-    \For{$i := c.n - 1$ \KwTo 0} {
-        $jhigh$ : int = min($i$, $c.jmax$)\;
-        $alpha$ : real = $alphas[i]$\;
+    \For{i := c.n - 1 \KwTo 0} {
+        jhigh : int = min(i, c.jmax)\;
+        alpha : real = alphas[i]\;
         
-        \For{$j := -jhigh$ \KwTo $jhigh$} {
-            $jind$ : int = $j + c.jmax$\;
-            Compute res based on Prices at $j+1$, $j$, $j-1$\;
+        \For{j := -jhigh \KwTo jhigh} {
+            jind : int = j + c.jmax\;
+            Compute res based on Prices at j+1, j, j-1\;
             \eIf{step i is the option maturity}{
                 \eIf(\tcc*[f]{call option}){c.type is CALL}{
-                    $PricesCopy[jind]$ = max($res - c.X$, 0)
+                    PricesCopy[jind] = max(res - c.X, 0)
                 }(\tcc*[f]{put option}){               
-                    $PricesCopy[jind]$ = max($c.X - res$, 0)
+                    PricesCopy[jind] = max(c.X - res, 0)
                 }
             }{
-                $PricesCopy[jind] = res$
+                PricesCopy[jind] = res
             }
         }
         
-        $Prices = PricesCopy$\;
-        fill $PricesCopy$ with 0\;
+        Prices = PricesCopy\;
+        fill PricesCopy with 0\;
     }
 
     \tcc{Return the calculated current option price}
-    \KwRet $Prices[c.jmax]$
+    \KwRet Prices[c.jmax]
 \end{algorithm}
-}
 
-\section{Results}
+\section{Validation}\label{section:sequential:validation}
 
-Results obtained by running this implementation will be used for validation of the parallel algorithms, so it is important that they are fully correct. We compared our intermediate array values of $alphas$, $Qs$ and $Prices$ along with the final results with values provided by our supervisor Wojciech M. Pawlak and made sure they are the same within a margin of error.
+Results obtained by running this implementation will be used for validation of the parallel algorithms, so it is important that they are fully correct. We compared our intermediate array values of $\mathit{alphas}$, $\mathit{Qs}$ and $Prices$ along with the final results with values provided by our supervisor Wojciech M. Pawlak and made sure they are the same within a margin of error.
 
-Table~\ref{table:book-results} compares our results for an option in Example 30.1 in Hull \& White~\cite[pg. 706]{ofod} with their results in Table 30.3~\cite[pg. 707]{ofod}. Our approach is fully numerical while their tree results are semi-analytic, since they do not build a tree for the whole nine-year bond but only for the three-year option and then compute the rest using analytic formulas. Despite this fact, our result for daily time steps, i.e. $365 \times 9$ steps for the full tree, are within $0.02\%$ difference of their analytic result.
+Table~\ref{table:book-results} compares the value of a three-year put option on a nine-year zero-coupon bond with a strike price of 63: $a = 0.1$ and $\sigma = 0.01$, which is an example option in Hull \& White~\cite[pg. 706]{ofod}. The left table shows book results~\cite[pg. 707]{ofod} and the right table shows our results for the same option with different time steps. Our approach is fully numerical while their tree results are semi-analytic, since they do not build a tree for the whole nine-year bond but only for the three-year option and then compute the rest using analytic formulas. Despite this fact, our result for daily time steps, i.e. $365 \times 9$ steps for the full tree, are within $0.02\%$ difference of their analytic result.
 
 \begin{table}[h]
 \centering
-\caption{Left table: value of a three-year put option on a nine-year zero-coupon bond with a strike price of 63: $a = 0.1$ and $\sigma = 0.01$~\cite[pg. 707]{ofod}.\\Right table: our results for the same option with different time steps.}.
+\caption{Sequential results compared on a book example}
+\source{Compiled by the authors, based on~\cite[pg. 707]{ofod}.}
 \label{table:book-results}
 \begin{tabular}{|lll|}
 \hline
@@ -173,6 +170,6 @@ Steps per year & Results \\ \hline
 \end{tabular}
 \end{table}
 
-\section{Summary}
+\section*{Summary}
 This chapter provided an overview of our sequential implementation with focus on explaining  the computations in forward and backward propagations and how the final results are obtained. Finally, it described how the computations and results were validated with external sources. 
-The following chapter will describe how this implementation was adapted for a parallel one option per thread version in Cuda.
+The following chapter will describe how this implementation was adapted for a parallel one option per thread version in CUDA.

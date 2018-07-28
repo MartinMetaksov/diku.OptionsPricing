@@ -1,5 +1,6 @@
 \chapter{Background}
 \label{chapter:background}
+This chapter will provide the essential background needed to understand the technical chapters of this thesis. It will study any necessary terminology and techniques used throughout the thesis, covering knowledge about finances, flattening and CUDA.
 
 \section{Financial background}
 Derivatives have become important in finance in the last 30 years with futures and options actively traded worldwide. The derivatives market is much bigger than the stock market when underlying assets are measured. Derivatives can be used for hedging, speculation or arbitrage as they transfer a wide range of risks in the economy from one entity to another. A \textit{derivative} is a financial instrument with a value that derives from the value of some other basic underlying asset.~\cite[pg.1]{ofod}
@@ -122,6 +123,7 @@ Unlike other methods, trinomial trees conveniently incorporate mean-reversion, b
   \label{fig:background:altbranchingtop}
 \end{subfigure}
 \caption{Alternative branching methods for a trinomial tree.}
+\label{fig:background:allbranchings}
 \source{Based on Options, Futures and Other Derivatives\cite{ofod}[pg. 698].}
 \end{figure}
 
@@ -139,5 +141,56 @@ Beside the Black-Scholes method and the binomial/trinomial tree approaches, ther
 % 20.8
 \textbf{Finite difference methods (FDM)} value a derivative by solving the differential equation that the derivative satisfies. The differential equations are converted into sets of difference equations and are are solved iteratively. This is similar to the trinomial trees method, since the computations also work back from the end of the derivative maturity to the beginning. The explicit finite difference method is functionally the same as using a trinomial tree, while the implicit finite difference method takes far longer computational time\cite{ofod}[pg.455 - 466].
 
+%%%% FLATTENING BACKGROUND %%%%
 \section{Flattening background}
-...
+As briefly mentioned in the Introduction, complex applications are often composed of multiple nested levels of operations. These include i.e. for-loops, if-then-else statements, etc. In order to effectively utilize massively parallel hardware, it is necessary that nested higher-order functions are properly flattened, which can be done with the use of certain flattening techniques such as the ones described in this section. Note that only flattening transformations that have been used in this project are described, even though many other transformations can be composed.  
+
+\subsection{Nested map in a map}
+\label{chapter:section:flattening:map}
+The $\mathit{map}$ function applies a given function to each element of a list. A nested map inside a map is one of the simplest flattening transformations that can be performed. The procedure is as simple as applying the nested map on the flattened array. E.g. suppose we have a nested function $\mathit{f(x)=x+1}$, applied on each of the nested elements of the array $\mathit{x=[[1,2,3],[4,5,6]]}$. This is done separately on both of the nested arrays, resulting in $\mathit{[[2,3,4],[5,6,7]]}$. The same operation would result in $\mathit{[2,3,4,5,6,7]}$, when the array is flat. This is also the expected outcome. 
+
+\subsection{Nested scan in a map}
+\label{chapter:section:flattening:scan}
+The $\mathit{scan}$ function takes as input a combining operator, a neutral element and an array. The operator is used consequently on all elements of the array, either by starting with the neutral, or with the first element in the array. These two different ways are called exclusive and inclusive scan respectively. This is very similar to $\mathit{reduce}$ with the difference that using $\mathit{scan}$ allows intermediate results to be kept in the returned result. E.g. suppose an array $\mathit{x=[[2, 3, 4],[5, 6, 7]]}$ is given and scan is performed with the $\mathit{(+)}$ operator and a neutral element $\mathit{0}$. An inclusive scan returns $\mathit{[[2, 5, 9], [5, 11, 18]]}$ for each of the nested arrays, while an exclusive scan similarly returns \\ $\mathit{[[0, 2, 5],[0, 5, 11]]}$, as it starts from the neutral element. On a flat array, scan is replaced by a segmented scan, which also takes a flag array as an input argument. The flag array indicates the positions and lengths of the nested arrays. E.g. the flag array will be $\mathit{[3,0,0,3,0,0]}$ on the example above and the complete transformation:\\ $\mathit{sgmScanInc}\:\mathit{(+)}\:\mathit{0}\:\mathit{[3,0,0,3,0,0]}\:\mathit{[2,3,4,5,6,7]}\:\equiv\:\mathit{[2,5,9,5,11,18]}$ and\\ $\mathit{sgmScanExc}\:\mathit{(+)}\:\mathit{0}\:\mathit{[3,0,0,3,0,0]}\:\mathit{[2,3,4,5,6,7]}\:\equiv\:\mathit{[0,2,5,0,5,11]}$.
+
+\subsection{Nested replicate in a map}
+\label{chapter:section:flattening:replicate}
+The \textit{replicate} function is used to create an array of \textit{n} exact copies of a number. The example shown below assumes 3 elements - \textit{ms=[0.0, 1.0, 2.0]} - replicated \textit{ns=[3,5,7]} times respectively. The flattening of a replicate nested inside a map is achieved by the following steps:
+\begin{itemize}
+    \item Compute an array of indexes - \textit{inds} - by using additive exclusive scan on \textit{ns}. In the example above, the result of this step should be \textit{inds=[0, 3, 8]}
+    
+    \item Compute the size - \textit{s} - of the target array. This can be done in multiple ways, one of which is by summing the last elements of \textit{inds} and the last element of \textit{ns}. This is \textit{s=8+7=15} in the given example.
+    
+    \item Compute a \textit{flags} array, by writing \textit{ns} into an array of size \textit{s} with zeros, at the locations indicated by the $\mathit{inds}$ array. In the given example, the results would be \textit{flags=[3, 0, 0, 5, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0]}. 
+    
+    \item Compute a \textit{vals} array, by writing the values to be replicated - \textit{ms} - into an array of size \textit{s} with zeros, at the locations indicated by the $\mathit{inds}$ array. In the given example, the results would be \textit{flags=[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}. 
+    
+    \item Compute the flattened nested replicate by performing an inclusive segmented scan on \textit{flags} with \textit{vals}. This results in \textit{result=[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]}.
+\end{itemize}
+\newpage
+\subsection{Nested reduce in a map}
+\label{chapter:section:flattening:reduce}
+A $\mathit{reduce}$ is another higher-order function which uses a given combining operator and a neutral element. It recursively processes its elements with the operator, building up a return value.
+As previously mentioned, this is quite similar to an inclusive scan operation, with the only difference that $\mathit{reduce}$ does not keep intermediate values. I.e. consider the nested array $\mathit{x=[[1,3,4],[6,7]]}$. A $\mathit{reduce}$ with a $\mathit{(+)}$ operator will produce $\mathit{8}$ and $\mathit{13}$ for the respective nested arrays. A flattened reduce should accordingly result in the array $\mathit{[8, 13]}$. A flattened reduce takes one more input argument - $\mathit{flags}$ - and comprises of a scan-pack composition, with the following steps:
+\begin{itemize}
+    \item Perform an additive inclusive segmented scan with $\mathit{flags=[1, 0, 0, 1, 0]}$ and $\mathit{x=[1, 3, 4, 6, 7]}$ in the example above. The result of this step will then be  $\mathit{vals=[1, 4, 8, 6, 13]}$. 
+    
+    \item Shift $\mathit{flags}$ left by 1, by applying the map $\mathit{if}\;\mathit{i}\;\mathit{<}\;\mathit{n-1}\;\mathit{then}\;\mathit{flags[i+1]}\;\mathit{else}\;\mathit{1}$ over the iterator from $\mathit{0}$ to the length of $\mathit{x}$. In the example above, this becomes $\mathit{sgm\_end=[0,0,1,0,1]}$.
+    
+    \item Compute $\mathit{inds0}$ by using an inclusive scan on the flags. $\mathit{inds0=[1,1,1,2,2]}$
+    
+    \item Obtain $\mathit{inds}$ by applying the map\\ $(i,e)\;->\;\mathit{if}\;\mathit{e}\;\mathit{>}\;\mathit{0}\;\mathit{then}\:\mathit{i-1}\;\mathit{else}\;\mathit{-1}$ on $\mathit{inds0}$ and $\mathit{sgm_end}$. This becomes $\mathit{inds=[-1,-1,0,-1,1]}$.
+    
+    \item Compute the end result by writing $\mathit{vals}$ on the $\mathit{inds}$ indexes to an empty array of size the last element of $\mathit{inds0}$, i.e., $\mathit{res=[8,13]}$
+\end{itemize}
+
+%%%%% CUDA Background %%%%%
+\section{CUDA background}
+\subsection{Roadmap}
+Short about: Kernels, Grids, Blocks, Threads, Warps, GPU Compute capability, Device <-> Host, something more ? 
+\subsection{Process flow}
+% https://en.wikipedia.org/wiki/CUDA
+\subsection{Memory coalescing}
+
+\section*{Summary}
+This chapter has provided a brief introduction to to the necessary knowledge needed to understand the following chapters. This has covered financial topics such as options, volatility, trinomial trees, and more, all needed in the implementations. Following was the flattening background needed for applying transformations in order to exploit thread divergence and experiment with different levels of nested parallelism. Finally, we have introduced the basics needed to understand terminology and techniques in CUDA, which have been all throughout this thesis. The following chapter will study the Hull-White Single-Factor Model, in order to explore its mechanisms and prepare an implementation strategy.
