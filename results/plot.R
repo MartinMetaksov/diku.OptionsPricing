@@ -22,7 +22,7 @@ readFuthark <- function(file, real) {
 }
 
 title = "results"
-datasets.names = c("Cuda option", "Cuda multi", "Futhark basic", "Futhark flat")
+datasets.names = c("Cuda-option", "Cuda-multi", "Futhark-basic", "Futhark-flat")
 datasets.files = c("option.csv", "multi.csv", "basic32.json", "basic64.json", "flat32.json", "flat64.json")
 
 # load and join data
@@ -60,7 +60,6 @@ data <- data[order(data$precision),]
 data$sort <- as.character(data$sort)
 data$sort[is.na(data$sort)] <- "-"
 data$sort <- as.factor(data$sort)
-data$type <- as.factor(data$type)
 data$version <- as.factor(data$version)
 data$block <- as.factor(data$block)
 data$precision <- as.factor(data$precision)
@@ -135,7 +134,11 @@ plotScatter <- function() {
   saveWidget(p, file = paste(title, "html", sep = ".")) 
 }
 
-makeBarPlot <- function(d, x, x_title, y_title, name) {
+mapSort <- function(d) {
+  mapvalues(d, from=c("-","w","W", "h", "H"), to=c("None", "Width ▲", "Width ▼", "Height ▲","Height ▼"))
+}
+
+makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
   d$float <- round(d$float, 3)
   d$double <- round(d$double, 3)
   files <- split(d, d$file)
@@ -143,79 +146,73 @@ makeBarPlot <- function(d, x, x_title, y_title, name) {
     title <- names(files)[i]
     p <-
       plot_ly(files[[i]]) %>%
-      add_trace(x = x, y = ~float, type = 'bar', name = "float", text = ~float, textposition = "auto",
+      add_trace(x = ~float, y = y, type = 'bar', name = "float", text = ~float, textposition = "auto",
                 marker = list(color = 'rgb(239,138,98)',
                               line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
-      add_trace(x = x, y = ~double, type = 'bar', name = "double", text = ~double, textposition = "auto",
+      add_trace(x = ~double, y = y, type = 'bar', name = "double", text = ~double, textposition = "auto",
                 marker = list(color = 'rgb(103,169,207)',
                               line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
-      add_annotations(
-        yref="paper", 
-        xref="paper", 
-        y=1.08, 
-        x=0.5, 
-        text=title, 
-        showarrow=F, 
-        font=list(size=30)
-      ) %>%
-      layout(title = FALSE,
+      layout(title = title,
              barmode = 'group',
-             font = list(family = "sans serif", size = 25),
+             margin = list(t = 120),
+             font = list(family = "sans serif", size = 60),
              xaxis = list(title = x_title),
-             yaxis = list(title = y_title),
-             legend = list(orientation = 'h'))
-    orca(p, paste(name, "-", title, ".png", sep = ""), scale = 2)
+             yaxis = list(title = y_title, autorange = "reversed", categoryorder = "array", categoryarray = y_order),
+             legend = list(orientation = 'h', x = -0.18))
+    orca(p, paste(name, "-", title, ".png", sep = ""), width = 1400, height = 1300)
   }
 }
 
 # CUDA-option
 plotCudaOptionBlocks <- function() {
-  subset <- data[data$type == "Cuda option", c(1,2,5,8)]
+  subset <- data[data$type == datasets.names[1], c(1,2,5,8)]
   cast <- dcast(subset, file + block ~ precision, value.var = "total.time", min)
   makeBarPlot(cast, ~block, "Block size", "Time (sec)", "option-blocks")
 }
 
 plotCudaOptionVersions <- function() {
-  subset <- data[data$type == "Cuda option", c(1,2,4,8)]
+  subset <- data[data$type == datasets.names[1], c(1,2,4,8)]
   cast <- dcast(subset, file + version ~ precision, value.var = "total.time", min)
   makeBarPlot(cast, ~version, "Version", "Time (sec)", "option-versions")
 }
 
 plotCudaOptionSorts <- function() {
-  subset <- data[data$type == "Cuda option", c(1,2,6,8)]
-  subset$sort <- mapvalues(subset$sort, 
-                                 from=c("-","w","W", "h", "H"), 
-                                 to=c("None", "Width asc.", "Width desc.", "Height asc.","Height desc."))
+  subset <- data[data$type == datasets.names[1], c(1,2,6,8)]
+  subset$sort <- mapSort(subset$sort)
   cast <- dcast(subset, file + sort ~ precision, value.var = "total.time", min)
   makeBarPlot(cast, ~sort, "Sorting", "Time (sec)", "option-sorts")
 }
 
 plotCudaOptionVersionsMem <- function() {
-  subset <- data[data$type == "Cuda option", c(1,2,4,9)]
+  subset <- data[data$type == datasets.names[1], c(1,2,4,9)]
   cast <- dcast(subset, file + version ~ precision, value.var = "memory", min)
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-option-versions")
 }
 
 # CUDA-multi
 plotCudaMultiVersions <- function() {
-  subset <- data[data$type == "Cuda multi", c(1,2,4,8)]
+  subset <- data[data$type == datasets.names[2], c(1,2,4,8)]
   cast <- dcast(subset, file + version ~ precision, value.var = "total.time", min)
   makeBarPlot(cast, ~version, "Version", "Time (sec)", "multi-versions")
 }
 
 plotCudaMultiSorts <- function() {
-  subset <- data[data$type == "Cuda multi", c(1,2,6,8)]
-  subset$sort <- mapvalues(subset$sort, 
-                           from=c("-","w","W", "h", "H"), 
-                           to=c("None", "Width asc.", "Width desc.", "Height asc.","Height desc."))
+  subset <- data[data$type == datasets.names[2], c(1,2,6,8)]
+  subset$sort <- mapSort(subset$sort)
   cast <- dcast(subset, file + sort ~ precision, value.var = "total.time", min)
   makeBarPlot(cast, ~sort, "Sorting", "Time (sec)", "multi-sorts")
 }
 
 plotCudaMultiVersionsMem <- function() {
-  subset <- data[data$type == "Cuda multi", c(1,2,4,9)]
+  subset <- data[data$type == datasets.names[2], c(1,2,4,9)]
   cast <- dcast(subset, file + version ~ precision, value.var = "memory", min)
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-multi-versions")
+}
+
+plotTypes <- function() {
+  subset <- data[, c(1,2,8,10)]
+  cast <- dcast(subset, file + type ~ precision, value.var = "total.time", min)
+  makeBarPlot(cast, ~type, "Parallel implementation", "Time (sec)", "all-approaches", datasets.names)
 }
 
 plotAll <- function() {
@@ -227,5 +224,6 @@ plotAll <- function() {
   plotCudaMultiVersions()
   plotCudaMultiSorts()
   plotCudaMultiVersionsMem()
+  plotTypes()
   setwd("..")
 }
