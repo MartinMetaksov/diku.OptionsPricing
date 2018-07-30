@@ -1,1 +1,76 @@
-{"trinom-flat.fut":{"datasets":{"../data/fut/0_UNIFORM.in":{"runtimes":[230137,228258,228548,228361,228077],"stderr":""},"../data/fut/1_RAND.in":{"runtimes":[11500148,11489972,11477330,11474404,11472773],"stderr":""},"../data/fut/2_RANDCONSTHEIGHT.in":{"runtimes":[986047,985690,985361,986098,985557],"stderr":""},"../data/fut/3_RANDCONSTWIDTH.in":{"runtimes":[2458746,2458308,2456799,2457078,2456924],"stderr":""},"../data/fut/4_SKEWED.in":{"runtimes":[2882782,2883042,2883070,2883181,2882295],"stderr":""},"../data/fut/5_SKEWEDCONSTHEIGHT.in":{"runtimes":[3050333,3049886,3053535,3052099,3050702],"stderr":""},"../data/fut/6_SKEWEDCONSTWIDTH.in":{"runtimes":[10803235,10802345,10800854,10799184,10798672],"stderr":""}}}}
+{
+    "trinom-flat.fut": {
+        "datasets": {
+            "../data/fut/0_UNIFORM.in": {
+                "runtimes": [
+                    230137,
+                    228258,
+                    228548,
+                    228361,
+                    228077
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND.in": {
+                "runtimes": [
+                    11500148,
+                    11489972,
+                    11477330,
+                    11474404,
+                    11472773
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT.in": {
+                "runtimes": [
+                    986047,
+                    985690,
+                    985361,
+                    986098,
+                    985557
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH.in": {
+                "runtimes": [
+                    2458746,
+                    2458308,
+                    2456799,
+                    2457078,
+                    2456924
+                ],
+                "stderr": ""
+            },
+            "../data/fut/4_SKEWED.in": {
+                "runtimes": [
+                    2882782,
+                    2883042,
+                    2883070,
+                    2883181,
+                    2882295
+                ],
+                "stderr": ""
+            },
+            "../data/fut/5_SKEWEDCONSTHEIGHT.in": {
+                "runtimes": [
+                    2741671,
+                    2741305,
+                    2740392,
+                    2740249,
+                    2739997
+                ],
+                "stderr": ""
+            },
+            "../data/fut/6_SKEWEDCONSTWIDTH.in": {
+                "runtimes": [
+                    924218,
+                    924027,
+                    924031,
+                    924253,
+                    924121
+                ],
+                "stderr": ""
+            }
+        }
+    }
+}

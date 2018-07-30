@@ -1,1 +1,76 @@
-{"trinom-flat.fut":{"datasets":{"../data/fut/0_UNIFORM.in":{"runtimes":[658671,658869,658676,658905,659095],"stderr":""},"../data/fut/1_RAND.in":{"runtimes":[26393110,26366972,26328369,26309352,26300660],"stderr":""},"../data/fut/2_RANDCONSTHEIGHT.in":{"runtimes":[1855223,1855640,1856567,1855811,1855488],"stderr":""},"../data/fut/3_RANDCONSTWIDTH.in":{"runtimes":[6853772,6853868,6854643,6850800,6852582],"stderr":""},"../data/fut/4_SKEWED.in":{"runtimes":[7354812,7356444,7356208,7355968,7354452],"stderr":""},"../data/fut/5_SKEWEDCONSTHEIGHT.in":{"runtimes":[8062860,8062127,8061763,8062095,8059897],"stderr":""},"../data/fut/6_SKEWEDCONSTWIDTH.in":{"runtimes":[23459572,23450530,23453843,23453647,23450553],"stderr":""}}}}
+{
+    "trinom-flat.fut": {
+        "datasets": {
+            "../data/fut/0_UNIFORM.in": {
+                "runtimes": [
+                    658671,
+                    658869,
+                    658676,
+                    658905,
+                    659095
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND.in": {
+                "runtimes": [
+                    26393110,
+                    26366972,
+                    26328369,
+                    26309352,
+                    26300660
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT.in": {
+                "runtimes": [
+                    1855223,
+                    1855640,
+                    1856567,
+                    1855811,
+                    1855488
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH.in": {
+                "runtimes": [
+                    6853772,
+                    6853868,
+                    6854643,
+                    6850800,
+                    6852582
+                ],
+                "stderr": ""
+            },
+            "../data/fut/4_SKEWED.in": {
+                "runtimes": [
+                    7354812,
+                    7356444,
+                    7356208,
+                    7355968,
+                    7354452
+                ],
+                "stderr": ""
+            },
+            "../data/fut/5_SKEWEDCONSTHEIGHT.in": {
+                "runtimes": [
+                    6957586,
+                    6955257,
+                    6953293,
+                    6950477,
+                    6945915
+                ],
+                "stderr": ""
+            },
+            "../data/fut/6_SKEWEDCONSTWIDTH.in": {
+                "runtimes": [
+                    2415664,
+                    2414554,
+                    2411870,
+                    2412244,
+                    2411526
+                ],
+                "stderr": ""
+            }
+        }
+    }
+}
