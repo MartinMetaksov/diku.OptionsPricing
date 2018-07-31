@@ -60,7 +60,7 @@ public:
 template<class KernelArgsT>
 __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options, KernelArgsT args)
 {
-    // Compute option indices and init Qs
+    // Compute option indices
     const auto idxBlock = blockIdx.x == 0 ? 0 : args.values.inds[blockIdx.x - 1];
     const auto idxBlockNext = args.values.inds[blockIdx.x];
     const auto idx = idxBlock + threadIdx.x;
@@ -142,11 +142,11 @@ __global__ void kernelMultipleOptionsPerThreadBlock(const KernelOptions options,
     {
         const int jhigh = min(i, c.jmax);
         const int j = threadIdx.x - c.jmax - scannedWidthIdx;
-        const real alpha = args.getAlphaAt(i - 1);
 
         // Precompute Qexp
         if (i <= c.n && j >= -jhigh && j <= jhigh)
         {
+            const real alpha = args.getAlphaAt(i - 1);
             args.getQs()[threadIdx.x] *= exp(-(alpha + j * c.dr) * c.dt);
         }
         __syncthreads();

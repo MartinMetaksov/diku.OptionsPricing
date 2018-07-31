@@ -207,8 +207,9 @@ void distribute_5(vector<RandOption> &options, const long numOptions, const int 
 
     while (currentNumOptions < (skewPerc / (real)100) * numOptions)
     {
-        real reversionRate = getRRByWidthRange(411, 511);
-        RandOption o(9, 12, reversionRate, true);
+        // int maturity = randIntInRange(1, 100);
+        real reversionRate_skew = getRRByWidthRange(7, 107);
+        RandOption o(100, 12, reversionRate_skew, true);
         addOption(options, o, currentNumOptions);
     }
 
@@ -216,7 +217,7 @@ void distribute_5(vector<RandOption> &options, const long numOptions, const int 
 
     while (currentNumOptions < numOptions)
     {
-        int maturity = randIntInRange(1, 100);
+        int maturity = randIntInRange(1, 30);
         real reversionRate = getRRByWidthRange(7, 107);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentNumOptions);
@@ -231,10 +232,12 @@ void distribute_6(vector<RandOption> &options, const long numOptions, const int 
 {
     long currentNumOptions = 0;
 
+    real reversionRate_skew = getRRByWidthRange(509, 511);
     while (currentNumOptions < (skewPerc / (real)100) * numOptions)
     {
-        int maturity = randIntInRange(70, 100);
-        RandOption o(maturity, 12, 0.1, true);
+        int maturity = randIntInRange(1, 30);
+
+        RandOption o(maturity, 12, reversionRate_skew, true);
         addOption(options, o, currentNumOptions);
     }
 
@@ -243,7 +246,7 @@ void distribute_6(vector<RandOption> &options, const long numOptions, const int 
     while (currentNumOptions < numOptions)
     {
         int maturity = randIntInRange(1, 30);
-        real reversionRate = getRRByWidthRange(7, 507);
+        real reversionRate = getRRByWidthRange(7, 107);
         RandOption o(maturity, 12, reversionRate, false);
         addOption(options, o, currentNumOptions);
     }
