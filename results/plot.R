@@ -148,6 +148,10 @@ mapFilesAxis <- function(d) {
             to=c("0 Uniform ", "1 Random ", "2 Random \nconst height ", "3 Random \nconst width ", "4 Skewed ", "5 Skewed \nconst height ", "6 Skewed \nconst width "))
 }
 
+mapScale <- function(d, s) {
+  round(d / s * 100, 0)
+}
+
 makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
   d$float <- round(d$float, 3)
   d$double <- round(d$double, 3)
@@ -178,10 +182,15 @@ makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
 }
 
 makeBarPlotTypes <- function(d, title, name) {
-  x_title <- "Time (sec)"
+  x_title <- "Difference in runtime from CUDA-option (%)"
   y_title <- "Dataset"
   colnames(d) <- sub("-", ".", colnames(d), fixed = TRUE)
   d$file <- mapFilesAxis(d$file)
+  
+  d$CUDA.multi <- mapScale(d$CUDA.multi, d$CUDA.option)
+  d$Futhark.basic <- mapScale(d$Futhark.basic, d$CUDA.option)
+  d$Futhark.flat <- mapScale(d$Futhark.flat, d$CUDA.option)
+  d$CUDA.option <- 100
   
   p <-
     plot_ly(d) %>%
@@ -201,7 +210,7 @@ makeBarPlotTypes <- function(d, title, name) {
            barmode = 'group',
            margin = list(t = 120),
            font = list(family = "sans serif", size = 60),
-           xaxis = list(title = x_title),
+           xaxis = list(title = x_title, ticksuffix = "%"),
            yaxis = list(title = y_title, autorange = "reversed"),
            legend = list(orientation = 'h'))
   orca(p, paste(name, ".png", sep = ""), width = 2300, height = 2800)
@@ -263,9 +272,6 @@ plotCudaMultiVersionsMem <- function() {
 plotTypes <- function() {
   subset <- data[, c(1,2,8,10)]
   cast <- dcast(subset, file + type ~ precision, value.var = "total.time", min)
-  
-  cast$float <- round(cast$float, 3)
-  cast$double <- round(cast$double, 3)
   
   float <- dcast(cast[, -3], file ~ type)
   double <- dcast(cast[, -4], file ~ type)
