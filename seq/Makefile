@@ -1,4 +1,4 @@
-CXX        	= g++ -std=c++11 -fopenmp -O3 #-g
+CXX        	= g++ -std=c++11 -O3 -fopenmp #-g
 
 SOURCES_CPP = SeqMain.cpp
 EXECUTABLE  = ../build/Seq
@@ -25,6 +25,9 @@ run: $(EXECUTABLE)
 
 test: $(EXECUTABLE)
 	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -test
+
+repeat: $(EXECUTABLE)
+	@./$(EXECUTABLE) -o $(DATA)/$(FILE).in -y $(DATA)/$(YIELD).in -test -r $(REP)
 
 clean:
 	@rm -f $(EXECUTABLE)

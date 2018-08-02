@@ -22,8 +22,8 @@ readFuthark <- function(file, real) {
 }
 
 title = "results"
-datasets.names = c("CUDA-option", "CUDA-multi", "Futhark-basic", "Futhark-flat")
-datasets.files = c("option.csv", "multi.csv", "basic32.json", "basic64.json", "flat32.json", "flat64.json")
+datasets.names = c("CUDA-option", "CUDA-multi", "Futhark-basic", "Futhark-flat", "Sequential")
+datasets.files = c("option.csv", "multi.csv", "basic32.json", "basic64.json", "flat32.json", "flat64.json", "seq.csv")
 
 # load and join data
 n <- 1
@@ -149,7 +149,7 @@ mapFilesAxis <- function(d) {
 }
 
 mapScale <- function(d, s) {
-  round(d / s * 100, 0)
+  round(s / d, 3)
 }
 
 makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
@@ -182,15 +182,15 @@ makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
 }
 
 makeBarPlotTypes <- function(d, title, name) {
-  x_title <- "Difference in runtime from CUDA-option (%)"
+  x_title <- "Speed-up (higher is better)"
   y_title <- "Dataset"
   colnames(d) <- sub("-", ".", colnames(d), fixed = TRUE)
   d$file <- mapFilesAxis(d$file)
   
-  d$CUDA.multi <- mapScale(d$CUDA.multi, d$CUDA.option)
-  d$Futhark.basic <- mapScale(d$Futhark.basic, d$CUDA.option)
-  d$Futhark.flat <- mapScale(d$Futhark.flat, d$CUDA.option)
-  d$CUDA.option <- 100
+  d$CUDA.option <- mapScale(d$CUDA.option, d$Sequential)
+  d$CUDA.multi <- mapScale(d$CUDA.multi, d$Sequential)
+  d$Futhark.basic <- mapScale(d$Futhark.basic, d$Sequential)
+  d$Futhark.flat <- mapScale(d$Futhark.flat, d$Sequential)
   
   p <-
     plot_ly(d) %>%
@@ -210,9 +210,9 @@ makeBarPlotTypes <- function(d, title, name) {
            barmode = 'group',
            margin = list(t = 120),
            font = list(family = "sans serif", size = 60),
-           xaxis = list(title = x_title, ticksuffix = "%"),
+           xaxis = list(title = x_title, ticksuffix = "x"),
            yaxis = list(title = y_title, autorange = "reversed"),
-           legend = list(orientation = 'h'))
+           legend = list(orientation = 'v'))
   orca(p, paste(name, ".png", sep = ""), width = 2300, height = 2800)
 }
 
@@ -276,8 +276,8 @@ plotTypes <- function() {
   float <- dcast(cast[, -3], file ~ type)
   double <- dcast(cast[, -4], file ~ type)
   
-  makeBarPlotTypes(float, "Parallel Implementations - Float", "all-approaches-float")
-  makeBarPlotTypes(double, "Parallel Implementations - Double", "all-approaches-double")
+  makeBarPlotTypes(float, "Comparison of Parallel Implementations (Float)", "all-approaches-float")
+  makeBarPlotTypes(double, "Comparison of Parallel Implementations (Double)", "all-approaches-double")
   
   cast$type <- paste(cast$type, " ", sep = "")
   makeBarPlot(cast, ~type, "Parallel implementation", "Time (sec)", "all-approaches", datasets.names)

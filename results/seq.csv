@@ -1,0 +1,15 @@
+file,precision,registers,version,block,sort,kernel time,total time,memory
+0_UNIFORM,float,-,-,-,-,-,23504104,-
+0_UNIFORM,double,-,-,-,-,-,21351860,-
+1_RAND,float,-,-,-,-,-,758350324,-
+1_RAND,double,-,-,-,-,-,611588855,-
+2_RANDCONSTHEIGHT,float,-,-,-,-,-,57103581,-
+2_RANDCONSTHEIGHT,double,-,-,-,-,-,46657207,-
+3_RANDCONSTWIDTH,float,-,-,-,-,-,142591280,-
+3_RANDCONSTWIDTH,double,-,-,-,-,-,129674252,-
+4_SKEWED,float,-,-,-,-,-,72313618,-
+4_SKEWED,double,-,-,-,-,-,62371044,-
+5_SKEWEDCONSTHEIGHT,float,-,-,-,-,-,52213840,-
+5_SKEWEDCONSTHEIGHT,double,-,-,-,-,-,46890730,-
+6_SKEWEDCONSTWIDTH,float,-,-,-,-,-,51269673,-
+6_SKEWEDCONSTWIDTH,double,-,-,-,-,-,46191206,-
