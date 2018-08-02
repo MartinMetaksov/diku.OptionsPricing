@@ -109,7 +109,7 @@ protected:
         thrust::device_vector<int32_t> keys(options.N);
         thrust::sequence(keys.begin(), keys.end());
 
-        if (ChunkSize < BlockSize) ChunkSize = BlockSize;
+        if (ChunkSize == -1) ChunkSize = BlockSize;
         const auto chunkCount = ceil(options.N / ((float)ChunkSize));
         thrust::device_vector<int32_t> QsInds(chunkCount);
         thrust::device_vector<int32_t> alphasInds(chunkCount);
