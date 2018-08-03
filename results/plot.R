@@ -241,12 +241,19 @@ plotCudaOptionSorts <- function() {
 
 plotCudaOptionVersionsMem <- function() {
   subset <- data[data$type == datasets.names[1], c(1,2,4,9)]
-  cast <- dcast(subset, file + version ~ precision, value.var = "memory", min)
+  cast <- dcast(subset, file + version ~ precision, value.var = "memory", mean)
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-option-versions")
 }
 
 # CUDA-multi
+plotCudaMultiBlocks <- function() {
+  subset <- data[data$type == datasets.names[2], c(1,2,5,8)]
+  cast <- dcast(subset, file + block ~ precision, value.var = "total.time", min)
+  cast$block <- paste(cast$block, " ", sep = "")
+  makeBarPlot(cast, ~block, "Block size", "Time (sec)", "multi-blocks")
+}
+
 plotCudaMultiVersions <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,4,8)]
   cast <- dcast(subset, file + version ~ precision, value.var = "total.time", min)
@@ -264,7 +271,7 @@ plotCudaMultiSorts <- function() {
 
 plotCudaMultiVersionsMem <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,4,9)]
-  cast <- dcast(subset, file + version ~ precision, value.var = "memory", min)
+  cast <- dcast(subset, file + version ~ precision, value.var = "memory", mean)
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-multi-versions")
 }
