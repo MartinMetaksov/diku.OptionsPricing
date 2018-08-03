@@ -10,7 +10,7 @@ namespace cuda
 namespace option
 {
 
-struct KernelArgsValuesChunk
+struct KernelArgsValuesGranular
 {
     real *res;
     real *QsAll;
@@ -18,36 +18,36 @@ struct KernelArgsValuesChunk
     real *alphasAll;
     int32_t *QsInds;
     int32_t *alphasInds;
-    int32_t chunkSize;
+    int32_t granularity;
 };
 
-class KernelArgsCoalescedChunk : public KernelArgsBase<KernelArgsValuesChunk>
+class KernelArgsCoalescedGranular : public KernelArgsBase<KernelArgsValuesGranular>
 {
 private:
     int widthStartIndex;
     int heightStartIndex;
 
-    __device__ inline int getArrayIndex(int index) const { return values.chunkSize * index + threadIdx.x % values.chunkSize; }
+    __device__ inline int getArrayIndex(int index) const { return values.granularity * index + threadIdx.x % values.granularity; }
 
 public:
 
-    KernelArgsCoalescedChunk(KernelArgsValuesChunk &v) : KernelArgsBase(v) { }
+    KernelArgsCoalescedGranular(KernelArgsValuesGranular &v) : KernelArgsBase(v) { }
 
     __device__ inline void init(const KernelOptions &options) override
     {
-        const int chunkIndex = getIdx() / values.chunkSize;
-        widthStartIndex = chunkIndex == 0 ? 0 : values.QsInds[chunkIndex - 1];
-        heightStartIndex = chunkIndex == 0 ? 0 : values.alphasInds[chunkIndex - 1];
+        const int index = getIdx() / values.granularity;
+        widthStartIndex = index == 0 ? 0 : values.QsInds[index - 1];
+        heightStartIndex = index == 0 ? 0 : values.alphasInds[index - 1];
     }
 
     __device__ void fillQs(const int count, const int value) override
     {
-        auto ptr = values.QsAll + widthStartIndex + threadIdx.x % values.chunkSize;
+        auto ptr = values.QsAll + widthStartIndex + threadIdx.x % values.granularity;
 
         for (auto i = 0; i < count; ++i)
         {
             *ptr = value;
-            ptr += values.chunkSize;
+            ptr += values.granularity;
         }
     }
 
@@ -76,31 +76,31 @@ public:
     __device__ inline real getAlphaAt(const int index) const override { return values.alphasAll[heightStartIndex + getArrayIndex(index)]; }
 };
 
-struct same_chunk_indices
+struct same_granularity_indices
 {
-    const int32_t ChunkSize;
+    const int32_t Granularity;
 
-    same_chunk_indices(int32_t chunkSize) : ChunkSize(chunkSize) {}
+    same_granularity_indices(int32_t granularity) : Granularity(granularity) {}
 
-    __host__ __device__ bool operator()(const int32_t &lhs, const int32_t &rhs) const {return lhs / ChunkSize == rhs / ChunkSize;}
+    __host__ __device__ bool operator()(const int32_t &lhs, const int32_t &rhs) const {return lhs / Granularity == rhs / Granularity;}
 };
 
-struct times_chunk_size
+struct times_granularity
 {
-    const int32_t ChunkSize;
+    const int32_t Granularity;
 
-    times_chunk_size(int32_t chunkSize) : ChunkSize(chunkSize) {}
+    times_granularity(int32_t granularity) : Granularity(granularity) {}
 
-    __host__ __device__ int32_t operator()(const int32_t &x) const {return x * ChunkSize;}
+    __host__ __device__ int32_t operator()(const int32_t &x) const {return x * Granularity;}
 };
 
-class KernelRunCoalescedChunk : public KernelRunBase
+class KernelRunCoalescedGranular : public KernelRunBase
 {
 private:
-    int32_t ChunkSize;
+    int32_t Granularity;
 
 public:
-    KernelRunCoalescedChunk(int32_t chunkSize) : ChunkSize(chunkSize) { }
+    KernelRunCoalescedGranular(int32_t granularity) : Granularity(granularity) { }
 
 protected:
     void runPreprocessing(CudaOptions &options, std::vector<real> &results) override
@@ -109,22 +109,22 @@ protected:
         thrust::device_vector<int32_t> keys(options.N);
         thrust::sequence(keys.begin(), keys.end());
 
-        if (ChunkSize == -1) ChunkSize = BlockSize;
-        const auto chunkCount = ceil(options.N / ((float)ChunkSize));
-        thrust::device_vector<int32_t> QsInds(chunkCount);
-        thrust::device_vector<int32_t> alphasInds(chunkCount);
-        thrust::device_vector<int32_t> keysOut(chunkCount);
-        thrust::reduce_by_key(keys.begin(), keys.end(), options.Widths.begin(), keysOut.begin(), QsInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
-        thrust::reduce_by_key(keys.begin(), keys.end(), options.Heights.begin(), keysOut.begin(), alphasInds.begin(), same_chunk_indices(ChunkSize), thrust::maximum<int32_t>());
+        if (Granularity == -1) Granularity = BlockSize;
+        const auto count = ceil(options.N / ((float)Granularity));
+        thrust::device_vector<int32_t> QsInds(count);
+        thrust::device_vector<int32_t> alphasInds(count);
+        thrust::device_vector<int32_t> keysOut(count);
+        thrust::reduce_by_key(keys.begin(), keys.end(), options.Widths.begin(), keysOut.begin(), QsInds.begin(), same_granularity_indices(Granularity), thrust::maximum<int32_t>());
+        thrust::reduce_by_key(keys.begin(), keys.end(), options.Heights.begin(), keysOut.begin(), alphasInds.begin(), same_granularity_indices(Granularity), thrust::maximum<int32_t>());
     
-        thrust::transform_inclusive_scan(QsInds.begin(), QsInds.end(), QsInds.begin(), times_chunk_size(ChunkSize), thrust::plus<int32_t>());
-        thrust::transform_inclusive_scan(alphasInds.begin(), alphasInds.end(), alphasInds.begin(), times_chunk_size(ChunkSize), thrust::plus<int32_t>());
+        thrust::transform_inclusive_scan(QsInds.begin(), QsInds.end(), QsInds.begin(), times_granularity(Granularity), thrust::plus<int32_t>());
+        thrust::transform_inclusive_scan(alphasInds.begin(), alphasInds.end(), alphasInds.begin(), times_granularity(Granularity), thrust::plus<int32_t>());
     
-        const int totalQsCount = QsInds[chunkCount - 1];
-        const int totalAlphasCount = alphasInds[chunkCount - 1];
+        const int totalQsCount = QsInds[count - 1];
+        const int totalAlphasCount = alphasInds[count - 1];
 
-        KernelArgsValuesChunk values;
-        values.chunkSize = ChunkSize;
+        KernelArgsValuesGranular values;
+        values.granularity = Granularity;
         values.QsInds  = thrust::raw_pointer_cast(QsInds.data());
         values.alphasInds = thrust::raw_pointer_cast(alphasInds.data());
 
@@ -133,7 +133,7 @@ protected:
         options.DeviceMemory += vectorsizeof(alphasInds);
         options.DeviceMemory += vectorsizeof(keysOut);
 
-        runKernel<KernelArgsCoalescedChunk>(options, results, totalQsCount, totalAlphasCount, values);
+        runKernel<KernelArgsCoalescedGranular>(options, results, totalQsCount, totalAlphasCount, values);
     }
 };
 

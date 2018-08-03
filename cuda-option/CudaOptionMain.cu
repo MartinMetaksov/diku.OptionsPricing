@@ -26,13 +26,13 @@ cuda::CudaRuntime run(const Options &options, const Yield &yield, vector<real> &
         }
         case 3:
         {
-            cuda::option::KernelRunCoalescedChunk kernelRun(blockSize);
+            cuda::option::KernelRunCoalescedGranular kernelRun(blockSize);  // block-level padding granularity
             kernelRun.run(options, yield, results, blockSize, sortType, isTest);
             return kernelRun.runtime;
         }
         case 4:
         {
-            cuda::option::KernelRunCoalescedChunk kernelRun(32);    // chunk size == warp size
+            cuda::option::KernelRunCoalescedGranular kernelRun(32);         // warp-level padding granularity
             kernelRun.run(options, yield, results, blockSize, sortType, isTest);
             return kernelRun.runtime;
         }
