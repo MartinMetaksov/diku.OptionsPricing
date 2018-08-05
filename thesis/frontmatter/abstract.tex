@@ -1,5 +1,15 @@
-TODO:
+In this thesis we describe different parallelization strategies for the Hull-White Single-Factor Model that prices financial derivatives using the trinomial trees numerical method. The work is focused on finding the middle ground between the distinct levels of parallelism and trade-offs such as thread divergence vs. locality of reference, by applying various optimization techniques and transformations. 
 
+First, we will present a sequential solution, used to validate all parallel implementations later through the project.
+
+Second, we will present a one-option per thread implementation, which will only deal with outer parallelism.
+
+Third, we will present a multiple options per thread block implementation, aiming to exploit both levels of parallelism. 
+
+Fourth, we will present a fully-flattened implementation, which will put emphasis on the importance of finding the middle ground between parallelization trade-offs. 
+
+Finally, we will present a number of experiments conducted to help explore the performance impacts by each implementation and optimization previously presented. This empirical validation will be used to pinpoint the implementations with highest performance on each different dataset.   
+\\\\\\\\
 \noindent
 \textbf{Keywords:}
-Trinomial trees, Hull-White One-factor Model, CUDA, C/C++, Parallel programming, Finances
+Option pricing, Trinomial trees, Hull-White Single-Factor Model, Parallel programming, Flattening, GPGPU, CUDA, C/C++, Futhark

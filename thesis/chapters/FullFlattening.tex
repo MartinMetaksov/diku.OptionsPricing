@@ -2,110 +2,232 @@
 \label{chapter:fullflattening}
 This chapter will introduce the classic, fully-flattened implementation of the model. It has been written in Futhark, a functional, high-level data-parallel language, with the main reason for this being simplicity. 
 
-The purpose of this implementation is to further underline the importance of the locality of reference vs. thread divergence trade-off, particularly when working with large data sets. In this case, thread divergence optimization is at its peak, while locality of reference is at its worst. The implementation exploits both inner and outer parallelism, as it computes all input options at the same time. 
+The purpose of this implementation is to further underline the importance of the locality of reference vs. thread divergence trade-off, particularly when working with large data sets. In this case, thread divergence optimization is at its peak, while locality of reference is at its worst. The implementation exploits both inner and outer parallelism, as it processes all input options at the same time. 
 
-\section{Sequential version to Futhark basic}
+\section{Sequential Version to Futhark-basic}
 As full-flattening is difficult to imagine and compose from scratch, we have started by creating a basic, one option per thread Futhark implementation, which we refer to as \textit{Futhark-basic}. Due to the functional language semantics, some of the optimizations done in \textit{CUDA-option} were not possible here. This involves particularly the memory allocations, which are handled automatically by the Futhark compiler, allowing only global memory padding. Nevertheless, sorting on either width or height can still turn to be useful in order to reduce thread-divergence overhead. 
 
-As it will be shown in chapter \ref{chapter:experimentalresults}, albeit its drawbacks, the performance of \textit{Futhark-basic} has the full potential of competing with both CUDA implementations. Despite that, its main purpose is to serve as a template for deriving a full-flattened version, which we refer to as \textit{Futhark-flat}.
+As it will be shown in chapter \ref{chapter:experimentalresults}, albeit its drawbacks, the performance of \textit{Futhark-basic} has the full potential of competing with both CUDA implementations. Despite that, its main purpose is to serve as a template for deriving a fully-flattened version, which we refer to as \textit{Futhark-flat}.
 
-Using a functional language to represent a data-processing algorithm is rather straight-forward. Once the options are read in the sequential version, they are iterated over by using a for loop. In Futhark, this is done by a map operation. Since this is the first map operation of the Futhark program, it is not nested, hence the function being mapped (called\\ $\mathit{trinomialOptionsHW1FCPU\_single}$) will be executed in parallel over all options. Temporary arrays such as $\mathit{Qs}$, $\mathit{QsCopy}$ and $\mathit{alphas}$ are declared with Futhark's $\mathit{let}$-binding and every variable gets allocated in global memory. While C programs usually first allocate an array, then enter a loop to provide its initial values, in Futhark this will be done by a composition of a replicate, a iota, or a map.
+Using a functional language to represent a data-processing algorithm is rather straight-forward. Once the options are read in the sequential version, they are iterated over by using a \textit{for-loop}. In Futhark, this is done by a \textit{map} operation. Since this is the first \textit{map} encountered in the Futhark program, and it is not nested, the function being mapped will be executed in parallel over all options. Temporary arrays such as \textit{Qs}, \textit{QsCopy} and \textit{alphas} are declared with Futhark's \textit{let}-binding and every variable gets allocated in global memory. While C programs usually first allocate an array, then enter a loop to provide its initial values, in Futhark this will be done by a composition of \textit{replicate}, \textit{iota} or \textit{map}.
 
-The rest of the code translation followed the sequential code inside the loop, by replacing C++ code with its functional Futhark equivalent. Two optimizations have been done in order to simplify and reuse code, which included (i) moving the backward and forward helpers into reusable functions, together with the computation of $\mathit{jvalues}$ and (ii) replacing the scatter in the forward helper by a gather operation in order to avoid data races in the execution. Other more complex transformations include summing up elements in an array, done by a loop in C++ and by a reduce operation in Futhark. However, none of these transformation can be described as non-trivial, as they are typical to functional languages. The complete code base for Futhark-basic can be found within $\textit{futhark/futhark-basic.fut}$.
+The rest of the code translation followed the sequential code inside the loop, by replacing C\texttt{++} code with its functional Futhark equivalent. Two optimizations have been done in order to simplify and reuse code, which included (i) moving the backward and forward helpers into reusable functions, together with the computation of \textit{jvalues} and (ii) replacing the scatter in the forward helper by a gather operation in order to optimize writes. Other more complex transformations include summing up elements in an array, done by a loop in C\texttt{++} and by a reduce operation in Futhark. However, none of these transformation can be described as non-trivial, as they are typical to functional languages. The complete code base for Futhark-basic can be found in file \textit{futhark/futhark-basic.fut} and is outlined in algorithm~\ref{alg:futhark-basic}.
 
-\section{Futhark basic to Futhark flat}
-Once Futhark-basic was validated against the C++ sequential implementation and the book example, \textit{Futhark-flat} could be derived. In Futhark, all arrays are stored in global memory, which increases the time each thread needs for reading the data. The difference in the implementations is based on the amount of options that are processed at the same time - we can either process one at a time, or all at the same time. \textit{Futhark-flat} is concerned with the latter. The transformations performed in \textit{CUDA-multi} (see the previous chapter - \ref{chapter:multoptionsperthreadblock}) and \textit{Futhark-flat} should in theory be the same, as the difference between the two only lies in the way memory is allocated and the number of options priced in parallel.
-
-The data is initially read from the file, where it is stored in a structure of arrays. The $\mathit{trinomialFlat}$ function is then being invoked with an array of all options as an input, where this array is converted into multiple structures of arrays. Each structure contains a single property of all options, e.g. the array $\mathit{widths}$ contains the tree width property for each option in the input. It can be seen that memory usage increases proportionally with the number of options. Furthermore, every array created inside $\mathit{trinomialFlat}$, such as $\mathit{Qs}$ and $\mathit{alphas}$ is also stored in global memory. In this implementation, the size of the width-dependent arrays (e.g. $\mathit{Qs}$ and $\mathit{QsCopy}$) is the number of options times the maximum width times the data type size (i.e. whether a float or double precision is used). Similarly with the height-dependent arrays ($\mathit{alphas}$), where the maximum height is used instead. While this implementation is expected to perform fast enough on small data sets, it is also expected that the performance will significantly degrade with the increase of the number of options, because of the excessive amount of memory it requires. 
-
-Since $\mathit{trinomialFlat}$ works with arrays of individual properties for all options, differently from $\mathit{trinomialOptionsHW1FCPU\_single}$, which works with individual properties for one option at a time, several flattening principles were used in order to apply the same permutations to all elements in the array at the same time. After inspecting \textit{Futhark-basic} code, we have extracted the following order of functions that have to be flattened in order to apply them on flat arrays: 
-
+\newpage
 \begin{algorithm}[H]
 \DontPrintSemicolon
 \caption{Futhark-basic\label{alg:futhark-basic}}
 \SetKwFor{For}{loop}{do}{end}
-\SetKwFor{ForAll}{map}{to}{end}
+\SetKwFor{ForAll}{map}{with function:}{end}
+\SetKw{KwFor}{for}
 \SetKw{Map}{map}
-\SetKw{Reduce}{reduce}
+\SetKw{Iota}{iota}
+\SetKw{Reduce}{reducePlus}
 \SetKw{Replicate}{replicate}
-\SetKw{Write}{write}
 \SetKw{Returnmap}{return@map}
+\SetKwInOut{Input}{Input}
+\SetKwInOut{Output}{Output}
 
-\ForAll{options}{
-    Qs = \Replicate{width} 0\tcc*{Init Qs to 0}
-    alphas = \Replicate{height} 0\tcc*{Init alphas to 0}
+\underline{function trinomialBasic}\;
+\Input{options : [ \{ StrikePrice, Maturity, Length, TermUnit, TermStepCount, ReversionRate, Volatility, Type \} ],\\yields : [ \{ Price, Timestep \} ]}
+\Output{Price approximations for all options}
+results = \ForAll{options}{
+    constants = compute constants from option\;
+    Qs = \Replicate{width 0}\tcc*{Init Qs to 0}
     Qs[jmax] = 1\tcc*{Initial Q value}
-    alphas[0] = compute yield at dt\tcc*{Initial alpha value}
-    \;
+    alphas = \Replicate{height 0}\tcc*{Init alphas to 0}
+    alphas[0] = compute yield at constants.dt\tcc*{Initial alpha value}
     \tcc{Forward propagation}
-    \For{(Qs,alphas) for i < height}{
-        Qs = \Map{Qs}\tcc*{Pre-compute Qs}
-        Qs = \Map{Qs}\tcc*{Compute Qs in the next step}
-        tmpQs = \Map{Qs}\tcc*{Compute tmpQs for reduce}
-        alpha = \Reduce{tmpQs}\tcc*{Sum up tmpQs}
-        alphas[i + 1] = alpha\tcc*{Compute the next alpha}
+    \For{(Qs,alphas) \KwFor i < height}{
+        \tcc{$f_1, f_2, f_3$ check for out-of-bounds on j-index and set 0s}
+        Qs = \Map{$f_1$ Qs}\tcc*{Pre-compute Qs}
+        Qs = \Map{$f_2$ (\Iota{width})}\tcc*{Get next step with fwdHelper}
+        tmpQs = \Map{$f_3$ Qs}\tcc*{Compute tmpQs for reduce}
+        alpha = \Reduce{tmpQs}\tcc*{Compute next alpha}
+        alphas[$\text{i}+1$] = alpha\tcc*{Set next alpha}
     }
-    \;
-    Prices = \Replicate{width} 100\tcc*{Init Prices to 100\textdollar}
     \tcc{Backward propagation}
-    \For{(Prices) for i < height}{
-        Prices = \Map{Prices}\tcc*{Compute previous step}
+    Prices = \Replicate{width 100}\tcc*{Init Prices to 100\textdollar}
+    \For{(Prices) \KwFor i=(max\_height-1) $\geq$ 0}{
+        \tcc{$f_4$ check for out-of-bounds on j-index and sets 0s}
+        Prices = \Map{$f_4$ (\Iota{width})}\tcc*{Prev step with bkwdHelper}
     }
-    \Returnmap{Prices[jmax]} \tcc*{Result for one option}
+    \Returnmap Prices[jmax] \tcc*{Result for one option}
 }
-\end{algorithm}
 
-It can be seen immediately that there is a repetitive use of operations, i.e. the two replicates on widths and the 4 maps on widths. This allows efficient reuse of some of the temporary arrays, used in the process of flattening, such as $\mathit{inds}$ and $\mathit{flags}$. The techniques we have used for flattening nested \textit{replicates}, \textit{maps}, \textit{scans}, \textit{reduces} and \textit{writes} can be seen in sections \ref{chapter:section:flattening:replicate},  \ref{chapter:section:flattening:map}, \ref{chapter:section:flattening:scan} and
-\ref{chapter:section:flattening:reduce} respectively. Note that since we're working on either the widths or the heights for all nested operations, it is also possible to reuse arrays between the different operations. Once the flattening has been performed, the new order of functions changed to the following algorithm, also described in pseudo code:
+\Return results
+\end{algorithm}
 \newpage
-% widths = 3, 5, 4
+
+\section{Futhark-basic to Futhark-flat}
+Once Futhark-basic was validated against the C\texttt{++} sequential implementation and the book example, \textit{Futhark-flat} could be derived. In Futhark, all arrays are stored in (slow) global memory, which increases the time each thread needs for reading the data. The two implementations work with different levels of parallelism. \textit{Futhark-basic} uses nested parallelism, where the pricing of one option happens sequentially, but multiple options are priced simultaneously with the use of a parallel map. In \textit{Futhark-flat} many nested computations are performed in parallel, operating on enormous arrays, each containing data for all options. Helper \textit{index} and \textit{flag} arrays are used to indicate the start and end memory addresses of each option in such arrays, in order to allow multiple threads to work on the same array in parallel. The way threads are allocated to work on each array happens behind the scenes, automated by the \textit{Futhark} compiler. The transformations performed in \textit{CUDA-multi} (see chapter \ref{chapter:multoptionsperthreadblock}) and \textit{Futhark-flat} should in theory be the same, as the difference between the two only lies in the way memory is allocated, the use of in-place updates in CUDA, and the amount of options processed in parallel.
+
+The program expects to read the dataset from input as a structure of arrays. The \textit{trinomialFlat} function is then invoked with an array of all options as input, where multiple arrays are computed from it, representing a series of \textit{OptionConstants} mentioned in algorithm~\ref{alg:sequential} in chapter~\ref{chapter:sequential}. It can be seen that memory usage increases proportionally with the number of options. Furthermore, every array created inside \textit{trinomialFlat}, such as \textit{Qs} and \textit{alphas} is also stored in global memory. In this implementation, the size of the width-dependent arrays (e.g. \textit{Qs} and \textit{QsCopy}) is the sum of all widths times the data type size (i.e. whether a float or double precision is used). Height-dependent arrays (\textit{alphas}) on the other hand are computed as the number of options times the maximum height times the data type size (Note that an optimization can be made here, to avoid the padding of height-dependent arrays). While this implementation is expected to perform fast enough on small data sets, it is also expected that the performance will significantly degrade with the increased number of options, because of the excessive amount of memory it requires. 
+
+Since \textit{trinomialFlat} works with arrays of individual properties for all options, differently from the function in \textit{Futhark-basic}, which works with individual properties for one option at a time, several flattening principles were used in order to apply the same permutations to all elements in the arrays at the same time. After inspecting \textit{Futhark-basic} code, we have extracted functions that have to be flattened in order to apply them on flat arrays.
+
+\subsection*{Flattening transformations}
+It can be seen immediately on Algorithm~\ref{alg:futhark-basic} that there is a repetitive use of operations, i.e., there are two \textit{replicates} on widths and 4 \textit{maps} on widths. This allows efficient reuse of many of the temporary arrays, used in the process of flattening, such as \textit{inds} and \textit{flags}. Furthermore, it is possible to reuse arrays between the different transformations, as e.g. \textit{replicate} and \textit{map} are both done on the widths array. The complete pseudo-code for \textit{Futhark-flat} can be found under algorithms~\ref{alg:futhark-flat}-\ref{alg:futhark-flat2} further in this section. Before the algorithm itself, we introduce the specific flattening operation we have used in order to implement it.
+\\\\
+The code transformation starts from a \textit{replicate} on the widths (Alg.~\ref{alg:futhark-basic} line 4). This is used to initialize the array of \textit{Qs}. As shown in the example in section \ref{chapter:section:flattening:reduce}, first step is obtaining \textit{ns} and \textit{ms}. The \textit{ns} in this case are the widths, which we can get from the option constants. We can then obtain the \textit{inds} and the \textit{size}. The \textit{inds} are computed by performing an exclusive scan. Since we needed the \textit{scanned\_lens} (an inclusive scan on widths) array further in the code, we omit the exclusive scan and instead perform a map, adding the neutral element 0 in the beginning and excluding the last element of \textit{scanned\_lens} (Alg.~\ref{alg:futhark-flat} line 7):
+\begin{align}
+\centered
+\nonumber
+\mathit{len\_inds} = &\;\mathit{map}\;(i\;\rightarrow\;\mathit{if}\;(i==0)\; \mathit{then}\;0\;\mathit{else}\;\mathit{scanned\_lens}[i-1])\\\nonumber
+&(\mathit{iota}\;\mathit{numAllOptions})
+\end{align}
+Furthermore, we can obtain the \textit{size} from \textit{last} \textit{scanned\_lens}. The next step is obtaining a \textit{flags} array as
+$\mathit{flags} = \mathit{scatter}\;(\mathit{replicate}\;w\;0)\;\mathit{len\_inds}\;\mathit{widths}$ (Alg.~\ref{alg:futhark-flat} line 8).
+The array of \textit{ms} on the other hand is obtained by performing a $\mathit{replicate}\;w\;0$. Computing the \textit{vals} array is the next step of the transformation. It can be seen in \textit{Futhark-basic}, however, that the \textit{Qs} array is not only initialized, but also the $\mathit{jmax}^{\mathit{th}}$ element of it is set to 1 (Alg.~\ref{alg:futhark-basic} lines 4-5). We have decided to simplify the process by combining these two operations. We start by creating a \textit{sgm\_inds} array by (Alg.~\ref{alg:futhark-flat} line 9-10):
+\begin{align}
+\centered
+\nonumber
+\mathit{scatter}\;(\mathit{replicate}\;w\;0)\;\mathit{len\_inds}\;(\mathit{iota}\;\mathit{numAllOptions})
+\end{align}
+ where \textit{numAllOptions} is obtained through $\mathit{length}\;\mathit{options}$. We then perform
+ \\$\mathit{sgmScanPlus}\;\mathit{flags}\;\mathit{sgm\_inds}$ which results in an array containing indexes of all options, spread across the \textit{size} of \textit{Qs}. In the next step, we create the array (Alg.~\ref{alg:futhark-flat} line 13)
+\begin{align}
+\centered
+\nonumber
+\mathit{q\_lens} = \mathit{map}(x\rightarrow x-1)\;(\mathit{sgmScanPlus}\;\mathit{flags}\;(\mathit{replicate}\;w\;1))
+\end{align}
+which contains segmented enumerators for each of the option widths. This array is going to be useful for getting $j-indexes$ from the \textit{Qs} arrays later on. Finally, we apply (Alg.~\ref{alg:futhark-flat} line 14)
+\begin{align}
+\centered
+\nonumber
+\mathit{Qs}=\mathit{map}\;((i,k) \rightarrow \mathit{if}\;(i==\mathit{jmaxs}[\mathit{sgm\_inds}[k]])\;\mathit{then}\;1\;\mathit{else}\;0)\;\mathit{q\_lens}\;(\mathit{iota}\;w)
+\end{align}
+This concludes the first replicate on widths.
+\\\\
+The next step is a \textit{replicate} on \textit{alphas} (Alg.~\ref{alg:futhark-basic} line 6) along the height of all trees. We have approached this transformation by determining the max height from all options, which could then be used to create an enormous array of size $\mathit{total\_len}=\mathit{numAllOptions}*\mathit{max\_height}$ (Alg.~\ref{alg:futhark-flat} line 16), where $\mathit{max\_height}$ is obtained with a custom \textit{reduce} on the heights, which finds the highest element. Once again we want to combine the initialization of \textit{alphas} to $0$ and the computation of $\mathit{alphas}[0]$ with the use of the \textit{yield curve}, however, for all options. This means that every $0^{\mathit{th}}$ element of each segment of \textit{alphas} has to be assigned with a value from the yield curve. We can do this in 1 step, but for simplicity, the pseudo-code of \textit{Futhark-flat} divides these first computations of alphas in two steps. We first $\mathit{replicate}\;\mathit{total\_len}\;0$ to initialize the array. Finally, we obtain (Alg.~\ref{alg:futhark-flat} line 21)\\
+$\mathit{alphas} = \mathit{scatter}\;\mathit{alphas}\;(\mathit{map}\;(i\;\rightarrow\;i*\mathit{seq\_len})\;(\mathit{iota}\;\mathit{numAllOptions}))\;\mathit{yields}$.
+\\\\
+The next three operations are two maps on \textit{Qs} and one on $\mathit{iota}\;\mathit{width}$ (Alg.~\ref{alg:futhark-basic} line 11-13). As mentioned in \ref{chapter:section:flattening:map}, a nested \textit{map} is simply the same function applied to the flat array. Since we already have the flat \textit{Qs}, we can safely apply the maps (Alg.~\ref{alg:futhark-flat2} lines 25-27). Similarly, we have \textit{q\_lens}, which contains segmented enumerators of all \textit{widths}. Note that, as before, the mapping functions consist of a safe mechanism, checking if the j-value is going out of bounds. This can happen in the beginning of the tree construction, as $j_{min}$ and $j_{max}$ have not been reached yet, hence some nodes are missing, e.g. there are no nodes above node B, or below node D on fig. \ref{fig:treeconststage1}.
+\\\\
+A \text{reduce} on \textit{tmpQs} is done next (Alg.~\ref{alg:futhark-basic} line 14), which needs to be flattened in order to obtain the new alphas for the next steps of all options. Luckily, \textit{tmpQs} are already flat, as it is a result of a \textit{map} operation performed on \textit{Qs}. As mentioned in chapter \ref{chapter:section:flattening:reduce}, we can obtain the \textit{vals} in a \textit{sgmReduce} by using a \textit{segmented scan} (Alg.~\ref{alg:futhark-flat2} line 28):
+\begin{align}
+\centered
+\nonumber
+\mathit{alphaVals} = \mathit{sgmscanPlus}\;\mathit{flags}\;\mathit{tmpQs}
+\end{align}
+We remove the redundant step of computing the actual \text{reduce} result and instead write the next step of \textit{alphas} directly, with the use of the \textit{alpha\_indsp1} helper array (Alg.~\ref{alg:futhark-flat2} lines 31-34). 
+\begin{align}
+\centered
+\nonumber \mathit{alpha\_indsp1}\;&=\;\mathit{map}\;f_6\;(\mathit{iota}\;\mathit{numAllOptions})\\
+\nonumber \mathit{alphas}\;&=\;\mathit{scatter}\;\mathit{alphas}\;\mathit{alpha\_indsp1}\;\mathit{alpha\_vals}
+\end{align}
+The backward propagation begins with the initialization of the \textit{Prices} array, which is a \textit{map} over \textit{iota w}, which is already flat, hence the map function is simply applied to all flat elements (Alg.~\ref{alg:futhark-flat2} line 38). Furthermore, we observe that Prices inside the backward propagation step are also computed with the use of a \textit{map} over \textit{iota w}, hence the same rule applies (Alg.~\ref{alg:futhark-flat2} line 41).
+\\
+Finally, \textit{Prices} at all \textit{jmax} must be returned. For this step, we can easily obtain \textit{inds} of all root elements in \textit{Prices} and their respective \textit{vals}. The algorithm is finalized by returning $\mathit{res} = \mathit{scatter}\;(\mathit{replicate}\;\mathit{numAllOptions}\;0)\;\mathit{inds}\;\mathit{vals}$ (Alg.~\ref{alg:futhark-flat2} line 45-49), which consists of the final price estimates for all options. 
+
+
+% The techniques we have used for flattening nested \textit{replicate}, \textit{map}, \textit{scan}, \textit{reduce} and \textit{write} can be seen in sections \ref{chapter:section:flattening:replicate},  \ref{chapter:section:flattening:map}, \ref{chapter:section:flattening:scan} and \ref{chapter:section:flattening:reduce} respectively. Note that since we are working on either the widths or the heights for all nested operations, 
+
+\newpage
 \begin{algorithm}[H]
 \DontPrintSemicolon
 \caption{Futhark-flat\label{alg:futhark-flat}}
 \SetKw{Map}{map}
-\SetKw{Reduce}{reduce}
+\SetKw{ReduceNormal}{reduce}
+\SetKw{Reduce}{reducePlus}
 \SetKw{Replicate}{replicate}
 \SetKw{Scatter}{scatter}
-\SetKw{Scan}{scan}
-\SetKw{Sgmscan}{sgmscan}
-\SetKw{Return}{return}
-flags = \Scatter{widths}\tcc*{Get flags array}
-sgm\_inds = \Scatter{option\_indexes}\;
-sgm\_inds = \Sgmscan{flags sgm\_inds}\tcc*{ Get segmented inds array}
-q\_lens = \Sgmscan{flags widths}\tcc*{Get segmented widths}
-Qs = \Map{q\_lens} 0\tcc*{Init Qs to 0s and Qs[jmaxs] to 1s}
-total\_len = numAllOptions * max\_height\tcc*{Get max height}
-alphas = \Replicate{total\_len 0}\tcc*{Init alphas to 0}
-alphas = \Scatter{yields at dt} 0\tcc*{Init alpha values}
-\;
-\tcc{Forward propagation}
-\For{(Qs,alphas) for i < max\_height}{
-    Qs = \Map{q\_lens}\tcc*{Compute Qs in the next steps}
-    tmpQs = \Map{Qs}\tcc*{Compute tmpQs for reduce}
-    alpha\_vals = \Sgmscan{flags tmpQs}\;
-    alpha\_vals = \Map{numAllOptions}\tcc*{Get alphas}
-    alphas = \Scatter{alpha\_vals}\tcc*{Compute next alphas}
-}
-\;
-Prices = \Map{width}\tcc*{Init Prices to 100\textdollar}
-\tcc{Backward propagation}
-\For{(Prices) for i < max\_height}{
-    Prices = \Map{q\_lens}\tcc*{Compute previous steps}
-}
-Prices = \Scatter{Prices}\tcc*{Scatter prices for all options}
-\Return{Prices} \tcc*{Result for all options}
+\SetKw{Scan}{scanPlus}
+\SetKw{Sgmscan}{sgmscanPlus}
+\SetKw{Last}{last}
+\SetKw{Length}{length}
+\SetKw{Iota}{iota}
+\SetKw{KwFor}{for}
+\SetKw{Unzip}{unzip}
+\SetKwInOut{Input}{Input}
+\SetKwInOut{Output}{Output}
 
+\underline{function trinomialFlat}\;
+\Input{options : [ \{ StrikePrice, Maturity, Length, TermUnit, TermStepCount, ReversionRate, Volatility, Type \} ],\\yields : [ \{ Price, Timestep \} ]}
+\Output{Price approximations for all options}
+\tcc*{Get option constants}
+(widths, heights, constants) = \Unzip{(\Map{$f_1$ options})}\;
+numAllOptions = \Length{options}\tcc*{Get length of options}
+scanned\_lens = \Scan{widths}\tcc*{Scan widths}
+w = \Last{scanned\_lens}\tcc*{Total size of all width arrays}
+len\_inds = \Map{(i $\rightarrow$ if (i == 0) then 0 else scanned\_lens[$i-\mathit{1}$]) (\Iota{ numAllOptions})}\tcc*{Get width indexes}
+flags = \Scatter{(\Replicate{w 0}) len\_inds widths}\tcc*{Get width flags}
+sgm\_inds = \Scatter{(\Replicate{w 0}) len\_inds (\Iota{ numAllOptions})}\;
+sgm\_inds = \Sgmscan{flags sgm\_inds}\tcc*{Get segm. width inds}
+\;
+\tcc{Get $j_{\mathit{min}}$ to $j_{\mathit{max}}$ range values for all options, represented in the range from $0$ to $2*j_{\mathit{max}}+1$}
+q\_lens = \Map{($text{x} \rightarrow x-1$) (\Sgmscan{flags (\Replicate{w 1})})}\;
+Qs = \Map{((i,k) $\rightarrow$ if (i == jmaxs[sgm\_inds[k]])\text{ then one else zero}) q\_lens (\Iota{w})}\tcc*{Initialize Qs}
+\tcc{Get max height}
+max\_height = \ReduceNormal{((x,y) $\rightarrow$ if (x > y) then x else y)) 0 heights}\;
+seq\_len = max\_height + 1\tcc*{Compute length of max tree height}
+total\_len = numAllOptions * seq\_len\tcc*{Copmute alphas length}
+alphas = \Replicate{total\_len 0}\tcc*{Init alphas array with 0s}
+\tcc{Init alphas array with initial alpha values on starting indexes for all options}
+alphas = \Scatter{alphas (\Map{($i \rightarrow i*\mathit{seq\_len}$) (\Iota{numAllOptions})}) yields}
+\end{algorithm}
+
+\newpage
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\caption{Futhark-flat - cont. 2\label{alg:futhark-flat2}}
+\SetKw{Map}{map}
+\SetKw{ReduceNormal}{reduce}
+\SetKw{Reduce}{reducePlus}
+\SetKw{Replicate}{replicate}
+\SetKw{Scatter}{scatter}
+\SetKw{Scan}{scanPlus}
+\SetKw{Sgmscan}{sgmscanPlus}
+\SetKw{Last}{last}
+\SetKw{Unzip}{unzip}
+\SetKw{Length}{length}
+\SetKw{Iota}{iota}
+\SetKw{KwFor}{for}
+\setcounter{AlgoLine}{21}
+
+\tcc{Forward propagation}
+\For{(Qs, alphas) \KwFor i < max\_height}{
+    \tcc{$f_2,f_3,f_4$ check for out-of-bounds on j-index and set 0s}
+    Qs = \Map{$f_2$ (Qs) (q\_lens) (\Iota{w})}\tcc*{Precompute Qexp on Qs array (uses sgm\_inds, seq\_len, alphas, other constants)}
+    Qs = \Map{$f_3$ q\_lens (\Iota{w})}\tcc*{Compute Qs in the next step}
+    tmpQs = \Map{$f_4$ q\_lens (\Iota{w})}\tcc*{Compute tmpQs for reduce}
+    alpha\_vals = \Sgmscan{flags tmpQs}\;
+    \;
+    \tcc{$f_5,f_6$ check for out-of-bounds on i-index and set 0s}
+    alpha\_vals = \Map{$f_5$ (\Iota{numAllOptions})}\tcc*{Compute alphas}
+    alpha\_indsp1 = \Map{$f_6$ (\Iota{numAllOptions})}\;
+    \tcc{Update alphas at next step}
+    alphas = \Scatter{alphas alpha\_indsp1 alpha\_vals}\;
+}\;
+\tcc{Backward propagation}
+Prices = \Map{$f_7$ (\Iota{w})}\tcc*{Init Prices to 100\textdollar}
+\For{(Prices) \KwFor $i=(\mathit{max\_height}-1)$ $\geq 0$}{
+    \tcc{$f_8$ check for out-of-bounds on j-index and sets 0s}
+    Prices = \Map{$f_8$ q\_lens (\Iota{w})}\tcc*{Compute Price at prev step}
+}\;
+\tcc{Get root inds and Prices}
+(inds, vals) = \Unzip (\Map{$f_9$ (iota numAllOptions)})\;
+\tcc{Scatter prices for all options}
+Prices = \Scatter{(\Replicate{numAllOptions 0}) inds vals}\;
+\;
+\Return{Prices} \tcc*{Return results for all options}
 \end{algorithm}
 
 \section{Validation}
 % validation on futhark-bench on the book example
-To validate the correctness of \textit{Futhark-flat}, we have used \textit{futhark-bench}, a built-in tool, which is the recommended way to benchmark Futhark programs. The code is compiled using the specified compiler and ran a specified number of times for each test case. The output is validated against the output files in the \textit{/out} folder, previously created by running the Sequential C++ implementation, described in chapter \ref{chapter:sequential}. The average runtime is also printed to the standard output. The options for running futhark-bench are specified directly inside the \textit{.fut} files, as e.g. the following snippet instructs futhark-bench the input and the output files to use when ran. \textit{Futhark-flat} has been successfully validated on all input data sets.  
-\begin{lstlisting}
--- ==
--- compiled input @ ../data/fut/0_UNIFORM.in
--- output @ ../data/out/0_UNIFORM.out
-\end{lstlisting}
+To validate the correctness of \textit{Futhark-flat}, we have used \textit{futhark-bench}, a built-in tool, which is the recommended way to benchmark Futhark programs. The code is compiled using the specified compiler and ran a specified number of times for each test case. The output is validated against the output files in the \textit{out} folder, previously created by running the Sequential C\texttt{++} implementation, described in chapter \ref{chapter:sequential}. The average runtime is also printed to the standard output. \textit{Futhark-flat} has been successfully validated on all input data sets.  
+
+\section{Comparison with CUDA-multi}
+\label{chapter:section:multiflatdifference}
+The core differences between \textit{CUDA-multi} and \textit{Futhark-flat} are (i) the number of options that can be priced in parallel and (ii) the arrangement of memory. While CUDA provides the concept of \textit{thread blocks}, where all threads in a single block are run on the same multiprocessor (hence allowing the use of \textit{shared thread memory} and \textit{register memory} for faster data access), Futhark operates on a larger granularity, thus is only able to operate with the much slower global memory. This difference makes it possible to derive a multiple options per thread block in CUDA, where a chunk of options can be priced in parallel, but not in Futhark. Despite that, both implementations operate on a flat list of options. Whether this list comprises of the number of options whose widths can fit in a CUDA block (1024), or of all options that were inputted, the flattening transformations of both versions remain semantically the same.
+
+When comparing the kernel function from \textit{CUDA-multi} with the \textit{trinomialFlat} function in \textit{Futhark-flat}, the first noticeable difference is the computation of option constants. While Futhark-flat computes constants for all options in one map operation and stores them in separate arrays in global memory, \textit{CUDA-multi} computes constants only for options in the current thread block (as intended) and stores them in fast thread registers.
+
+In CUDA's case, option constants could also be stored in shared memory to ease the register pressure in order to fit more blocks on SMs, but that would mean each memory access is always slower. On the other hand, we can also enforce a limit on the number of registers, but it might result in register spilling to slow global memory. However, spilled registers can still get cached in L1 cache which has the same speed as shared memory. We tried to experiment with putting the constants into shared memory and it indeed eased register pressure, but it also noticeably hurt the performance. Possible optimization in \textit{CUDA-multi} could be some combination of shared memory for rarely accessed constants and registers for frequently accessed ones.
+
+Another similar difference is in forward propagation, where \textit{CUDA-multi} stores temporary values \textit{tmpQs} in thread registers which results in much faster access.
+
 \section*{Summary}
-This chapter has provided an overview of our fully flattened parallel implementation using Futhark. It has started by introducing \textit{Futhark-basic}, a one-option per thread implementation in Futhark, created and used as a template to derive \textit{Futhark-flat}, together with the flattening transformations applied and the method we have used to validate its correctness. This concludes the last two algorithm implementations and leads to the the methodology and experiments performed in order to determine the pros and cons of each version and more importantly their performance.   
+This chapter has provided an overview of our fully flattened parallel implementation using Futhark. It has started by introducing \textit{Futhark-basic}, a one-option per thread implementation in Futhark, created and used as a template to derive \textit{Futhark-flat}, together with the flattening transformations applied and the method we have used to validate its correctness. At the end, it compared flattening implementation in \textit{Futhark-flat} with the one in \textit{CUDA-multi}. This concludes the last two algorithm implementations and leads to the methodology and experiments performed in order to determine the pros and cons of each version and more importantly their performance.  
 
 

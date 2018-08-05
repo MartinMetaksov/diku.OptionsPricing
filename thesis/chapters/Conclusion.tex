@@ -1,3 +1,25 @@
-\chapter{Conclusion} 
+\chapter{Conclusion}
 \label{Conclusion}
-print("hello world")
+This thesis has presented multiple different parallelization strategies for the Hull-White Single-Factor Model with the use of the trinomial trees numerical method. The main purpose of these implementations is to improve the model performance, by pricing as many options in as little time as possible. 
+
+We have presented a sequential implementation, serving as a proof-of-concept and used it for validating the correctness of our parallel approaches. We have shown two parallel one-option per thread implementations --- one in CUDA and another one in Futhark, exploiting only outer parallelism. We have demonstrated the steps applied to transform the one-option per thread version into a multiple options per thread block parallel version in CUDA, in an attempt to harness the possibilities of inner parallelism. We have also derived and presented a fully-flattened parallel approach written in Futhark, showing an important trade-off, that fully optimizing thread divergence comes with the price of degrading locality of reference.
+
+We have created 7 distinct datasets, and ran numerous experiments to highlight the impact of our implementations and we have achieved as much as \textasciitilde$529\times$ performance increase of \textit{CUDA-option} over the sequential implementation. These experiments have also validated our claims that there is no single implementation which works best for all data distributions, by demonstrating that \textit{CUDA-multi} can result in a speedup of \textasciitilde$2\times$ on skewed datasets and up to \textasciitilde$13\times$ on smaller datasets over \textit{CUDA-option}. We have demonstrated that optimizations such as memory coalescing, sorting and block size choices can have a high positive impact on the performance of the parallel implementations (both in terms of runtime and memory consumption). Despite that, we have also established that each of these optimizations comes with its trade-offs (e.g. coalescing improves the runtime, but also increases the memory consumption, smaller block sizes may result in block execution overhead, while larger block sizes may degrade thread divergence), which need to be considered. This has led up to the usefulness of dynamic analysis, which can be used to determine the optimal implementation based on the dataset.
+
+All code and datasets used in this project can be found on our public GitHub repository:
+\begin{center}
+\textbf{https://github.com/MartinMetaksov/diku.OptionsPricing}
+\end{center}
+
+% at the end answer the following questions
+% \textbf{What are the performance trade-offs for parallelizing the Hull-White Single-Factor Model on modern massively parallel hardware and which optimization techniques can yield performance benefits?}\\\\
+% \textbf{Which techniques for parallelism optimization work best for the different data classes and how do we combine all parallel versions into one program that provides high performance on all data sets?}
+
+\paragraph{Limitations and Future Work}
+Despite answering the research questions, further optimizations could be done to decrease the runtimes of our implementations even more. The primary example of this is \textit{CUDA-multi}, where option packing is not optimal and is done sequentially. As mentioned in chapter~\ref{section:cudamulti:preprocessing}, this is a combinatorial NP-hard problem, which can be researched separately. There is a high possibility that an optimized bin packing solution may have some impact on the overall performance of \textit{CUDA-multi}, making it a potential candidate for future improvements. 
+
+% we can measure skewness by some statistical measure (find some reference). We can also put this in the future works.
+Furthermore, we could derive an inspector/executor technique that chooses between the two of our fast parallel implementations --- \textit{CUDA-option} and \textit{CUDA-multi} based on the size, skewness and option widths of an input dataset.
+
+
+Finally, another downside was the lack of optimizations on \textit{Futhark-flat}. As mentioned in chapter~\ref{chapter:fullflattening}, height-size arrays are padded on global-level, potentially degrading the performance. While we still do not expect it to outperform \textit{CUDA-option}, we believe that fully optimizing this version can potentially lead to new discoveries. 

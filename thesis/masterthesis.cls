@@ -22,12 +22,21 @@
 \RequirePackage{listings}
 \RequirePackage{url}
 \RequirePackage{comment}
+\RequirePackage{csquotes}
 \RequirePackage[toc,page]{appendix}
 \RequirePackage[linesnumbered,ruled,commentsnumbered]{algorithm2e}
 \usepackage{caption}
 \usepackage[table,xcdraw]{xcolor}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{chngpage}
+\usepackage{textpos}
+\usepackage{csvsimple}
+
+% Sorting triangles
+\DeclareUnicodeCharacter{25B2}{$\blacktriangle$}
+\DeclareUnicodeCharacter{25BC}{$\blacktriangledown$}
 
 \RequirePackage{color}
 \definecolor{special}{rgb}{0.3, 0.3, 0.3}
@@ -40,7 +49,6 @@
 
 \RequirePackage{hyperref}
 \hypersetup{
-	linktocpage,
     colorlinks,
     citecolor=special,
     filecolor=black,
@@ -82,17 +90,18 @@
 	\addcontentsline{toc}{chapter}{\numberline{}Abstract}
 }
 
-% \newcommand{\acknowledgments}{
-%     \newpage
-% 	\chapter*{Acknowledgments}
-% 	\input{frontmatter/acknowledgments}
-% 	\addcontentsline{toc}{chapter}{\numberline{}Acknowledgments}
-% }
+\newcommand{\acknowledgments}{
+    \newpage
+	\chapter*{Acknowledgments}
+	\input{frontmatter/acknowledgments}
+	\addcontentsline{toc}{chapter}{\numberline{}Acknowledgments}
+}
 
 \newcommand{\contents}{
     \newpage
     \addcontentsline{toc}{chapter}{\numberline{}Contents}
     \setlength{\parskip}{0pt}
+    \setcounter{tocdepth}
     \tableofcontents
 }
 
@@ -184,4 +193,19 @@
             {\large \@date \par}
         \end{center}
     \end{titlepage}
+}
+
+% Appendix chapter
+\newcommand{\appchapter}[1]{%
+\newgeometry{top=3cm}
+  \begingroup
+    \let\@makechapterhead\@gobble
+    \pagestyle{fancy}
+    
+    \chapter{#1}
+    \begin{textblock*}{0cm}(0,-1cm)
+        \textbf{\Large{Appendix \Alph{chapter}. #1}}
+    \end{textblock*}
+  
+  \endgroup
 }
