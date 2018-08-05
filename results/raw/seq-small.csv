@@ -1,0 +1,25 @@
+file,precision,registers,version,block,sort,kernel time,total time,memory
+0_UNIFORM_1000,float,-,-,-,-,-,361135,-
+0_UNIFORM_1000,double,-,-,-,-,-,320725,-
+1_RAND_1000,float,-,-,-,-,-,11931297,-
+1_RAND_1000,double,-,-,-,-,-,9676919,-
+2_RANDCONSTHEIGHT_1000,float,-,-,-,-,-,862491,-
+2_RANDCONSTHEIGHT_1000,double,-,-,-,-,-,703398,-
+3_RANDCONSTWIDTH_1000,float,-,-,-,-,-,2267826,-
+3_RANDCONSTWIDTH_1000,double,-,-,-,-,-,2023095,-
+0_UNIFORM_10000,float,-,-,-,-,-,3563899,-
+0_UNIFORM_10000,double,-,-,-,-,-,3218152,-
+1_RAND_10000,float,-,-,-,-,-,116335989,-
+1_RAND_10000,double,-,-,-,-,-,93793864,-
+2_RANDCONSTHEIGHT_10000,float,-,-,-,-,-,8718504,-
+2_RANDCONSTHEIGHT_10000,double,-,-,-,-,-,7168232,-
+3_RANDCONSTWIDTH_10000,float,-,-,-,-,-,21462685,-
+3_RANDCONSTWIDTH_10000,double,-,-,-,-,-,19465381,-
+0_UNIFORM_30000,float,-,-,-,-,-,10656900,-
+0_UNIFORM_30000,double,-,-,-,-,-,9668099,-
+1_RAND_30000,float,-,-,-,-,-,345945099,-
+1_RAND_30000,double,-,-,-,-,-,280587995,-
+2_RANDCONSTHEIGHT_30000,float,-,-,-,-,-,26187373,-
+2_RANDCONSTHEIGHT_30000,double,-,-,-,-,-,21497153,-
+3_RANDCONSTWIDTH_30000,float,-,-,-,-,-,65593586,-
+3_RANDCONSTWIDTH_30000,double,-,-,-,-,-,59412900,-

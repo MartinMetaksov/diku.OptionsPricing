@@ -22,6 +22,7 @@ readFuthark <- function(file, real) {
 }
 
 title = "results"
+datasets.folder = "raw"
 datasets.names = c("CUDA-option", "CUDA-multi", "Futhark-basic", "Futhark-flat", "Sequential")
 datasets.files = c("option.csv", "multi.csv", "basic32.json", "basic64.json", "flat32.json", "flat64.json", "seq.csv")
 
@@ -30,7 +31,7 @@ n <- 1
 f <- 1
 data <- data.frame()
 while (n <= length(datasets.names)) {
-  file <- datasets.files[f]
+  file <- file.path(datasets.folder, datasets.files[f])
   name <- datasets.names[n]
   
   if (endsWith(file, "csv")) {
@@ -44,7 +45,8 @@ while (n <= length(datasets.names)) {
     data <- bind_rows(data, set)
     
     f <- f + 1
-    set <- readFuthark(datasets.files[f], "double")
+    file <- file.path(datasets.folder, datasets.files[f])
+    set <- readFuthark(file, "double")
     set$type <- name
     data <- bind_rows(data, set)
   }
@@ -148,16 +150,19 @@ mapFilesAxis <- function(d) {
             to=c("0 Uniform ", "1 Random ", "2 Random \nconst height ", "3 Random \nconst width ", "4 Skewed ", "5 Skewed \nconst height ", "6 Skewed \nconst width "))
 }
 
+mapFilesCSV <- function(d) {
+  mapvalues(d, from=c("0_UNIFORM", "1_RAND", "2_RANDCONSTHEIGHT", "3_RANDCONSTWIDTH", "4_SKEWED", "5_SKEWEDCONSTHEIGHT", "6_SKEWEDCONSTWIDTH"),
+            to=c("DAT 0", "DAT 1", "DAT 2", "DAT 3", "DAT 4", "DAT 5", "DAT 6"))
+}
+
 mapScale <- function(d, s) {
   round(s / d, 3)
 }
 
 makeBarPlot <- function(d, y, y_title, x_title, name, y_order = NA) {
-  d$float <- round(d$float, 3)
-  d$double <- round(d$double, 3)
   d$fileTitle <- mapFilesTitle(d$file)
   files <- split(d, d$file)
-  
+
   for (i in seq_along(files)) {
     title <- names(files)[i]
     plotTitle <- files[[i]]$fileTitle
@@ -216,10 +221,24 @@ makeBarPlotTypes <- function(d, title, name) {
   orca(p, paste(name, ".png", sep = ""), width = 2300, height = 2800)
 }
 
+writeCSV <- function(float, double, name) {
+  colnames(float) <- mapFilesCSV(colnames(float))
+  colnames(double) <- mapFilesCSV(colnames(double))
+  write.csv(float, file = paste(name, "-float.csv", sep = ""), row.names = F, quote=F)
+  write.csv(double, file = paste(name, "-double.csv", sep = ""), row.names = F, quote=F)
+}
+
 # CUDA-option
 plotCudaOptionBlocks <- function() {
   subset <- data[data$type == datasets.names[1], c(1,2,5,8)]
   cast <- dcast(subset, file + block ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, block ~ file, value.var = "float")
+  double <- dcast(cast, block ~ file, value.var = "double")
+  writeCSV(float, double, "option-blocks")
+  # printing plots
   cast$block <- paste(cast$block, " ", sep = "")
   makeBarPlot(cast, ~block, "Block size", "Time (sec)", "option-blocks")
 }
@@ -227,6 +246,13 @@ plotCudaOptionBlocks <- function() {
 plotCudaOptionVersions <- function() {
   subset <- data[data$type == datasets.names[1], c(1,2,4,8)]
   cast <- dcast(subset, file + version ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, version ~ file, value.var = "float")
+  double <- dcast(cast, version ~ file, value.var = "double")
+  writeCSV(float, double, "option-versions")
+  # printing plots
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Time (sec)", "option-versions")
 }
@@ -235,6 +261,13 @@ plotCudaOptionSorts <- function() {
   subset <- data[data$type == datasets.names[1], c(1,2,6,8)]
   subset$sort <- mapSort(subset$sort)
   cast <- dcast(subset, file + sort ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, sort ~ file, value.var = "float")
+  double <- dcast(cast, sort ~ file, value.var = "double")
+  writeCSV(float, double, "option-sorts")
+  # printing plots
   cast$sort <- paste(cast$sort, " ", sep = "")
   makeBarPlot(cast, ~sort, "Sorting", "Time (sec)", "option-sorts")
 }
@@ -242,14 +275,42 @@ plotCudaOptionSorts <- function() {
 plotCudaOptionVersionsMem <- function() {
   subset <- data[data$type == datasets.names[1], c(1,2,4,9)]
   cast <- dcast(subset, file + version ~ precision, value.var = "memory", mean)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, version ~ file, value.var = "float")
+  double <- dcast(cast, version ~ file, value.var = "double")
+  writeCSV(float, double, "mem-option-versions")
+  # printing plots
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-option-versions")
+}
+
+printCudaOptionSorts <- function() {
+  subset <- data[data$type == datasets.names[1], c(1,2,6,7,8)]
+  subset$prep <- (subset$total.time - subset$kernel.time) * 1000
+  subset <- subset[, c(1,2,3,6)]
+  subset$sort <- mapSort(subset$sort)
+  cast <- dcast(subset, file + sort ~ precision, value.var = "prep", mean)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, sort ~ file, value.var = "float")
+  double <- dcast(cast, sort ~ file, value.var = "double")
+  writeCSV(float, double, "option-sorts-prep")
 }
 
 # CUDA-multi
 plotCudaMultiBlocks <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,5,8)]
   cast <- dcast(subset, file + block ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, block ~ file, value.var = "float")
+  double <- dcast(cast, block ~ file, value.var = "double")
+  writeCSV(float, double, "multi-blocks")
+  # printing plots
   cast$block <- paste(cast$block, " ", sep = "")
   makeBarPlot(cast, ~block, "Block size", "Time (sec)", "multi-blocks")
 }
@@ -257,6 +318,13 @@ plotCudaMultiBlocks <- function() {
 plotCudaMultiVersions <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,4,8)]
   cast <- dcast(subset, file + version ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, version ~ file, value.var = "float")
+  double <- dcast(cast, version ~ file, value.var = "double")
+  writeCSV(float, double, "multi-versions")
+  # printing plots
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Time (sec)", "multi-versions")
 }
@@ -265,6 +333,13 @@ plotCudaMultiSorts <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,6,8)]
   subset$sort <- mapSort(subset$sort)
   cast <- dcast(subset, file + sort ~ precision, value.var = "total.time", min)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, sort ~ file, value.var = "float")
+  double <- dcast(cast, sort ~ file, value.var = "double")
+  writeCSV(float, double, "multi-sorts")
+  # printing plots
   cast$sort <- paste(cast$sort, " ", sep = "")
   makeBarPlot(cast, ~sort, "Sorting", "Time (sec)", "multi-sorts")
 }
@@ -272,8 +347,28 @@ plotCudaMultiSorts <- function() {
 plotCudaMultiVersionsMem <- function() {
   subset <- data[data$type == datasets.names[2], c(1,2,4,9)]
   cast <- dcast(subset, file + version ~ precision, value.var = "memory", mean)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, version ~ file, value.var = "float")
+  double <- dcast(cast, version ~ file, value.var = "double")
+  writeCSV(float, double, "mem-multi-versions")
+  # printing plots
   cast$version <- paste(cast$version, " ", sep = "")
   makeBarPlot(cast, ~version, "Version", "Memory (MB)", "mem-multi-versions")
+}
+
+printCudaMultiVersions <- function() {
+  subset <- data[data$type == datasets.names[2], c(1,2,4,7,8)]
+  subset$prep <- (subset$total.time - subset$kernel.time) * 1000
+  subset <- subset[, c(1,2,3,6)]
+  cast <- dcast(subset, file + version ~ precision, value.var = "prep", mean)
+  # printing tables
+  cast$float <- round(cast$float, 3)
+  cast$double <- round(cast$double, 3)
+  float <- dcast(cast, version ~ file, value.var = "float")
+  double <- dcast(cast, version ~ file, value.var = "double")
+  writeCSV(float, double, "multi-versions-prep")
 }
 
 plotTypes <- function() {
@@ -296,9 +391,13 @@ plotAll <- function() {
   plotCudaOptionVersions()
   plotCudaOptionSorts()
   plotCudaOptionVersionsMem()
+  printCudaOptionSorts()
+  
+  plotCudaMultiBlocks()
   plotCudaMultiVersions()
   plotCudaMultiSorts()
   plotCudaMultiVersionsMem()
+  printCudaMultiVersions()
   plotTypes()
   setwd("..")
 }

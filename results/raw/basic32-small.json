@@ -1,0 +1,126 @@
+{
+    "trinom-basic.fut": {
+        "datasets": {
+            "../data/fut/0_UNIFORM_1000.in": {
+                "runtimes": [
+                    12501,
+                    12498,
+                    12497,
+                    12511,
+                    12500
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND_1000.in": {
+                "runtimes": [
+                    1648756,
+                    1648973,
+                    1648856,
+                    1648789,
+                    1648651
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT_1000.in": {
+                "runtimes": [
+                    126021,
+                    122094,
+                    120382,
+                    120377,
+                    120369
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH_1000.in": {
+                "runtimes": [
+                    135696,
+                    130721,
+                    129721,
+                    130030,
+                    130208
+                ],
+                "stderr": ""
+            },
+            "../data/fut/0_UNIFORM_10000.in": {
+                "runtimes": [
+                    16606,
+                    16602,
+                    16607,
+                    16598,
+                    16625
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND_10000.in": {
+                "runtimes": [
+                    1925099,
+                    1924442,
+                    1925348,
+                    1925106,
+                    1923882
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT_10000.in": {
+                "runtimes": [
+                    151218,
+                    148798,
+                    148721,
+                    148816,
+                    148833
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH_10000.in": {
+                "runtimes": [
+                    180278,
+                    174869,
+                    174951,
+                    174905,
+                    174939
+                ],
+                "stderr": ""
+            },
+            "../data/fut/0_UNIFORM_30000.in": {
+                "runtimes": [
+                    49103,
+                    49058,
+                    48989,
+                    45128,
+                    45296
+                ],
+                "stderr": ""
+            },
+            "../data/fut/1_RAND_30000.in": {
+                "runtimes": [
+                    5615540,
+                    5614777,
+                    5613123,
+                    5612440,
+                    5611652
+                ],
+                "stderr": ""
+            },
+            "../data/fut/2_RANDCONSTHEIGHT_30000.in": {
+                "runtimes": [
+                    444816,
+                    446827,
+                    444150,
+                    446469,
+                    443670
+                ],
+                "stderr": ""
+            },
+            "../data/fut/3_RANDCONSTWIDTH_30000.in": {
+                "runtimes": [
+                    522789,
+                    522838,
+                    522897,
+                    522717,
+                    522904
+                ],
+                "stderr": ""
+            }
+        }
+    }
+}
