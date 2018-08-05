@@ -146,8 +146,8 @@ mapFilesTitle <- function(d) {
 }
 
 mapFilesAxis <- function(d) {
-  mapvalues(d, from=c("0_UNIFORM", "1_RAND", "2_RANDCONSTHEIGHT", "3_RANDCONSTWIDTH", "4_SKEWED", "5_SKEWEDCONSTHEIGHT", "6_SKEWEDCONSTWIDTH"),
-            to=c("0 Uniform ", "1 Random ", "2 Random \nconst height ", "3 Random \nconst width ", "4 Skewed ", "5 Skewed \nconst height ", "6 Skewed \nconst width "))
+  mapvalues(d, from=c("0_UNIFORM", "0_UNIFORM_1000", "0_UNIFORM_10000", "0_UNIFORM_30000", "1_RAND", "1_RAND_1000", "1_RAND_10000", "1_RAND_30000", "2_RANDCONSTHEIGHT", "2_RANDCONSTHEIGHT_1000", "2_RANDCONSTHEIGHT_10000", "2_RANDCONSTHEIGHT_30000", "3_RANDCONSTWIDTH", "3_RANDCONSTWIDTH_1000", "3_RANDCONSTWIDTH_10000", "3_RANDCONSTWIDTH_30000", "4_SKEWED", "5_SKEWEDCONSTHEIGHT", "6_SKEWEDCONSTWIDTH"),
+            to=c("0 Uniform ", "0 Uniform  1k ", "0 Uniform 10k ", "0 Uniform 30k ", "1 Random ", "1 Random  1k ", "1 Random 10k ", "1 Random 30k ", "2 Random \nconst height ", "2 Random \nconst height  1k ", "2 Random \nconst height 10k ", "2 Random \nconst height 30k ", "3 Random \nconst width ", "3 Random \nconst width  1k ", "3 Random \nconst width 10k ", "3 Random \nconst width 30k ", "4 Skewed ", "5 Skewed \nconst height ", "6 Skewed \nconst width "))
 }
 
 mapFilesCSV <- function(d) {
@@ -196,19 +196,23 @@ makeBarPlotTypes <- function(d, title, name) {
   d$CUDA.multi <- mapScale(d$CUDA.multi, d$Sequential)
   d$Futhark.basic <- mapScale(d$Futhark.basic, d$Sequential)
   d$Futhark.flat <- mapScale(d$Futhark.flat, d$Sequential)
+  d$CUDA.option.text <- paste(d$CUDA.option)
+  d$CUDA.multi.text <- paste(d$CUDA.multi)
+  d$Futhark.basic.text <- paste(d$Futhark.basic)
+  d$Futhark.flat.text <- paste(d$Futhark.flat)
   
   p <-
     plot_ly(d) %>%
-    add_trace(x = ~CUDA.option, y = ~file, type = 'bar', name = "CUDA-option", text = ~CUDA.option, textposition = "auto",
+    add_trace(x = ~CUDA.option, y = ~file, type = 'bar', name = "CUDA-option", text = ~CUDA.option.text, textposition = "auto",
               marker = list(color = 'rgb(102,194,165',
                             line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
-    add_trace(x = ~CUDA.multi, y = ~file, type = 'bar', name = "CUDA-multi", text = ~CUDA.multi, textposition = "auto",
+    add_trace(x = ~CUDA.multi, y = ~file, type = 'bar', name = "CUDA-multi", text = ~CUDA.multi.text, textposition = "auto",
               marker = list(color = 'rgb(252,141,98)',
                             line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
-    add_trace(x = ~Futhark.basic, y = ~file, type = 'bar', name = "Futhark-basic", text = ~Futhark.basic, textposition = "auto",
+    add_trace(x = ~Futhark.basic, y = ~file, type = 'bar', name = "Futhark-basic", text = ~Futhark.basic.text, textposition = "auto",
               marker = list(color = 'rgb(141,160,203)',
                             line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
-    add_trace(x = ~Futhark.flat, y = ~file, type = 'bar', name = "Futhark-flat", text = ~Futhark.flat, textposition = "auto",
+    add_trace(x = ~Futhark.flat, y = ~file, type = 'bar', name = "Futhark-flat", text = ~Futhark.flat.text, textposition = "auto",
               marker = list(color = 'rgb(231,138,195)',
                             line = list(color = 'rgb(8,48,107)', width = 0.7))) %>%
     layout(title = title,
@@ -372,7 +376,7 @@ printCudaMultiVersions <- function() {
 }
 
 plotTypes <- function() {
-  subset <- data[, c(1,2,8,10)]
+  subset <- data[data$file == "0_UNIFORM_1000" | data$file ==  "0_UNIFORM_10000" | data$file == "0_UNIFORM_30000" | data$file == "1_RAND_1000" | data$file == "1_RAND_10000" | data$file == "1_RAND_30000", c(1,2,8,10)]
   cast <- dcast(subset, file + type ~ precision, value.var = "total.time", min)
   
   float <- dcast(cast[, -3], file ~ type)
@@ -386,7 +390,7 @@ plotTypes <- function() {
 }
 
 plotAll <- function() {
-  setwd("plots")
+  setwd(paste(datasets.folder, "plots", sep = "-"))
   plotCudaOptionBlocks()
   plotCudaOptionVersions()
   plotCudaOptionSorts()
