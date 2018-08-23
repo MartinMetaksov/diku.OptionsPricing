@@ -83,11 +83,11 @@ let unzip10 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j (xs: [n](a,b,c,d,e,f,g,h,i,j)): ([
     let (is, js) = unzip ijs
     in (as, bs, cs, ds, es, fs, gs, hs, is, js)
 
--- | As `unzip10`@term, but with one more array.
-let unzip11 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k (xs: [n](a,b,c,d,e,f,g,h,i,j,k)): ([n]a, [n]b, [n]c, [n]d, [n]e, [n]f, [n]g, [n]h, [n]i, [n]j, [n]k) =
-    let (as, bs, cs, ds, es, fs, gs, hs, is, jks) = unzip10 (map (\(a,b,c,d,e,f,g,h,i,j,k) -> (a,b,c,d,e,f,g,h,i,(j,k))) xs)
-    let (js, ks) = unzip jks
-    in (as, bs, cs, ds, es, fs, gs, hs, is, js, ks)
+-- -- | As `unzip10`@term, but with one more array.
+-- let unzip11 [n] 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k (xs: [n](a,b,c,d,e,f,g,h,i,j,k)): ([n]a, [n]b, [n]c, [n]d, [n]e, [n]f, [n]g, [n]h, [n]i, [n]j, [n]k) =
+--     let (as, bs, cs, ds, es, fs, gs, hs, is, jks) = unzip10 (map (\(a,b,c,d,e,f,g,h,i,j,k) -> (a,b,c,d,e,f,g,h,i,(j,k))) xs)
+--     let (js, ks) = unzip jks
+--     in (as, bs, cs, ds, es, fs, gs, hs, is, js, ks)
 
 let sgmScanPlus [n] (flags: [n]i32) (data: [n]i32) : [n]i32 =
     (unzip (scan (\(x_flag,x) (y_flag,y) ->
@@ -261,7 +261,7 @@ let trinomialFlat [ycCount] [numAllOptions]
     (options : [numAllOptions]TOptionData) 
   : [numAllOptions]real = unsafe
     -- header: get the options
-    let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths, heights) = unzip11 (
+    let (Xs, ops, lens, tus, ns, dts, drs, Ms, jmaxs, widths) = unzip10 (
         map (\{StrikePrice, Maturity, Length, ReversionRateParameter, VolatilityParameter, TermUnit, TermStepCount, OptionType} ->
             let termUnit = ui2r TermUnit
             let termUnitsInYearCount = r2i (r_ceil(year / termUnit))
@@ -274,19 +274,15 @@ let trinomialFlat [ycCount] [numAllOptions]
             let M  = (r_exp (zero - a * dt)) - one
             let jmax = r2i (- 0.184 / M) + 1
             let width = 2 * jmax + 1
-            in  (StrikePrice, OptionType, Length, termUnit, n, dt, dr, M, jmax, width, n)
+            in  (StrikePrice, OptionType, Length, termUnit, n, dt, dr, M, jmax, width)
     ) options)
 
     -- make the flag array (probably useful for segmented scan/reduce operations)
     let scanned_lens = scan (+) 0 widths
-    let len_valinds = map2 (\m i -> 
-        if i == 0 then (0, m) 
-        else (scanned_lens[i-1], m)
-    ) widths (iota numAllOptions)
-
     let w = last scanned_lens
-    let (len_inds, len_vals) = unzip len_valinds
-    let flags = scatter (replicate w 0) len_inds len_vals
+    let len_inds = map (\i -> if i == 0 then 0 else scanned_lens[i-1]) (iota numAllOptions)
+    let flags = scatter (replicate w 0) len_inds widths
+
 
     -- make the flat segment-index array
     let sgm_inds = scatter (replicate w 0) len_inds (iota numAllOptions)
@@ -298,26 +294,28 @@ let trinomialFlat [ycCount] [numAllOptions]
 
     let Qs = map2 (\i k -> if i == jmaxs[sgm_inds[k]] then one else zero) q_lens (iota w)
 
-    let max_height = reduce (\x y -> i32.max x y) 0 heights
-    let seq_len = max_height + 1
-    let total_len = numAllOptions * seq_len
-    let alphas = replicate total_len zero
+    let max_height = reduce (\x y -> i32.max x y) 0 ns
+    let scanned_h_lens = scan (+) 0 (map (\h -> h+1) ns)
+    let h = last scanned_h_lens
+    let h_len_inds = map (\i -> if i == 0 then 0 else scanned_h_lens[i-1]) (iota numAllOptions)
+    
+    
+    let alphas = replicate h zero
     let alphas = scatter alphas
-        ( map (\i -> i*seq_len) (iota numAllOptions) )
+        h_len_inds
         ( map (\i -> getYieldAtYear dts[i] tus[i] h_YieldCurve) (iota numAllOptions) )
 
     -------------------------
     -- FORWARD PROPAGATION --
     -------------------------
-    let (_,alphas) = loop (Qs: *[w]real, alphas: *[total_len]real) for i < max_height do
+    let (_,alphas) = loop (Qs: *[w]real, alphas: *[h]real) for i < max_height do
         let jhighs = map (\jmax -> i32.min (i + 1) jmax) jmaxs
-
         -- Precompute Qexp
         let Qs = map3 (\q jind wind ->
             let opt_ind = sgm_inds[wind]
             let j = jind - jmaxs[opt_ind] in
                 if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
-                else q * r_exp (-(alphas[opt_ind * seq_len + i] + (i2r j) * drs[opt_ind]) * dts[opt_ind])
+                else q * r_exp (-(alphas[h_len_inds[opt_ind] + i] + (i2r j) * drs[opt_ind]) * dts[opt_ind])
         ) (Qs) (q_lens) (iota w)
 
         let Qs = map2 (\jind wind ->
@@ -346,8 +344,12 @@ let trinomialFlat [ycCount] [numAllOptions]
                 in (r_log (alpha_vals[scanned_lens[opt_ind]-1] / P) ) / dts[opt_ind]
         ) (iota numAllOptions)
 
-        let alpha_indvals = map (\opt_ind->opt_ind*seq_len + i + 1) (iota numAllOptions)
-        let alphas = scatter alphas alpha_indvals alpha_vals
+        let alpha_inds = map (\opt_ind -> 
+            if (i >= ns[opt_ind]) then -1 
+            else h_len_inds[opt_ind] + i + 1) 
+        (iota numAllOptions)
+
+        let alphas = scatter alphas alpha_inds alpha_vals
     in  (Qs,alphas)
 
     --------------------------
@@ -369,7 +371,7 @@ let trinomialFlat [ycCount] [numAllOptions]
                 else
                     let j = jind - jmaxs[opt_ind] in
                     if (j < (-jhighs[opt_ind])) || (j > jhighs[opt_ind]) then zero
-                    else bkwdHelper Xs[opt_ind] ops[opt_ind] Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[opt_ind*seq_len + i] callCopy jmaxs[opt_ind] j wind (i == (r2i (lens[opt_ind] / dts[opt_ind])))
+                    else bkwdHelper Xs[opt_ind] ops[opt_ind] Ms[opt_ind] drs[opt_ind] dts[opt_ind] alphas[h_len_inds[opt_ind] + i] callCopy jmaxs[opt_ind] j wind (i == (r2i (lens[opt_ind] / dts[opt_ind])))
             ) (q_lens) (iota w)
     in call
 
