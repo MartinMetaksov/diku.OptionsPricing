@@ -1,2 +1,2 @@
-# diku.OptionsPricing
-MSc thesis repo
+# Accelerated Interest Rate Option Pricing using Trinomial Trees
+Master thesis code repository
